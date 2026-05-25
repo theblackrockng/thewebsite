@@ -3,11 +3,11 @@ export const LOGO_URL = "https://customer-assets.emergentagent.com/job_fancy-upg
 export const BRAND = {
   name: "The BlackRock",
   tagline: "Lagos",
-  phone: "+234 803 615 3158",
-  phoneTel: "+2348036153158",
+  phone: "+234 805 523 8353",
+  phoneTel: "+2348055238353",
   email: "hello@theblackrock.ng",
-  whatsapp: "https://wa.me/2348036153158?text=Hello%20BlackRock%20Lagos%2C%20I%27d%20like%20to%20enquire%20about%20a%20reservation.",
-  address: "12 Ikeja GRA, Lagos, Nigeria",
+  whatsapp: "https://wa.me/2348055238353?text=Hello%20BlackRock%20Lagos%2C%20I%27d%20like%20to%20enquire%20about%20a%20reservation.",
+  address: "11 Ajao Road, off Adeniyi Road, Ikeja, Lagos, Nigeria",
   hours: [
     { day: "Monday – Thursday", time: "5:00 PM – 12:00 AM" },
     { day: "Friday – Saturday", time: "5:00 PM – 2:00 AM" },

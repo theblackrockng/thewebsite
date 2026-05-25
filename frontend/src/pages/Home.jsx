@@ -13,11 +13,25 @@ export default function Home() {
       {/* HERO */}
       <section className="relative h-screen min-h-[580px] md:min-h-[720px] w-full overflow-hidden" data-testid="hero-section">
         <div className="absolute inset-0">
+          {/* VIDEO HERO — to revert, swap the <video> block for the <img> below */}
+          <video
+            autoPlay
+            muted
+            loop
+            playsInline
+            poster={IMAGES.heroRooftop}
+            className="w-full h-full object-cover"
+          >
+            <source src="/blackrockrestaurant_n_lounge_1770636012_3828688686636248989_75801884820.mov" type="video/mp4" />
+            <source src="/blackrockrestaurant_n_lounge_1770636012_3828688686636248989_75801884820 2.mov" type="video/mp4" />
+          </video>
+          {/* REVERT: replace the <video> above with this <img> to go back to static hero:
           <img
             src={IMAGES.heroRooftop}
             alt="The BlackRock rooftop"
             className="w-full h-full object-cover ken-burns"
           />
+          */}
           {/* Strong layered overlays for legibility */}
           <div className="absolute inset-0 bg-[var(--charcoal)]/75" />
           <div className="absolute inset-0 bg-gradient-to-b from-[var(--charcoal)]/50 via-[var(--charcoal)]/60 to-[var(--charcoal)]" />
