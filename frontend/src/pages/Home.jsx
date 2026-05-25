@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Star, MapPin, Phone } from "lucide-react";
 import { IMAGES, BRAND, OCCASIONS } from "../lib/data";
 import SectionHeader from "../components/SectionHeader";
+import BrandMark from "../components/BrandMark";
 
 const occasionPreview = OCCASIONS.slice(0, 4);
 
@@ -10,7 +11,7 @@ export default function Home() {
   return (
     <div className="page-enter">
       {/* HERO */}
-      <section className="relative h-screen min-h-[720px] w-full overflow-hidden" data-testid="hero-section">
+      <section className="relative h-screen min-h-[580px] md:min-h-[720px] w-full overflow-hidden" data-testid="hero-section">
         <div className="absolute inset-0">
           <img
             src={IMAGES.heroRooftop}
@@ -22,11 +23,19 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-b from-[var(--charcoal)]/50 via-[var(--charcoal)]/60 to-[var(--charcoal)]" />
           <div className="absolute inset-0 bg-gradient-to-r from-[var(--charcoal)] via-[var(--charcoal)]/80 to-[var(--charcoal)]/40" />
         </div>
-        <div className="relative z-10 h-full flex flex-col justify-center px-6 md:px-16 max-w-[1440px] mx-auto">
+        <div className="relative z-10 h-full flex flex-col justify-center px-4 md:px-16 max-w-[1440px] mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.1, delay: 0.5 }}
+            className="mb-3"
+          >
+            <BrandMark variant="dark" size="hero" />
+          </motion.div>
           <motion.span
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.9, delay: 0.6 }}
+            transition={{ duration: 0.9, delay: 0.7 }}
             className="gold-line left mb-8"
           >
             Restaurant · Lounge · Rooftop
@@ -34,8 +43,8 @@ export default function Home() {
           <motion.h1
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 1, delay: 0.8 }}
-            className="font-serif-display text-[var(--warm-white)] text-5xl sm:text-6xl md:text-7xl lg:text-[112px] leading-[0.95] max-w-5xl drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
+            transition={{ duration: 1, delay: 0.9 }}
+            className="font-serif-display text-[var(--warm-white)] text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-[0.95] max-w-4xl drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
           >
             Lagos,<br />
             <span className="font-serif-italic text-[var(--gold)]">served right.</span>
@@ -47,7 +56,7 @@ export default function Home() {
             className="text-white/85 text-base md:text-lg font-light max-w-xl mt-8 leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
           >
             A restaurant, lounge and rooftop in the soul of Ikeja — where
-            jollof meets candlelight, and every evening tastes like home.
+            good food meets candlelight, and every evening tastes like home.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -78,35 +87,70 @@ export default function Home() {
         </div>
       </section>
 
-      {/* BRAND STATEMENT */}
-      <section className="bg-[var(--warm-white)] py-28 md:py-40 relative" data-testid="brand-statement">
-        <div className="max-w-5xl mx-auto px-6 md:px-12 text-center">
+      {/* FOOD SHOWCASE */}
+      <section className="bg-[var(--warm-white)] py-20 md:py-28 overflow-hidden" data-testid="brand-statement">
+        {/* Header */}
+        <div className="max-w-[1440px] mx-auto px-6 md:px-12 text-center mb-12">
           <motion.span
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
-            className="gold-line mb-10"
+            className="gold-line mb-6"
           >
-            Welcome
+            On The Table
           </motion.span>
           <motion.p
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: "-80px" }}
-            transition={{ duration: 1 }}
-            className="font-serif-display text-3xl md:text-5xl lg:text-6xl leading-[1.15] text-[var(--charcoal)] mt-6"
+            viewport={{ once: true }}
+            transition={{ duration: 0.9, delay: 0.2 }}
+            className="font-serif-display text-2xl md:text-4xl text-[var(--charcoal)] mt-5 leading-snug"
           >
             We built BlackRock for Lagos —
             <span className="font-serif-italic text-[var(--burgundy)]"> for nights that take their time.</span>
           </motion.p>
+        </div>
+
+        {/* Marquee strip — same as Instagram section */}
+        <div className="overflow-hidden">
+          <div className="flex marquee gap-3 w-max">
+            {[
+              IMAGES.jollof, IMAGES.starter, IMAGES.pepperSoup, IMAGES.noodles,
+              IMAGES.pasta, IMAGES.photo1, IMAGES.photo2, IMAGES.food3,
+              IMAGES.food4, IMAGES.food5, IMAGES.food7,
+              IMAGES.food12, IMAGES.food13,
+              IMAGES.food14, IMAGES.food15, IMAGES.food16,
+              IMAGES.jollof, IMAGES.starter, IMAGES.pepperSoup, IMAGES.noodles,
+              IMAGES.pasta, IMAGES.photo1, IMAGES.photo2, IMAGES.food3,
+              IMAGES.food4, IMAGES.food5, IMAGES.food7,
+              IMAGES.food12, IMAGES.food13,
+              IMAGES.food14, IMAGES.food15, IMAGES.food16,
+            ].map((src, i) => (
+              <div key={i} className="img-hover w-[160px] h-[160px] md:w-[240px] md:h-[240px] flex-shrink-0">
+                <img src={src} alt="BlackRock dish" loading="lazy" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* CTAs */}
+        <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <motion.div
-            initial={{ scaleY: 0 }}
-            whileInView={{ scaleY: 1 }}
+            initial={{ opacity: 0, y: 16 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ duration: 0.8, delay: 0.4 }}
-            className="w-px h-20 bg-[var(--gold)] mx-auto mt-14 origin-top"
-          />
+            transition={{ duration: 0.8, delay: 0.3 }}
+            className="flex flex-col sm:flex-row gap-4 justify-center mt-12"
+          >
+            <Link to="/menu" className="btn-burgundy">
+              <span>Explore Full Menu</span>
+              <ArrowRight size={14} />
+            </Link>
+            <Link to="/reservations" className="btn-outline-gold">
+              <span>Reserve a Table</span>
+            </Link>
+          </motion.div>
         </div>
       </section>
 
@@ -118,7 +162,7 @@ export default function Home() {
             title="Every night, a different kind of evening."
             subtitle="From quiet date nights to private dining for twenty — tell us why you're coming, and we'll build the night around it."
           />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mt-16">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mt-10 md:mt-16">
             {occasionPreview.map((o, i) => (
               <motion.div
                 key={o.id}
@@ -169,7 +213,7 @@ export default function Home() {
               Goat that falls off the bone. Suya the way Sabo intended.
               Our menu is a tour of Nigeria — cooked with respect, plated with pride.
             </p>
-            <div className="mt-10 grid grid-cols-3 gap-6 max-w-md">
+            <div className="mt-8 grid grid-cols-3 gap-4 md:gap-6 max-w-md">
               <div>
                 <div className="font-serif-display text-4xl text-[var(--burgundy)]">85+</div>
                 <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Dishes On Menu</div>

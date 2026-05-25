@@ -18,12 +18,12 @@ export default function Contact() {
   };
 
   return (
-    <div className="page-enter pt-24">
+    <div className="page-enter pt-20 md:pt-28 lg:pt-36">
       {/* Header */}
       <section className="bg-[var(--warm-white)] pt-16 pb-12 md:pt-24" data-testid="contact-header">
         <div className="max-w-[1200px] mx-auto px-6 md:px-12 text-center">
           <span className="gold-line">Contact</span>
-          <h1 className="font-serif-display text-5xl md:text-7xl lg:text-8xl leading-[0.95] mt-8 text-[var(--charcoal)]">
+          <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--charcoal)]">
             Say <span className="font-serif-italic text-[var(--burgundy)]">hello.</span>
           </h1>
           <p className="text-[var(--muted)] mt-8 max-w-xl mx-auto font-light text-base md:text-lg">
@@ -50,7 +50,7 @@ export default function Contact() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: i * 0.08 }}
-              className="block p-8 bg-[var(--cream)] hover:bg-[var(--charcoal)] hover:text-[var(--warm-white)] transition-all duration-500 group"
+              className="block p-5 md:p-8 bg-[var(--cream)] hover:bg-[var(--charcoal)] hover:text-[var(--warm-white)] transition-all duration-500 group"
               data-testid={`contact-${c.label.toLowerCase()}`}
             >
               <div className="flex items-start justify-between mb-8">
@@ -58,7 +58,7 @@ export default function Contact() {
                 <span className="text-[10px] uppercase tracking-[0.28em] opacity-50">{c.tag}</span>
               </div>
               <div className="text-xs uppercase tracking-[0.28em] opacity-60 mb-2">{c.label}</div>
-              <div className="font-serif-display text-2xl">{c.value}</div>
+              <div className="font-serif-display text-lg md:text-2xl leading-snug">{c.value}</div>
             </motion.a>
           ))}
         </div>
@@ -161,7 +161,7 @@ export default function Contact() {
 
       {/* Map */}
       <section className="bg-[var(--charcoal)]" data-testid="contact-map">
-        <div className="w-full h-[450px] md:h-[560px]">
+        <div className="w-full h-[280px] md:h-[450px] lg:h-[560px]">
           <iframe
             title="The BlackRock Location"
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3963.0!2d3.3441!3d6.6019!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sIkeja+GRA+Lagos!5e0!3m2!1sen!2sng!4v0000000000"

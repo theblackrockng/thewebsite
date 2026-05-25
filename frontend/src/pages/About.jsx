@@ -30,7 +30,7 @@ export default function About() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.7 }}
-            className="font-serif-display text-[var(--warm-white)] text-5xl md:text-7xl lg:text-8xl leading-[0.95]"
+            className="font-serif-display text-[var(--warm-white)] text-3xl md:text-6xl lg:text-8xl leading-[0.95]"
           >
             Cut from <span className="font-serif-italic text-[var(--gold)]">black rock.</span>
           </motion.h1>

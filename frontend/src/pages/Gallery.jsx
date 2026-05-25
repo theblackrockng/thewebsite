@@ -29,12 +29,12 @@ export default function Gallery() {
   const filtered = filter === "All" ? galleryImages : galleryImages.filter(g => g.tag === filter);
 
   return (
-    <div className="page-enter pt-24">
+    <div className="page-enter pt-20 md:pt-28 lg:pt-36">
       {/* Header */}
       <section className="bg-[var(--warm-white)] pt-16 pb-12 md:pt-24" data-testid="gallery-header">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 text-center">
           <span className="gold-line">Gallery</span>
-          <h1 className="font-serif-display text-5xl md:text-7xl lg:text-8xl leading-[0.95] mt-8 text-[var(--charcoal)]">
+          <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--charcoal)]">
             A look <span className="font-serif-italic text-[var(--burgundy)]">inside.</span>
           </h1>
           <p className="text-[var(--muted)] mt-8 max-w-xl mx-auto font-light text-base md:text-lg">

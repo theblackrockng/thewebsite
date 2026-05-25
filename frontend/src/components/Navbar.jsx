@@ -31,10 +31,10 @@ export default function Navbar({ onReserveClick }) {
         style={{ backgroundColor: "var(--warm-white)" }}
         data-testid="navbar"
       >
-        <div className="max-w-[1440px] mx-auto px-6 md:px-12 flex items-center justify-between h-24 md:h-28">
+        <div className="max-w-[1440px] mx-auto px-4 md:px-12 flex items-center justify-between h-20 md:h-28 lg:h-36">
           {/* Logo */}
           <Link to="/" className="flex items-center gap-3" data-testid="logo-link">
-            <BrandMark variant="light" size="md" />
+            <BrandMark variant="light" size="md" className="!h-14 md:!h-24 lg:!h-32 w-auto" />
           </Link>
 
           {/* Desktop nav */}

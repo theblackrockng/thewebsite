@@ -11,10 +11,11 @@ import { LOGO_URL } from "../lib/data";
  */
 export default function BrandMark({ variant = "light", size = "md", className = "" }) {
   const sizes = {
-    sm: { img: "h-14", title: "text-3xl md:text-4xl", sub: "text-[10px]" },
-    md: { img: "h-16 md:h-20", title: "text-4xl md:text-5xl", sub: "text-[11px]" },
-    lg: { img: "h-24 md:h-28", title: "text-5xl md:text-6xl", sub: "text-xs" },
-    xl: { img: "h-28 md:h-32", title: "text-6xl md:text-7xl", sub: "text-sm" },
+    sm:   { img: "h-14",        title: "text-3xl md:text-4xl",           sub: "text-[10px]" },
+    md:   { img: "h-16 md:h-20",title: "text-4xl md:text-5xl",           sub: "text-[11px]" },
+    lg:   { img: "h-24 md:h-28",title: "text-5xl md:text-6xl",           sub: "text-xs" },
+    xl:   { img: "h-28 md:h-32",title: "text-6xl md:text-7xl",           sub: "text-sm" },
+    hero: { img: "h-36 md:h-44",title: "text-7xl sm:text-8xl md:text-9xl", sub: "text-base md:text-lg" },
   };
   const s = sizes[size] || sizes.md;
 
@@ -30,9 +31,10 @@ export default function BrandMark({ variant = "light", size = "md", className = 
   }
 
   // dark variant — text rendition
+  const isHero = size === "hero";
   return (
-    <span className={`brand-mark-text dark ${className}`} data-testid="brand-mark-dark">
-      <span className={`bm-title ${s.title}`}>The BlackRock</span>
+    <span className={`brand-mark-text dark size-${size} ${className}`} data-testid="brand-mark-dark">
+      <span className={`bm-title ${s.title}`}>{isHero ? "BLACKROCK" : "The BlackRock"}</span>
       <span className={`bm-sub ${s.sub}`}>LAGOS</span>
     </span>
   );

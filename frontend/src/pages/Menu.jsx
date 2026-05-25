@@ -24,12 +24,12 @@ export default function MenuPage() {
   const [active, setActive] = useState(categories[0]);
 
   return (
-    <div className="page-enter pt-24">
+    <div className="page-enter pt-20 md:pt-28 lg:pt-36">
       {/* Header */}
       <section className="bg-[var(--warm-white)] pt-16 pb-12 md:pt-24 md:pb-20" data-testid="menu-header">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 text-center">
           <span className="gold-line">Our Menu</span>
-          <h1 className="font-serif-display text-5xl md:text-7xl lg:text-8xl leading-[0.95] mt-8 text-[var(--charcoal)]">
+          <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--charcoal)]">
             What we'll <span className="font-serif-italic text-[var(--burgundy)]">cook for you.</span>
           </h1>
           <p className="text-[var(--muted)] mt-8 max-w-2xl mx-auto font-light text-base md:text-lg leading-relaxed">
@@ -41,7 +41,7 @@ export default function MenuPage() {
 
       {/* Category tabs */}
       <section
-        className="sticky top-24 md:top-28 z-30 backdrop-blur-md border-y border-[var(--border-soft)]"
+        className="sticky top-20 md:top-28 lg:top-36 z-30 backdrop-blur-md border-y border-[var(--border-soft)]"
         style={{ backgroundColor: "rgba(250, 248, 245, 0.95)" }}
         data-testid="menu-tabs"
       >
@@ -51,7 +51,7 @@ export default function MenuPage() {
               <button
                 key={cat}
                 onClick={() => setActive(cat)}
-                className={`flex-shrink-0 px-6 py-3 text-xs uppercase tracking-[0.28em] font-medium transition-all duration-300 border ${
+                className={`flex-shrink-0 px-4 py-2 md:px-6 md:py-3 text-xs uppercase tracking-[0.22em] font-medium transition-all duration-300 border ${
                   active === cat
                     ? "bg-[var(--charcoal)] text-[var(--warm-white)] border-[var(--charcoal)]"
                     : "bg-transparent text-[var(--charcoal)] border-[var(--border-soft)] hover:border-[var(--charcoal)]"
@@ -75,7 +75,7 @@ export default function MenuPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.5 }}
-              className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16"
+              className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16"
             >
               {/* Featured image */}
               <div className="lg:col-span-5 lg:sticky lg:top-44 self-start">
@@ -100,10 +100,10 @@ export default function MenuPage() {
                     data-testid={`menu-item-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <div className="flex items-baseline justify-between gap-6">
-                      <h3 className="font-serif-display text-2xl md:text-3xl text-[var(--charcoal)]">
+                      <h3 className="font-serif-display text-lg md:text-3xl text-[var(--charcoal)]">
                         {item.name}
                       </h3>
-                      <div className="font-serif-display text-xl md:text-2xl text-[var(--burgundy)] flex-shrink-0">
+                      <div className="font-serif-display text-base md:text-2xl text-[var(--burgundy)] flex-shrink-0">
                         {item.price}
                       </div>
                     </div>

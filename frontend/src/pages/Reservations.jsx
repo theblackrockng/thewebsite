@@ -48,12 +48,12 @@ export default function Reservations() {
   };
 
   return (
-    <div className="page-enter pt-24">
+    <div className="page-enter pt-20 md:pt-28 lg:pt-36">
       {/* Header */}
       <section className="bg-[var(--warm-white)] pt-12 pb-8 md:pt-20" data-testid="reservation-header">
         <div className="max-w-[1200px] mx-auto px-6 md:px-12 text-center">
           <span className="gold-line">Reserve</span>
-          <h1 className="font-serif-display text-5xl md:text-7xl lg:text-8xl leading-[0.95] mt-8 text-[var(--charcoal)]">
+          <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--charcoal)]">
             Tell us about <span className="font-serif-italic text-[var(--burgundy)]">your night.</span>
           </h1>
           <p className="text-[var(--muted)] mt-8 max-w-xl mx-auto font-light text-base md:text-lg leading-relaxed">
@@ -65,11 +65,11 @@ export default function Reservations() {
       <section className="bg-[var(--warm-white)] pb-24 md:pb-32">
         <div className="max-w-[1200px] mx-auto px-6 md:px-12">
           {/* Step indicator */}
-          <div className="flex items-center justify-center gap-4 mb-16">
+          <div className="flex items-center justify-center gap-3 mb-10 md:mb-16">
             {[1, 2, 3].map((s) => (
-              <div key={s} className="flex items-center gap-4">
+              <div key={s} className="flex items-center gap-3">
                 <div
-                  className={`w-8 h-8 flex items-center justify-center text-xs tracking-wider transition-all ${
+                  className={`w-7 h-7 md:w-8 md:h-8 flex items-center justify-center text-xs tracking-wider transition-all ${
                     step >= s
                       ? "bg-[var(--burgundy)] text-[var(--warm-white)]"
                       : "bg-transparent border border-[var(--border-soft)] text-[var(--muted)]"
@@ -105,7 +105,7 @@ export default function Reservations() {
                       className={`occasion-card text-left ${occasion === o.id ? "selected" : ""}`}
                       data-testid={`occasion-${o.id}`}
                     >
-                      <h3 className="font-serif-display text-2xl md:text-3xl mb-3">{o.label}</h3>
+                      <h3 className="font-serif-display text-lg md:text-3xl mb-2">{o.label}</h3>
                       <p className="text-xs leading-relaxed opacity-70">{o.note}</p>
                     </button>
                   ))}

@@ -7,7 +7,7 @@ export default function Footer() {
   return (
     <footer className="bg-[var(--charcoal)] text-[var(--warm-white)] relative grain" data-testid="footer">
       <div className="max-w-[1440px] mx-auto px-6 md:px-12 pt-20 pb-10">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-12">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12">
           {/* Brand */}
           <div className="md:col-span-5">
             <BrandMark variant="dark" size="lg" className="mb-8" />
