@@ -3,13 +3,26 @@ import { motion } from "framer-motion";
 import { Phone, Mail, MapPin, MessageCircle, Clock, Send, Check } from "lucide-react";
 import { BRAND } from "../lib/data";
 import SectionHeader from "../components/SectionHeader";
+import { supabase } from "../lib/supabase";
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState("");
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
+    setSendError("");
+    setSending(true);
+    const { error } = await supabase.from("enquiries").insert({
+      name: form.name,
+      email: form.email,
+      message: form.message,
+      status: "new",
+    });
+    setSending(false);
+    if (error) { setSendError("Something went wrong. Please try again or email us directly."); return; }
     setSent(true);
     setTimeout(() => {
       setSent(false);
@@ -146,13 +159,16 @@ export default function Contact() {
                   data-testid="contact-input-message"
                 />
               </div>
+              {sendError && (
+                <p className="text-sm text-red-400 border border-red-400/20 bg-red-400/5 px-4 py-3">{sendError}</p>
+              )}
               <button
                 type="submit"
-                disabled={sent}
+                disabled={sent || sending}
                 className="btn-burgundy"
                 data-testid="contact-submit"
               >
-                {sent ? (<><Check size={14} /> <span>Sent. We'll be in touch</span></>) : (<><Send size={14} /> <span>Send Message</span></>)}
+                {sent ? (<><Check size={14} /> <span>Sent. We'll be in touch</span></>) : sending ? (<><span>Sending...</span></>) : (<><Send size={14} /> <span>Send Message</span></>)}
               </button>
             </form>
           </div>

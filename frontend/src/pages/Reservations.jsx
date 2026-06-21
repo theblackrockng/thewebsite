@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Phone, MessageCircle, X, ArrowRight, ArrowLeft } from "lucide-react";
 import { OCCASIONS, BRAND, IMAGES } from "../lib/data";
+import { supabase } from "../lib/supabase";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -33,6 +34,8 @@ export default function Reservations() {
     celebratingWhat: "",
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (initialOcc) setOccasion(initialOcc);
@@ -43,8 +46,35 @@ export default function Reservations() {
 
   const handleChange = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError("");
+    setSubmitting(true);
+
+    const partyValue = form.party === "other" ? form.partyOther : form.party;
+    const notes = [
+      form.special,
+      form.whoseBirthday && `Birthday person: ${form.whoseBirthday}`,
+      form.ageTurning && `Turning: ${form.ageTurning}`,
+      form.companyName && `Company: ${form.companyName}`,
+      form.yearsAnniversary && `Years: ${form.yearsAnniversary}`,
+      form.celebratingWhat && `Celebrating: ${form.celebratingWhat}`,
+    ].filter(Boolean).join(" | ");
+
+    const { error } = await supabase.from("reservations").insert({
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+      date: form.date,
+      time: form.time,
+      party: String(partyValue),
+      occasion: selectedOcc?.label || occasion,
+      notes: notes || null,
+      status: "pending",
+    });
+
+    setSubmitting(false);
+    if (error) { setSubmitError("Something went wrong. Please try again or call us directly."); return; }
     setSubmitted(true);
   };
 
@@ -344,13 +374,16 @@ export default function Reservations() {
                   />
                 </div>
 
+                {submitError && (
+                  <p className="text-sm text-red-400 border border-red-400/20 bg-red-400/5 px-4 py-3 mb-2">{submitError}</p>
+                )}
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <button type="button" onClick={() => setStep(1)} className="btn-ghost-dark" data-testid="form-back">
                     <ArrowLeft size={14} /> Change occasion
                   </button>
-                  <button type="submit" className="btn-burgundy" data-testid="form-submit">
-                    <span>Confirm Reservation</span>
-                    <ArrowRight size={14} />
+                  <button type="submit" disabled={submitting} className="btn-burgundy" data-testid="form-submit">
+                    <span>{submitting ? "Sending..." : "Confirm Reservation"}</span>
+                    {!submitting && <ArrowRight size={14} />}
                   </button>
                 </div>
               </motion.form>
