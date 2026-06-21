@@ -6,7 +6,7 @@ import SectionHeader from "../components/SectionHeader";
 
 const values = [
   { num: "01", title: "Lagos on the plate", body: "Every dish on our menu traces back to a Nigerian market, a family kitchen, or a roadside that taught us how it should taste." },
-  { num: "02", title: "Hospitality with intention", body: "We don't believe in standard. Every guest, every table, every greeting — considered." },
+  { num: "02", title: "Hospitality with intention", body: "We don't believe in standard. Every guest, every table, every greeting, considered." },
   { num: "03", title: "A room that listens", body: "Acoustics built so you can hear your dinner companion. Lighting that flatters everyone. Music that knows when to lift." },
 ];
 
@@ -37,38 +37,66 @@ export default function About() {
         </div>
       </section>
 
-      {/* Opening statement */}
-      <section className="bg-[var(--warm-white)] py-24 md:py-36" data-testid="opening-statement">
-        <div className="max-w-4xl mx-auto px-6 md:px-12 text-center">
+      {/* Brand story */}
+      <section className="bg-[var(--charcoal)] py-24 md:py-36" data-testid="opening-statement">
+        <div className="max-w-3xl mx-auto px-6 md:px-12">
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 1 }}
-            className="font-serif-display text-3xl md:text-4xl lg:text-5xl leading-[1.2] text-[var(--charcoal)]"
+            className="font-serif-display text-3xl md:text-4xl lg:text-5xl leading-[1.2] text-[var(--warm-white)] text-center mb-16"
           >
-            We started with a quiet idea — that Lagos deserved a place to
-            <span className="font-serif-italic text-[var(--burgundy)]"> slow down in.</span>
-            <br />Not a club. Not a foreign restaurant. Somewhere that finally tasted like home.
+            BlackRock was born from a simple realization:
+            <span className="font-serif-italic text-[var(--gold)]"> great food deserves a great experience.</span>
           </motion.p>
+          <div className="space-y-8 text-[var(--muted)] text-base md:text-lg leading-relaxed font-light">
+            <motion.p initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.1 }}>
+              Our founder, Mr. Shegun Ogunsanya, traveled across different countries and dined in numerous restaurants. During those experiences, he discovered something remarkable. Many of the so-called international dishes were not necessarily better than the rich, flavorful meals we enjoy here at home. What often made the difference was the environment, the professionalism of the service, the ambience, and the attention to detail that made every guest feel valued.
+            </motion.p>
+            <motion.p initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.2 }}>
+              Inspired by this insight, BLACKROCK was created to offer the very best of both worlds: delicious local and continental cuisine served in a welcoming, elegant environment with exceptional customer service.
+            </motion.p>
+            <motion.p initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.3 }}>
+              At BLACKROCK, we believe that quality food begins with quality ingredients. Every meal is prepared using carefully selected natural ingredients, free from artificial additives, colors, and preservatives. Our ingredients are professionally sourced, tested, and transformed into memorable meals by trained culinary professionals in a well-organized kitchen.
+            </motion.p>
+            <motion.p initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.4 }}>
+              We are passionate about serving food that not only tastes exceptional but also supports the health and well-being of our guests. Generous portions, affordable pricing, and uncompromising quality are at the heart of everything we do.
+            </motion.p>
+            <motion.p initial={{ opacity: 0, y: 16 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.8, delay: 0.5 }}>
+              Whether you're dining with family, friends, colleagues, or simply treating yourself, BLACKROCK is a place where great food, excellent service, and a remarkable dining experience come together.
+            </motion.p>
+          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.9, delay: 0.6 }}
+            className="mt-16 pt-12 border-t border-[var(--gold)]/20 text-center"
+          >
+            <p className="font-serif-display text-2xl md:text-3xl lg:text-4xl text-[var(--warm-white)] leading-snug">
+              Clean food. Natural ingredients.<br />
+              <span className="font-serif-italic text-[var(--gold)]">Exceptional experience.</span>
+            </p>
+            <p className="text-[var(--muted)] text-sm uppercase tracking-[0.3em] mt-6">That's the BLACKROCK promise.</p>
+          </motion.div>
         </div>
       </section>
 
-      {/* Three spaces detailed */}
-      <section className="bg-[var(--cream)] py-24 md:py-36" data-testid="three-spaces-about">
+      {/* Two spaces detailed */}
+      <section className="bg-[var(--charcoal-soft)] py-24 md:py-36" data-testid="three-spaces-about">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <SectionHeader
-            kicker="Three Floors"
-            title="One destination, three moods."
+            kicker="Two Spaces"
+            title="One destination, two moods."
             align="left"
           />
           <div className="mt-16 space-y-24 md:space-y-32">
             {[
-            { img: IMAGES.interior1, name: "The Restaurant", floor: "Ground Floor", desc: "Forty seats, white linen, an open kitchen. Continental, traditional, and everything in between — from grilled T-bone to ofada and ayamase. This is where the night begins.", reverse: false },
-            { img: IMAGES.bar, name: "The Bush Bar", floor: "First Floor", desc: "Pepper soup steaming on the table. Palm wine pouring slowly. Asun smoking off the grill. The closest thing to a proper Lagos joint, set inside a serious kitchen.", reverse: true },
-            { img: IMAGES.rooftopNight, name: "The Rooftop", floor: "Top Floor", desc: "Open to the sky. Fire pits in the corners. The Ikeja skyline curling around you. Smaller plates, longer pours, conversations that stretch into morning.", reverse: false },
+            { img: IMAGES.interior1, name: "The Restaurant", floor: "Ground Floor", desc: "White linen, warm light, an open kitchen. Continental, traditional, and everything in between. From grilled T-bone to ofada and ayamase. The night begins here.", reverse: false },
+            { img: IMAGES.rooftopNight, name: "The Rooftop Lounge", floor: "Rooftop", desc: "Open to the sky. The Ikeja skyline curling around you. Smaller plates, longer pours, conversations that stretch into morning.", reverse: true },
             ].map((s, i) => (
-              <div key={s.name} className={`grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center ${s.reverse ? "" : ""}`}>
+              <div key={s.name} className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
                 <motion.div
                   initial={{ opacity: 0, x: s.reverse ? 30 : -30 }}
                   whileInView={{ opacity: 1, x: 0 }}
@@ -80,7 +108,7 @@ export default function About() {
                 </motion.div>
                 <div className={s.reverse ? "lg:order-1" : ""}>
                   <span className="gold-line left">{s.floor}</span>
-                  <h3 className="font-serif-display text-4xl md:text-5xl lg:text-6xl mt-6 text-[var(--charcoal)]">
+                  <h3 className="font-serif-display text-4xl md:text-5xl lg:text-6xl mt-6 text-[var(--warm-white)]">
                     {s.name}
                   </h3>
                   <p className="text-[var(--muted)] text-base md:text-lg leading-relaxed mt-6 font-light max-w-lg">
@@ -90,7 +118,7 @@ export default function About() {
                     <div className="font-serif-display text-6xl text-[var(--burgundy)] leading-none">0{i + 1}</div>
                     <div className="w-12 h-px bg-[var(--gold)]" />
                     <div className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">
-                      {i === 0 ? "Dinner from 5pm" : i === 1 ? "Open till 2am" : "Sunset onwards"}
+                      Open Daily from 10:00 AM
                     </div>
                   </div>
                 </div>
@@ -124,7 +152,7 @@ export default function About() {
       </section>
 
       {/* Social proof numbers */}
-      <section className="bg-[var(--warm-white)] py-24" data-testid="social-proof">
+      <section className="bg-[var(--charcoal)] py-24" data-testid="social-proof">
         <div className="max-w-[1200px] mx-auto px-6 md:px-12 grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
           {[
             { n: "4.9", l: "Google Rating" },

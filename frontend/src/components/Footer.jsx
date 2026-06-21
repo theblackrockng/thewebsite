@@ -12,11 +12,11 @@ export default function Footer() {
           <div className="md:col-span-5">
             <BrandMark variant="dark" size="lg" className="mb-8" />
             <p className="font-serif-italic text-xl text-[var(--gold)] leading-snug max-w-md mb-6">
-              "Lagos on a plate. Lagos in a glass. Lagos in the air."
+              "Flavor on a plate. Wine in the glass. Joy filling the air."
             </p>
             <p className="text-sm text-white/60 leading-relaxed max-w-md">
               A restaurant, lounge and rooftop in the heart of Ikeja. From jollof to T-bone,
-              pepper soup to palm wine — every flavour of Lagos, under one roof.
+              pepper soup to palm wine. Every flavour of Lagos, under one roof.
             </p>
           </div>
 
@@ -72,7 +72,7 @@ export default function Footer() {
 
         <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-white/40 tracking-wider">
-            © {new Date().getFullYear()} The BlackRock Lagos. All rights reserved.
+            © {new Date().getFullYear()} BLACKROCK. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
             <a href="#" className="text-white/60 hover:text-[var(--gold)] transition-colors" aria-label="Instagram">

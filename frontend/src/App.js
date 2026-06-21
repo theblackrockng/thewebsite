@@ -15,6 +15,7 @@ import MenuPage from "./pages/Menu";
 import Reservations from "./pages/Reservations";
 import Gallery from "./pages/Gallery";
 import Contact from "./pages/Contact";
+import Blog from "./pages/Blog";
 import ContentHub from "./pages/ContentHub";
 import ContentHubAsset from "./pages/ContentHubAsset";
 import ContentHubGuide from "./pages/ContentHubGuide";
@@ -70,6 +71,7 @@ function App() {
                     <Route path="/reservations" element={<Reservations />} />
                     <Route path="/gallery" element={<Gallery />} />
                     <Route path="/contact" element={<Contact />} />
+                    <Route path="/blog" element={<Blog />} />
                   </Routes>
                 </main>
                 <Footer />

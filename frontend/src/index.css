@@ -1,43 +1,43 @@
-@import url('https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:wght@300;400;500;600;700&family=Finger+Paint&family=Rubik+Dirt&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caveat+Brush&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Montserrat:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500;600;700&family=Rubik+Dirt&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-    --burgundy: #7a1c1c;
-    --burgundy-deep: #5a0f0f;
-    --gold: #c8a96e;
+    --burgundy: #8B1A2B;
+    --burgundy-deep: #6B1220;
+    --gold: #C9A84C;
     --gold-light: #e0c890;
-    --charcoal: #1a1a1a;
-    --charcoal-soft: #232323;
-    --warm-white: #faf8f5;
-    --cream: #f2ede6;
-    --muted: #888580;
-    --border-soft: #e0d9d0;
+    --charcoal: #0f0d0a;
+    --charcoal-soft: #1a1612;
+    --warm-white: #F5F0E8;
+    --cream: #141210;
+    --muted: #9C8E7A;
+    --border-soft: #2e2820;
 }
 
 @layer base {
     :root {
-        --background: 38 33% 97%;
-        --foreground: 0 0% 10%;
-        --card: 0 0% 100%;
-        --card-foreground: 0 0% 10%;
-        --popover: 0 0% 100%;
-        --popover-foreground: 0 0% 10%;
-        --primary: 0 62% 29%;
-        --primary-foreground: 38 33% 97%;
-        --secondary: 38 18% 92%;
-        --secondary-foreground: 0 0% 10%;
-        --muted: 38 18% 92%;
-        --muted-foreground: 36 4% 51%;
-        --accent: 38 33% 92%;
-        --accent-foreground: 0 0% 10%;
+        --background: 30 20% 4%;
+        --foreground: 38 30% 95%;
+        --card: 25 15% 8%;
+        --card-foreground: 38 30% 95%;
+        --popover: 25 15% 8%;
+        --popover-foreground: 38 30% 95%;
+        --primary: 350 67% 32%;
+        --primary-foreground: 38 30% 95%;
+        --secondary: 25 15% 10%;
+        --secondary-foreground: 38 30% 95%;
+        --muted: 25 15% 12%;
+        --muted-foreground: 30 14% 55%;
+        --accent: 25 15% 12%;
+        --accent-foreground: 38 30% 95%;
         --destructive: 0 84% 60%;
         --destructive-foreground: 0 0% 98%;
-        --border: 36 22% 85%;
-        --input: 36 22% 85%;
-        --ring: 0 62% 29%;
+        --border: 25 14% 14%;
+        --input: 25 14% 14%;
+        --ring: 350 67% 32%;
         --radius: 0.25rem;
     }
 }
@@ -52,10 +52,10 @@ html {
 
 body {
     margin: 0;
-    font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: 'Montserrat', 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
     font-weight: 400;
-    background: var(--warm-white);
-    color: var(--charcoal);
+    background: var(--charcoal);
+    color: var(--warm-white);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
@@ -79,7 +79,6 @@ h1, h2, h3, h4, h5, h6 {
     font-weight: 400;
 }
 
-/* Brush font — used for the BlackRock wordmark on dark backgrounds */
 .font-brush {
     font-family: 'Caveat Brush', cursive;
     font-weight: 400;
@@ -87,7 +86,6 @@ h1, h2, h3, h4, h5, h6 {
     line-height: 0.9;
 }
 
-/* Brand mark wordmark — text-based fallback for dark sections */
 .brand-mark-text {
     display: inline-flex;
     flex-direction: column;
@@ -97,18 +95,18 @@ h1, h2, h3, h4, h5, h6 {
 .brand-mark-text .bm-title {
     font-family: 'Caveat Brush', cursive;
     font-size: 2rem;
-    color: var(--burgundy);
+    color: var(--gold);
     letter-spacing: 0.01em;
     white-space: nowrap;
 }
 .brand-mark-text.dark .bm-title {
-    color: #f5e7e7;
+    color: var(--gold);
 }
 .brand-mark-text .bm-sub {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Montserrat', sans-serif;
     font-size: 0.65rem;
     letter-spacing: 0.32em;
     color: var(--gold);
@@ -120,7 +118,7 @@ h1, h2, h3, h4, h5, h6 {
     content: '';
     width: 14px;
     height: 1px;
-    background: var(--burgundy);
+    background: var(--gold);
     flex-shrink: 0;
 }
 .brand-mark-text.dark .bm-sub::before,
@@ -133,17 +131,15 @@ h1, h2, h3, h4, h5, h6 {
     50%       { transform: scale(1.08); }
 }
 
-/* Navbar wordmark — Finger Paint, zoom pulse, dark */
 .navbar-wordmark {
     font-family: 'Rubik Dirt', cursive;
     font-size: clamp(1.2rem, 2.5vw, 2rem);
-    color: var(--charcoal);
+    color: var(--gold);
     letter-spacing: 0.04em;
     animation: zoom-pulse 3s ease-in-out infinite;
     display: inline-block;
 }
 
-/* Hero size — Finger Paint font, zoom pulse */
 .brand-mark-text.size-hero {
     display: inline-flex;
     animation: zoom-pulse 3s ease-in-out infinite;
@@ -164,45 +160,40 @@ h1, h2, h3, h4, h5, h6 {
     letter-spacing: 0.42em;
 }
 
-/* Logo image (PNG with white bg) — knock out white via multiply on light bg */
 .logo-img-light {
     mix-blend-mode: multiply;
 }
 
-/* Custom selection */
 ::selection {
     background: var(--burgundy);
     color: var(--warm-white);
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
 }
 ::-webkit-scrollbar-track {
-    background: var(--cream);
+    background: var(--charcoal);
 }
 ::-webkit-scrollbar-thumb {
-    background: var(--charcoal);
+    background: var(--charcoal-soft);
     border-radius: 0;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: var(--burgundy);
+    background: var(--gold);
 }
 
-/* Custom cursor for interactive elements */
 .cursor-elegant {
     cursor: pointer;
 }
 
-/* Decorative gold line */
 .gold-line {
     display: inline-flex;
     align-items: center;
     gap: 12px;
     color: var(--gold);
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Montserrat', sans-serif;
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.32em;
@@ -219,7 +210,6 @@ h1, h2, h3, h4, h5, h6 {
 .gold-line.left::before { display: none; }
 .gold-line.right::after { display: none; }
 
-/* Grain overlay for textured feel */
 .grain {
     position: relative;
 }
@@ -233,21 +223,20 @@ h1, h2, h3, h4, h5, h6 {
     mix-blend-mode: overlay;
 }
 
-/* Premium button */
 .btn-burgundy {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
     padding: 14px 32px;
-    background: var(--burgundy);
-    color: var(--warm-white);
-    font-family: 'DM Sans', sans-serif;
+    background: var(--gold);
+    color: var(--charcoal);
+    font-family: 'Montserrat', sans-serif;
     font-size: 12px;
-    font-weight: 500;
+    font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.22em;
-    border: 1px solid var(--burgundy);
+    border: 1px solid var(--gold);
     position: relative;
     overflow: hidden;
     transition: color 280ms ease, border-color 280ms ease;
@@ -256,13 +245,13 @@ h1, h2, h3, h4, h5, h6 {
     content: '';
     position: absolute;
     inset: 0;
-    background: var(--charcoal);
+    background: var(--warm-white);
     transform: translateY(100%);
     transition: transform 380ms cubic-bezier(0.65, 0, 0.35, 1);
     z-index: 0;
 }
 .btn-burgundy:hover::before { transform: translateY(0); }
-.btn-burgundy:hover { border-color: var(--charcoal); }
+.btn-burgundy:hover { border-color: var(--warm-white); color: var(--charcoal); }
 .btn-burgundy > * { position: relative; z-index: 1; }
 
 .btn-outline-gold {
@@ -272,48 +261,47 @@ h1, h2, h3, h4, h5, h6 {
     gap: 10px;
     padding: 14px 32px;
     background: transparent;
-    color: var(--gold);
-    font-family: 'DM Sans', sans-serif;
+    color: var(--warm-white);
+    font-family: 'Montserrat', sans-serif;
     font-size: 12px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.22em;
-    border: 1px solid var(--gold);
+    border: 1px solid rgba(245,240,232,0.5);
     position: relative;
     overflow: hidden;
-    transition: color 280ms ease;
+    transition: color 280ms ease, border-color 280ms ease;
 }
 .btn-outline-gold::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: var(--gold);
+    background: var(--warm-white);
     transform: scaleY(0);
     transform-origin: bottom;
     transition: transform 380ms cubic-bezier(0.65, 0, 0.35, 1);
     z-index: 0;
 }
 .btn-outline-gold:hover::before { transform: scaleY(1); }
-.btn-outline-gold:hover { color: var(--charcoal); }
+.btn-outline-gold:hover { color: var(--charcoal); border-color: var(--warm-white); }
 .btn-outline-gold > * { position: relative; z-index: 1; }
 
 .btn-ghost-dark {
     display: inline-flex;
     align-items: center;
     gap: 10px;
-    color: var(--charcoal);
-    font-family: 'DM Sans', sans-serif;
+    color: var(--warm-white);
+    font-family: 'Montserrat', sans-serif;
     font-size: 12px;
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.22em;
     padding-bottom: 4px;
-    border-bottom: 1px solid var(--charcoal);
-    transition: gap 280ms ease, border-color 280ms ease;
+    border-bottom: 1px solid rgba(245,240,232,0.3);
+    transition: gap 280ms ease, border-color 280ms ease, color 280ms ease;
 }
-.btn-ghost-dark:hover { gap: 18px; border-bottom-color: var(--burgundy); color: var(--burgundy); }
+.btn-ghost-dark:hover { gap: 18px; border-bottom-color: var(--gold); color: var(--gold); }
 
-/* Reveal animations */
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(24px); }
     to { opacity: 1; transform: translateY(0); }
@@ -333,22 +321,19 @@ h1, h2, h3, h4, h5, h6 {
 .reveal-delay-3 { animation-delay: 0.45s; }
 .reveal-delay-4 { animation-delay: 0.6s; }
 
-/* Ken burns / slow pan effect for hero */
 .ken-burns {
     animation: slowPan 16s ease-in-out infinite alternate;
 }
 
-/* Marquee for instagram strip */
 @keyframes marquee {
     0% { transform: translateX(0); }
     100% { transform: translateX(-50%); }
 }
 .marquee { animation: marquee 40s linear infinite; }
 
-/* Underline hover for nav links */
 .nav-link {
     position: relative;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Montserrat', sans-serif;
     font-size: 12px;
     font-weight: 500;
     text-transform: uppercase;
@@ -374,15 +359,15 @@ h1, h2, h3, h4, h5, h6 {
     transform: scaleX(1);
     transform-origin: left;
 }
+.nav-link:hover { color: var(--gold); }
 .nav-link.active { color: var(--gold); }
 
 .nav-link-dark {
-    color: var(--charcoal);
+    color: var(--warm-white);
 }
-.nav-link-dark.active { color: var(--burgundy); }
-.nav-link-dark::after { background: var(--burgundy); }
+.nav-link-dark.active { color: var(--gold); }
+.nav-link-dark::after { background: var(--gold); }
 
-/* Image hover lift */
 .img-hover {
     overflow: hidden;
     position: relative;
@@ -396,7 +381,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .img-hover:hover img { transform: scale(1.06); }
 
-/* Section dividers */
 .section-divider {
     width: 1px;
     height: 64px;
@@ -406,23 +390,22 @@ h1, h2, h3, h4, h5, h6 {
     animation: fadeIn 1.2s ease-out both;
 }
 
-/* Form inputs (light) */
 .tbr-input {
     width: 100%;
     background: transparent;
     border: none;
     border-bottom: 1px solid var(--border-soft);
     padding: 14px 0;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Montserrat', sans-serif;
     font-size: 14px;
-    color: var(--charcoal);
+    color: var(--warm-white);
     outline: none;
     transition: border-color 220ms ease;
 }
-.tbr-input:focus { border-bottom-color: var(--burgundy); }
+.tbr-input:focus { border-bottom-color: var(--gold); }
 .tbr-input::placeholder { color: var(--muted); font-weight: 300; }
 .tbr-label {
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Montserrat', sans-serif;
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.28em;
@@ -431,37 +414,36 @@ h1, h2, h3, h4, h5, h6 {
     margin-bottom: 4px;
 }
 
-/* Occasion card */
 .occasion-card {
     position: relative;
-    background: var(--warm-white);
+    background: var(--charcoal-soft);
     border: 1px solid var(--border-soft);
     padding: 28px 24px;
     cursor: pointer;
     transition: all 380ms cubic-bezier(0.2, 0.7, 0.2, 1);
     overflow: hidden;
+    color: var(--warm-white);
 }
 .occasion-card::before {
     content: '';
     position: absolute;
     left: 0; top: 0; bottom: 0;
     width: 2px;
-    background: var(--burgundy);
+    background: var(--gold);
     transform: scaleY(0);
     transform-origin: bottom;
     transition: transform 380ms cubic-bezier(0.65, 0, 0.35, 1);
 }
 .occasion-card:hover,
 .occasion-card.selected {
-    background: var(--charcoal);
+    background: var(--burgundy);
     color: var(--warm-white);
-    border-color: var(--charcoal);
+    border-color: var(--burgundy);
     transform: translateY(-4px);
 }
 .occasion-card:hover::before,
 .occasion-card.selected::before { transform: scaleY(1); }
 
-/* Floating WhatsApp button */
 .float-wa {
     position: fixed;
     bottom: 28px;
@@ -480,22 +462,20 @@ h1, h2, h3, h4, h5, h6 {
 }
 .float-wa:hover { transform: scale(1.08) rotate(-6deg); }
 
-/* Reservation modal sheet */
 .sheet-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(10, 10, 10, 0.7);
-    backdrop-filter: blur(6px);
+    background: rgba(10, 10, 10, 0.8);
+    backdrop-filter: blur(8px);
     z-index: 70;
     animation: fadeIn 320ms ease both;
 }
 
-/* Custom checkbox - subtle */
 input[type='checkbox'].tbr-cb {
     appearance: none;
     width: 16px;
     height: 16px;
-    border: 1px solid var(--charcoal);
+    border: 1px solid var(--border-soft);
     background: transparent;
     display: inline-block;
     vertical-align: middle;
@@ -503,24 +483,22 @@ input[type='checkbox'].tbr-cb {
     cursor: pointer;
 }
 input[type='checkbox'].tbr-cb:checked {
-    background: var(--burgundy);
-    border-color: var(--burgundy);
+    background: var(--gold);
+    border-color: var(--gold);
 }
 input[type='checkbox'].tbr-cb:checked::after {
     content: '';
     position: absolute;
     left: 4px; top: 0px;
     width: 5px; height: 9px;
-    border: solid white;
+    border: solid var(--charcoal);
     border-width: 0 1.5px 1.5px 0;
     transform: rotate(45deg);
 }
 
-/* Hide scrollbar on horizontal scroll containers */
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 
-/* Image vignette */
 .vignette {
     position: relative;
 }
@@ -532,9 +510,14 @@ input[type='checkbox'].tbr-cb:checked::after {
     pointer-events: none;
 }
 
-/* Page transitions */
 @keyframes pageEnter {
     from { opacity: 0; }
     to { opacity: 1; }
 }
 .page-enter { animation: pageEnter 600ms ease both; }
+
+/* Dark select/option override */
+select.tbr-input option {
+    background: var(--charcoal-soft);
+    color: var(--warm-white);
+}

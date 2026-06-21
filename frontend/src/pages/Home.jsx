@@ -13,7 +13,7 @@ export default function Home() {
       {/* HERO */}
       <section className="relative h-screen min-h-[580px] md:min-h-[720px] w-full overflow-hidden" data-testid="hero-section">
         <div className="absolute inset-0">
-          {/* VIDEO HERO — to revert, swap the <video> block for the <img> below */}
+          {/* VIDEO HERO - to revert, swap the <video> block for the <img> below */}
           <video
             autoPlay
             muted
@@ -58,10 +58,11 @@ export default function Home() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.9 }}
-            className="font-serif-display text-[var(--warm-white)] text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-[0.95] max-w-4xl drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
+            className="font-serif-display text-[var(--warm-white)] text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-[1.05] max-w-4xl drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
           >
-            Lagos,<br />
-            <span className="font-serif-italic text-[var(--gold)]">served right.</span>
+            Where exceptional food<br />
+            meets beautiful ambience,<br />
+            <span className="font-serif-italic text-[var(--gold)]">and every meal feels like home.</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -69,8 +70,7 @@ export default function Home() {
             transition={{ duration: 0.9, delay: 1.05 }}
             className="text-white/85 text-base md:text-lg font-light max-w-xl mt-8 leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
           >
-            A restaurant, lounge and rooftop in the soul of Ikeja — where
-            good food meets candlelight, and every evening tastes like home.
+            A restaurant and rooftop lounge in the heart of Ikeja. Quality ingredients, exceptional service, and a space where every guest feels valued.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -102,7 +102,7 @@ export default function Home() {
       </section>
 
       {/* FOOD SHOWCASE */}
-      <section className="bg-[var(--warm-white)] py-20 md:py-28 overflow-hidden" data-testid="brand-statement">
+      <section className="bg-[var(--charcoal)] py-20 md:py-28 overflow-hidden" data-testid="brand-statement">
         {/* Header */}
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 text-center mb-12">
           <motion.span
@@ -119,14 +119,14 @@ export default function Home() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.9, delay: 0.2 }}
-            className="font-serif-display text-2xl md:text-4xl text-[var(--charcoal)] mt-5 leading-snug"
+            className="font-serif-display text-2xl md:text-4xl text-[var(--warm-white)] mt-5 leading-snug"
           >
-            We built BlackRock for Lagos —
-            <span className="font-serif-italic text-[var(--burgundy)]"> for nights that take their time.</span>
+            Great food deserves
+            <span className="font-serif-italic text-[var(--burgundy)]"> a great experience.</span>
           </motion.p>
         </div>
 
-        {/* Marquee strip — same as Instagram section */}
+        {/* Marquee strip - same as Instagram section */}
         <div className="overflow-hidden">
           <div className="flex marquee gap-3 w-max">
             {[
@@ -169,12 +169,12 @@ export default function Home() {
       </section>
 
       {/* OCCASIONS PREVIEW */}
-      <section className="bg-[var(--cream)] py-24 md:py-32" data-testid="occasions-preview">
+      <section className="bg-[var(--charcoal-soft)] py-24 md:py-32" data-testid="occasions-preview">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <SectionHeader
             kicker="Made for moments"
             title="Every night, a different kind of evening."
-            subtitle="From quiet date nights to private dining for twenty — tell us why you're coming, and we'll build the night around it."
+            subtitle="From quiet date nights to private dining for twenty. Tell us why you're coming, and we'll build the night around it."
           />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mt-10 md:mt-16">
             {occasionPreview.map((o, i) => (
@@ -204,7 +204,7 @@ export default function Home() {
       </section>
 
       {/* SIGNATURE EXPERIENCE - SPLIT */}
-      <section className="bg-[var(--warm-white)] py-24 md:py-36" data-testid="signature-section">
+      <section className="bg-[var(--charcoal)] py-24 md:py-36" data-testid="signature-section">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           <motion.div
             initial={{ opacity: 0, x: -30 }}
@@ -217,7 +217,7 @@ export default function Home() {
           </motion.div>
           <div className="order-1 lg:order-2">
             <span className="gold-line left mb-6">The Kitchen</span>
-            <h2 className="font-serif-display text-4xl md:text-5xl lg:text-6xl leading-tight mt-6 text-[var(--charcoal)]">
+            <h2 className="font-serif-display text-4xl md:text-5xl lg:text-6xl leading-tight mt-6 text-[var(--warm-white)]">
               From Mile 12 to
               <br />
               <span className="font-serif-italic text-[var(--burgundy)]">your table.</span>
@@ -225,7 +225,7 @@ export default function Home() {
             <p className="text-[var(--muted)] text-base md:text-lg leading-relaxed mt-8 max-w-xl font-light">
               Jollof smoked over open fire. Pepper soup that clears the head.
               Goat that falls off the bone. Suya the way Sabo intended.
-              Our menu is a tour of Nigeria — cooked with respect, plated with pride.
+              Our menu is a tour of Nigeria, cooked with respect, plated with pride.
             </p>
             <div className="mt-8 grid grid-cols-3 gap-4 md:gap-6 max-w-md">
               <div>
@@ -248,20 +248,19 @@ export default function Home() {
         </div>
       </section>
 
-      {/* THREE SPACES */}
+      {/* TWO SPACES */}
       <section className="bg-[var(--charcoal)] text-[var(--warm-white)] py-24 md:py-36 grain relative" data-testid="three-spaces">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <SectionHeader
-            kicker="Three Spaces, One Address"
+            kicker="Two Spaces, One Address"
             title="Choose your evening."
-            subtitle="Each floor speaks in its own language. Pick the one that matches your mood."
+            subtitle="A restaurant downstairs, a rooftop lounge above. Two moods, one destination."
             dark
           />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-20">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-20">
             {[
-              { img: IMAGES.interior1, name: "The Restaurant", desc: "Continental and traditional. White linen, warm light, full flavours.", floor: "Ground" },
-              { img: IMAGES.bar, name: "The Bush Bar", desc: "Pepper soup, palm wine, asun off the grill — Lagos turnt up.", floor: "First Floor" },
-              { img: IMAGES.rooftopNight, name: "The Rooftop", desc: "Open sky, Ikeja skyline, fire pits, the night stretches long.", floor: "Top" },
+              { img: IMAGES.interior1, name: "The Restaurant", desc: "Continental and traditional. White linen, warm light, full flavours.", floor: "Ground Floor" },
+              { img: IMAGES.rooftopNight, name: "The Rooftop Lounge", desc: "Open sky, the Ikeja skyline around you. Good company, longer pours, the night stretches.", floor: "Rooftop" },
             ].map((s, i) => (
               <motion.div
                 key={s.name}
@@ -288,7 +287,7 @@ export default function Home() {
       </section>
 
       {/* TESTIMONIAL */}
-      <section className="bg-[var(--cream)] py-24 md:py-36" data-testid="testimonial-section">
+      <section className="bg-[var(--charcoal-soft)] py-24 md:py-36" data-testid="testimonial-section">
         <div className="max-w-4xl mx-auto px-6 md:px-12 text-center">
           <div className="flex justify-center gap-1 mb-8">
             {[...Array(5)].map((_, i) => (
@@ -300,9 +299,9 @@ export default function Home() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.9 }}
-            className="font-serif-italic text-3xl md:text-4xl lg:text-5xl leading-[1.25] text-[var(--charcoal)]"
+            className="font-serif-italic text-3xl md:text-4xl lg:text-5xl leading-[1.25] text-[var(--warm-white)]"
           >
-            "Best jollof in Ikeja — and I don't say that lightly. We came for dinner, stayed for the asun. Lagos at its finest."
+            "Best jollof in Ikeja, and I don't say that lightly. We came for dinner, stayed for the asun. Lagos at its finest."
           </motion.blockquote>
           <div className="mt-10 text-xs uppercase tracking-[0.32em] text-[var(--muted)]">
             Tomi A. · Google Review
@@ -311,7 +310,7 @@ export default function Home() {
       </section>
 
       {/* INSTAGRAM STRIP */}
-      <section className="bg-[var(--warm-white)] py-20 overflow-hidden" data-testid="instagram-strip">
+      <section className="bg-[var(--charcoal)] py-20 overflow-hidden" data-testid="instagram-strip">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 mb-12">
           <div className="flex items-end justify-between flex-wrap gap-4">
             <div>
@@ -340,7 +339,7 @@ export default function Home() {
             <h2 className="font-serif-display text-4xl md:text-5xl lg:text-6xl leading-tight mt-6">
               In the heart of
               <br />
-              <span className="font-serif-italic text-[var(--gold)]">Ikeja GRA.</span>
+              <span className="font-serif-italic text-[var(--gold)]">Ikeja.</span>
             </h2>
             <div className="mt-12 space-y-5">
               <div className="flex items-start gap-4">
@@ -360,7 +359,7 @@ export default function Home() {
             </div>
             <div className="mt-12 flex flex-wrap gap-4">
               <Link to="/reservations" className="btn-outline-gold" data-testid="location-reserve">Reserve a Table</Link>
-              <a href="https://maps.google.com/?q=Ikeja+GRA+Lagos" target="_blank" rel="noopener noreferrer" className="btn-ghost-dark text-[var(--gold)] border-[var(--gold)]" style={{borderBottomColor: "var(--gold)", color: "var(--gold)"}}>
+              <a href="https://maps.google.com/?q=11+Ajao+Road+Adeniyi+Jones+Ikeja+Lagos" target="_blank" rel="noopener noreferrer" className="btn-ghost-dark text-[var(--gold)] border-[var(--gold)]" style={{borderBottomColor: "var(--gold)", color: "var(--gold)"}}>
                 Get Directions <ArrowRight size={14} />
               </a>
             </div>

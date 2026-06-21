@@ -23,6 +23,7 @@ export default function Reservations() {
     date: today,
     time: "7:30 PM",
     party: 2,
+    partyOther: "",
     special: "",
     // dynamic
     whoseBirthday: "",
@@ -50,11 +51,11 @@ export default function Reservations() {
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
       {/* Header */}
-      <section className="bg-[var(--warm-white)] pt-12 pb-8 md:pt-20" data-testid="reservation-header">
+      <section className="bg-[var(--charcoal)] pt-12 pb-8 md:pt-20" data-testid="reservation-header">
         <div className="max-w-[1200px] mx-auto px-6 md:px-12 text-center">
           <span className="gold-line">Reserve</span>
-          <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--charcoal)]">
-            Tell us about <span className="font-serif-italic text-[var(--burgundy)]">your night.</span>
+          <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--warm-white)]">
+            Tell us about <span className="font-serif-italic text-[var(--gold)]">your night.</span>
           </h1>
           <p className="text-[var(--muted)] mt-8 max-w-xl mx-auto font-light text-base md:text-lg leading-relaxed">
             Every booking begins with an occasion. The night is shaped around it.
@@ -62,7 +63,7 @@ export default function Reservations() {
         </div>
       </section>
 
-      <section className="bg-[var(--warm-white)] pb-24 md:pb-32">
+      <section className="bg-[var(--charcoal)] pb-24 md:pb-32">
         <div className="max-w-[1200px] mx-auto px-6 md:px-12">
           {/* Step indicator */}
           <div className="flex items-center justify-center gap-3 mb-10 md:mb-16">
@@ -71,13 +72,13 @@ export default function Reservations() {
                 <div
                   className={`w-7 h-7 md:w-8 md:h-8 flex items-center justify-center text-xs tracking-wider transition-all ${
                     step >= s
-                      ? "bg-[var(--burgundy)] text-[var(--warm-white)]"
+                      ? "bg-[var(--gold)] text-[var(--charcoal)]"
                       : "bg-transparent border border-[var(--border-soft)] text-[var(--muted)]"
                   }`}
                 >
                   {step > s ? <Check size={14} /> : s}
                 </div>
-                {s < 3 && <div className={`w-12 h-px ${step > s ? "bg-[var(--burgundy)]" : "bg-[var(--border-soft)]"}`} />}
+                {s < 3 && <div className={`w-12 h-px ${step > s ? "bg-[var(--gold)]" : "bg-[var(--border-soft)]"}`} />}
               </div>
             ))}
           </div>
@@ -93,7 +94,7 @@ export default function Reservations() {
                 data-testid="step-occasion"
               >
                 <div className="text-center mb-12">
-                  <h2 className="font-serif-display text-3xl md:text-4xl text-[var(--charcoal)]">
+                  <h2 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
                     What are you celebrating?
                   </h2>
                 </div>
@@ -128,16 +129,16 @@ export default function Reservations() {
                   </div>
                   <div>
                     <span className="gold-line left">Concierge</span>
-                    <h2 className="font-serif-display text-4xl md:text-5xl mt-6 text-[var(--charcoal)]">
-                      This deserves a <span className="font-serif-italic text-[var(--burgundy)]">personal touch.</span>
+                    <h2 className="font-serif-display text-4xl md:text-5xl mt-6 text-[var(--warm-white)]">
+                      This deserves a <span className="font-serif-italic text-[var(--gold)]">personal touch.</span>
                     </h2>
                     <p className="text-[var(--muted)] mt-6 leading-relaxed font-light text-base md:text-lg">
-                      {selectedOcc.note} Speak with our host team — we'll arrange every detail, in private.
+                      {selectedOcc.note} Speak with our host team. We'll arrange every detail, in private.
                     </p>
                     <div className="mt-10 space-y-3">
                       <a
                         href={`tel:${BRAND.phoneTel}`}
-                        className="flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--charcoal)] transition-colors group"
+                        className="flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--gold)] transition-colors group"
                         data-testid="concierge-call"
                       >
                         <div className="flex items-center gap-4">
@@ -153,7 +154,7 @@ export default function Reservations() {
                         href={BRAND.whatsapp}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--charcoal)] transition-colors group"
+                        className="flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--gold)] transition-colors group"
                         data-testid="concierge-whatsapp"
                       >
                         <div className="flex items-center gap-4">
@@ -167,12 +168,12 @@ export default function Reservations() {
                       </a>
                       <button
                         onClick={() => setStep(2.5)}
-                        className="w-full flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--charcoal)] transition-colors group text-left"
+                        className="w-full flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--gold)] transition-colors group text-left"
                         data-testid="concierge-form"
                       >
                         <div>
                           <div className="text-xs uppercase tracking-[0.28em] text-[var(--muted)]">Or</div>
-                          <div className="font-serif-display text-xl">Send a brief — we'll call you back</div>
+                          <div className="font-serif-display text-xl">Send a brief. We'll call you back</div>
                         </div>
                         <ArrowRight size={16} className="text-[var(--muted)] group-hover:translate-x-1 transition-transform" />
                       </button>
@@ -199,7 +200,7 @@ export default function Reservations() {
                   <div className="text-xs uppercase tracking-[0.32em] text-[var(--burgundy)] mb-3">
                     {selectedOcc?.label}
                   </div>
-                  <h2 className="font-serif-display text-3xl md:text-4xl text-[var(--charcoal)]">
+                  <h2 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
                     {isConcierge ? "Tell us what you need" : "Your details"}
                   </h2>
                 </div>
@@ -253,7 +254,19 @@ export default function Reservations() {
                         {[1,2,3,4,5,6,7,8,9,10,12,15,20].map((n) => (
                           <option key={n} value={n}>{n} {n === 1 ? "guest" : "guests"}</option>
                         ))}
+                        <option value="other">More than 20 guests</option>
                       </select>
+                      {form.party === "other" && (
+                        <input
+                          type="number"
+                          min="21"
+                          className="tbr-input mt-3"
+                          placeholder="How many guests?"
+                          value={form.partyOther}
+                          onChange={(e) => handleChange("partyOther", e.target.value)}
+                          data-testid="input-party-other"
+                        />
+                      )}
                     </div>
                   )}
                   {!isConcierge && (
@@ -382,7 +395,7 @@ function SuccessModal({ form, occasion, onClose }) {
         className="fixed inset-0 z-[80] flex items-center justify-center p-4 pointer-events-none"
         data-testid="success-modal"
       >
-        <div className="bg-[var(--warm-white)] max-w-xl w-full pointer-events-auto relative overflow-hidden">
+        <div className="bg-[var(--charcoal)] max-w-xl w-full pointer-events-auto relative overflow-hidden">
           <div className="bg-[var(--charcoal)] p-10 md:p-14 text-center relative grain">
             <button
               onClick={onClose}
@@ -399,6 +412,7 @@ function SuccessModal({ form, occasion, onClose }) {
               className="w-16 h-16 rounded-full bg-[var(--gold)] flex items-center justify-center mx-auto mb-8"
             >
               <Check size={28} className="text-[var(--charcoal)]" strokeWidth={2.5} />
+
             </motion.div>
             <div className="gold-line mb-4">Confirmed</div>
             <h3 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
@@ -412,10 +426,10 @@ function SuccessModal({ form, occasion, onClose }) {
             <Row label="Occasion" value={occasion?.label || "Reservation"} />
             {form.date && <Row label="Date" value={new Date(form.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} />}
             {form.time && <Row label="Time" value={form.time} />}
-            {form.party && <Row label="Party" value={`${form.party} ${form.party == 1 ? "guest" : "guests"}`} />}
+            {form.party && <Row label="Party" value={form.party === "other" ? `${form.partyOther} guests` : `${form.party} ${form.party == 1 ? "guest" : "guests"}`} />}
             <Row label="Address" value={BRAND.address} />
           </div>
-          <div className="p-6 bg-[var(--cream)] text-center text-xs uppercase tracking-[0.28em] text-[var(--muted)]">
+          <div className="p-6 bg-[var(--charcoal-soft)] text-center text-xs uppercase tracking-[0.28em] text-[var(--muted)]">
             For changes, call <a href={`tel:${BRAND.phoneTel}`} className="text-[var(--burgundy)]">{BRAND.phone}</a>
           </div>
         </div>
@@ -428,7 +442,7 @@ function Row({ label, value }) {
   return (
     <div className="flex items-baseline justify-between gap-4 border-b border-[var(--border-soft)] pb-3">
       <div className="text-xs uppercase tracking-[0.28em] text-[var(--muted)]">{label}</div>
-      <div className="font-serif-display text-lg text-[var(--charcoal)] text-right">{value}</div>
+      <div className="font-serif-display text-lg text-[var(--warm-white)] text-right">{value}</div>
     </div>
   );
 }

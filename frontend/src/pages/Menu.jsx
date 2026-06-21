@@ -12,7 +12,7 @@ const imgByCat = {
   Salads: IMAGES.salad,
   Rice: IMAGES.jollof,
   Noodles: IMAGES.noodles,
-  "Bush Bar Kitchen": IMAGES.pepperSoup,
+  "Pepper Soup & Specials": IMAGES.pepperSoup,
   Continental: IMAGES.steak,
   Sauces: IMAGES.pasta,
   "Charcoal Grills": IMAGES.grill,
@@ -26,15 +26,15 @@ export default function MenuPage() {
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
       {/* Header */}
-      <section className="bg-[var(--warm-white)] pt-16 pb-12 md:pt-24 md:pb-20" data-testid="menu-header">
+      <section className="bg-[var(--charcoal)] pt-16 pb-12 md:pt-24 md:pb-20" data-testid="menu-header">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 text-center">
           <span className="gold-line">Our Menu</span>
-          <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--charcoal)]">
+          <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--warm-white)]">
             What we'll <span className="font-serif-italic text-[var(--burgundy)]">cook for you.</span>
           </h1>
           <p className="text-[var(--muted)] mt-8 max-w-2xl mx-auto font-light text-base md:text-lg leading-relaxed">
             Our menu shifts with the seasons and the markets. What follows is a
-            recent expression — your night may bring something new.
+            recent expression. Your night may bring something new.
           </p>
         </div>
       </section>
@@ -42,7 +42,7 @@ export default function MenuPage() {
       {/* Category tabs */}
       <section
         className="sticky top-20 md:top-28 lg:top-36 z-30 backdrop-blur-md border-y border-[var(--border-soft)]"
-        style={{ backgroundColor: "rgba(250, 248, 245, 0.95)" }}
+        style={{ backgroundColor: "rgba(15,13,10,0.96)" }}
         data-testid="menu-tabs"
       >
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
@@ -53,8 +53,8 @@ export default function MenuPage() {
                 onClick={() => setActive(cat)}
                 className={`flex-shrink-0 px-4 py-2 md:px-6 md:py-3 text-xs uppercase tracking-[0.22em] font-medium transition-all duration-300 border ${
                   active === cat
-                    ? "bg-[var(--charcoal)] text-[var(--warm-white)] border-[var(--charcoal)]"
-                    : "bg-transparent text-[var(--charcoal)] border-[var(--border-soft)] hover:border-[var(--charcoal)]"
+                    ? "bg-[var(--gold)] text-[var(--charcoal)] border-[var(--gold)]"
+                    : "bg-transparent text-[var(--muted)] border-[var(--border-soft)] hover:border-[var(--gold)] hover:text-[var(--warm-white)]"
                 }`}
                 data-testid={`menu-tab-${cat.toLowerCase()}`}
               >
@@ -66,7 +66,7 @@ export default function MenuPage() {
       </section>
 
       {/* Menu items */}
-      <section className="bg-[var(--warm-white)] py-20 md:py-28" data-testid="menu-items-section">
+      <section className="bg-[var(--charcoal)] py-20 md:py-28" data-testid="menu-items-section">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <AnimatePresence mode="wait">
             <motion.div
@@ -96,14 +96,14 @@ export default function MenuPage() {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: i * 0.08 }}
-                    className="py-8 border-b border-[var(--border-soft)] hover:bg-[var(--cream)]/40 transition-colors px-2 -mx-2"
+                    className="py-8 border-b border-[var(--border-soft)] hover:bg-[var(--charcoal-soft)]/40 transition-colors px-2 -mx-2"
                     data-testid={`menu-item-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                   >
-                    <div className="flex items-baseline justify-between gap-6">
-                      <h3 className="font-serif-display text-lg md:text-3xl text-[var(--charcoal)]">
+                    <div className="flex items-start justify-between gap-6">
+                      <h3 className="font-serif-display text-lg md:text-2xl text-[var(--warm-white)] leading-snug">
                         {item.name}
                       </h3>
-                      <div className="font-serif-display text-base md:text-2xl text-[var(--burgundy)] flex-shrink-0">
+                      <div className="flex-shrink-0 bg-[var(--gold)] text-[var(--charcoal)] font-sans font-bold text-sm md:text-base px-3 py-1 tracking-wide mt-1">
                         {item.price}
                       </div>
                     </div>
@@ -119,7 +119,7 @@ export default function MenuPage() {
       </section>
 
       {/* CTA */}
-      <section className="bg-[var(--cream)] py-24" data-testid="menu-cta">
+      <section className="bg-[var(--charcoal-soft)] py-24" data-testid="menu-cta">
         <div className="max-w-3xl mx-auto px-6 md:px-12 text-center">
           <SectionHeader
             kicker="Hungry?"

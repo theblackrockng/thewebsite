@@ -26,9 +26,12 @@ export default function Navbar({ onReserveClick }) {
     <>
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 border-b ${
-          scrolled ? "border-[var(--border-soft)] shadow-[0_8px_30px_rgba(0,0,0,0.06)]" : "border-transparent"
+          scrolled ? "border-[var(--border-soft)]" : "border-transparent"
         }`}
-        style={{ backgroundColor: "rgba(250,248,245,0.5)" }}
+        style={{
+          backgroundColor: scrolled ? "rgba(15,13,10,0.96)" : "transparent",
+          backdropFilter: scrolled ? "blur(12px)" : "none",
+        }}
         data-testid="navbar"
       >
         <div className="max-w-[1440px] mx-auto px-4 md:px-12 flex items-center justify-between h-20 md:h-28 lg:h-36">
@@ -45,7 +48,7 @@ export default function Navbar({ onReserveClick }) {
                 <Link
                   key={link.to}
                   to={link.to}
-                  className={`nav-link nav-link-dark ${active ? "active" : ""}`}
+                  className={`nav-link ${active ? "active" : ""}`}
                   data-testid={`nav-${link.label.toLowerCase()}`}
                 >
                   {link.label}
@@ -71,7 +74,7 @@ export default function Navbar({ onReserveClick }) {
             data-testid="mobile-menu-open"
             aria-label="Open menu"
           >
-            <Menu size={24} className="text-[var(--charcoal)]" />
+            <Menu size={24} className="text-[var(--warm-white)]" />
           </button>
         </div>
       </header>

@@ -34,8 +34,8 @@ export default function BrandMark({ variant = "light", size = "md", className = 
   const isHero = size === "hero";
   return (
     <span className={`brand-mark-text dark size-${size} ${className}`} data-testid="brand-mark-dark">
-      <span className={`bm-title ${s.title}`}>{isHero ? "BLACKROCK" : "The BlackRock"}</span>
-      {!isHero && <span className={`bm-sub ${s.sub}`}>LAGOS</span>}
+      <span className={`bm-title ${s.title}`}>BLACKROCK</span>
+      {!isHero && <span className={`bm-sub ${s.sub}`}>RESTAURANT & LOUNGE</span>}
     </span>
   );
 }

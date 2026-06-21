@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 
-export default function SectionHeader({ kicker, title, subtitle, align = "center", dark = false }) {
+export default function SectionHeader({ kicker, title, subtitle, align = "center", dark = true }) {
   const textAlign = align === "left" ? "text-left items-start" : "text-center items-center";
   const titleColor = dark ? "text-[var(--warm-white)]" : "text-[var(--charcoal)]";
   const subColor = dark ? "text-white/65" : "text-[var(--muted)]";
