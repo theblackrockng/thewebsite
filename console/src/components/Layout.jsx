@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
+  FileText, Users, UserCircle, Settings, Home, Search,
   Bell, Sun, Moon, LogOut, Menu, X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -13,11 +14,9 @@ function useTheme() {
     try { return localStorage.getItem("blackrock-theme") === "dark"; }
     catch { return false; }
   });
-
   useLayoutEffect(() => {
     document.documentElement.setAttribute("data-theme", isDark ? "dark" : "light");
   }, [isDark]);
-
   const toggleDark = useCallback(() => {
     setIsDark((prev) => {
       const next = !prev;
@@ -25,73 +24,150 @@ function useTheme() {
       return next;
     });
   }, []);
-
   return [isDark, toggleDark];
 }
 
-/* ─── Nav items ─── */
-const NAV_ITEMS = [
-  { to: "/",            label: "Dashboard",   icon: LayoutGrid },
-  { to: "/reservations",label: "Reservations",icon: CalendarDays,   badge: "pending" },
-  { to: "/enquiries",   label: "Enquiries",   icon: MessageSquare,  badge: "enquiries" },
-  { to: "/menu",        label: "Menu",        icon: UtensilsCrossed },
+/* ─── useCurrentPage ─── */
+function useCurrentPage() {
+  const { pathname } = useLocation();
+  const map = { "/": "Dashboard", "/reservations": "Reservations", "/menu": "Menu Editor", "/enquiries": "Enquiries" };
+  return map[pathname] ?? "Console";
+}
+
+/* ─── Nav groups ─── */
+const NAV_GROUPS = [
+  {
+    label: "Management",
+    items: [
+      { to: "/",             label: "Dashboard",    icon: LayoutGrid },
+      { to: "/reservations", label: "Reservations", icon: CalendarDays,   badge: "pending" },
+      { to: "/enquiries",    label: "Enquiries",    icon: MessageSquare,  badge: "enquiries" },
+    ],
+  },
+  {
+    label: "Content",
+    items: [
+      { to: "/menu", label: "Menu Editor",  icon: UtensilsCrossed },
+      { to: null,    label: "Content Hub",  icon: FileText },
+    ],
+  },
+  {
+    label: "People",
+    items: [
+      { to: null, label: "Staff Directory", icon: Users },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { to: null, label: "User Management", icon: UserCircle },
+      { to: null, label: "Settings",        icon: Settings },
+    ],
+  },
 ];
 
-/* ─── TopNavLink ─── */
-function TopNavLink({ item, pathname, pendingCount, newEnqCount, onClick }) {
+/* ─── NavItem ─── */
+function NavItem({ item, pathname, pendingCount, newEnqCount, onClick }) {
   const Icon = item.icon;
-  const active = pathname === item.to;
-  const badgeCount =
-    item.badge === "pending"   ? pendingCount :
-    item.badge === "enquiries" ? newEnqCount  : 0;
-  const isAmber = item.badge === "pending";
+  const active = item.to !== null && pathname === item.to;
+  const isLink = item.to !== null;
+
+  const badgeEl = (() => {
+    if (item.badge === "pending" && pendingCount > 0)
+      return <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 600, background: "rgba(245,158,11,0.15)", color: "#d97706", padding: "1px 6px", borderRadius: 99 }}>{pendingCount > 99 ? "99+" : pendingCount}</span>;
+    if (item.badge === "enquiries" && newEnqCount > 0)
+      return <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 600, background: "rgba(239,68,68,0.15)", color: "#ef4444", padding: "1px 6px", borderRadius: 99 }}>{newEnqCount > 99 ? "99+" : newEnqCount}</span>;
+    return null;
+  })();
+
+  const base = { display: "flex", alignItems: "center", gap: 9, borderRadius: 7, fontSize: 13, textDecoration: "none", userSelect: "none" };
+
+  if (active) {
+    return (
+      <Link to={item.to} onClick={onClick} style={{ ...base, padding: "8px 12px", background: "var(--ds-nav-active)", borderLeft: "3px solid var(--ds-gold)", color: "var(--ds-gold)", fontWeight: 500 }}>
+        <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />{item.label}{badgeEl}
+      </Link>
+    );
+  }
+
+  if (!isLink) {
+    return (
+      <div style={{ ...base, padding: "8px 12px 8px 15px", color: "var(--ds-muted)", cursor: "default", opacity: 0.6 }}>
+        <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />{item.label}{badgeEl}
+      </div>
+    );
+  }
 
   return (
     <Link
       to={item.to}
       onClick={onClick}
-      style={{
-        display: "flex", alignItems: "center", gap: 6,
-        padding: "6px 12px",
-        borderRadius: 7,
-        fontSize: 13,
-        fontWeight: active ? 500 : 400,
-        color: active ? "var(--ds-gold)" : "var(--ds-muted)",
-        background: active ? "var(--ds-nav-active)" : "transparent",
-        textDecoration: "none",
-        whiteSpace: "nowrap",
-        position: "relative",
-        flexShrink: 0,
-        border: active ? "1px solid rgba(200,169,110,0.18)" : "1px solid transparent",
-        transition: "background 0.12s, color 0.12s, border-color 0.12s",
-      }}
-      onMouseEnter={(e) => {
-        if (!active) {
-          e.currentTarget.style.background = "var(--ds-nav-active)";
-          e.currentTarget.style.color = "var(--ds-text)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!active) {
-          e.currentTarget.style.background = "transparent";
-          e.currentTarget.style.color = "var(--ds-muted)";
-        }
-      }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "var(--ds-nav-active)"; e.currentTarget.style.color = "var(--ds-text)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--ds-muted)"; }}
+      style={{ ...base, padding: "8px 12px 8px 15px", color: "var(--ds-muted)", background: "transparent" }}
     >
-      <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />
-      <span>{item.label}</span>
-      {badgeCount > 0 && (
-        <span style={{
-          fontSize: 9.5, fontWeight: 700, lineHeight: 1,
-          background: isAmber ? "rgba(245,158,11,0.15)" : "rgba(239,68,68,0.15)",
-          color: isAmber ? "#d97706" : "#ef4444",
-          padding: "2px 6px",
-          borderRadius: 99,
-        }}>
-          {badgeCount > 99 ? "99+" : badgeCount}
-        </span>
-      )}
+      <Icon size={15} strokeWidth={1.75} style={{ flexShrink: 0 }} />{item.label}{badgeEl}
     </Link>
+  );
+}
+
+/* ─── SidebarContent ─── */
+function SidebarContent({ pathname, pendingCount, newEnqCount, session, onNav }) {
+  const emailRaw = session?.user?.email ?? "";
+  const initials = emailRaw.slice(0, 2).toUpperCase() || "BK";
+  const displayName = emailRaw.split("@")[0] || "Admin";
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      {/* Wordmark */}
+      <div style={{ padding: "26px 20px 16px 24px" }}>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 21, fontWeight: 700, letterSpacing: "3.5px", color: "var(--ds-gold)", textTransform: "uppercase", lineHeight: 1 }}>
+          BLACKROCK
+        </div>
+        <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "2.2px", color: "var(--ds-muted)", textTransform: "uppercase", marginTop: 5 }}>
+          Admin Console
+        </div>
+      </div>
+
+      {/* Gold rule */}
+      <div style={{ height: 1, background: "linear-gradient(to right, var(--ds-gold), transparent)", margin: "0 0 16px 24px", width: "68%", opacity: 0.45 }} />
+
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: "0 12px", overflowY: "auto" }}>
+        {NAV_GROUPS.map((group) => (
+          <div key={group.label} style={{ marginBottom: 18 }}>
+            <div style={{ fontSize: 9, fontWeight: 600, letterSpacing: "2px", color: "var(--ds-muted)", textTransform: "uppercase", padding: "0 12px", marginBottom: 4 }}>
+              {group.label}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              {group.items.map((item) => (
+                <NavItem key={item.label} item={item} pathname={pathname} pendingCount={pendingCount} newEnqCount={newEnqCount} onClick={onNav} />
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {/* Admin chip at bottom */}
+      <div style={{ padding: "14px 16px", borderTop: "1px solid var(--ds-border)", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: "50%",
+          background: "rgba(200,169,110,0.15)",
+          border: "1.5px solid var(--ds-gold)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0,
+          fontSize: 11.5, fontWeight: 600, color: "var(--ds-gold)",
+        }}>
+          {initials}
+        </div>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ds-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {displayName}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--ds-muted)" }}>Administrator</div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -101,17 +177,12 @@ export default function Layout({ children }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [isDark, toggleDark] = useTheme();
-  const [pendingCount, setPendingCount]   = useState(0);
-  const [newEnqCount,  setNewEnqCount]    = useState(0);
-  const [clock, setClock]                 = useState("");
-  const [mobileOpen, setMobileOpen]       = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [newEnqCount, setNewEnqCount] = useState(0);
+  const [clock, setClock] = useState("");
+  const pageName = useCurrentPage();
 
-  /* Admin info derived from session */
-  const emailRaw    = session?.user?.email ?? "";
-  const initials    = emailRaw.slice(0, 2).toUpperCase() || "BK";
-  const displayName = emailRaw.split("@")[0] || "Admin";
-
-  /* Fetch badge counts */
   useEffect(() => {
     async function fetchCounts() {
       const [r1, r2] = await Promise.all([
@@ -124,7 +195,6 @@ export default function Layout({ children }) {
     fetchCounts();
   }, []);
 
-  /* Live clock */
   useEffect(() => {
     function tick() {
       const now = new Date();
@@ -135,7 +205,7 @@ export default function Layout({ children }) {
     return () => clearInterval(id);
   }, []);
 
-  const dateStr    = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  const dateStr = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
   const totalBadge = Math.min(99, pendingCount + newEnqCount);
 
   const handleSignOut = async () => {
@@ -143,233 +213,153 @@ export default function Layout({ children }) {
     navigate("/login");
   };
 
-  /* ── Icon button shared style ── */
   const iconBtn = {
-    width: 32, height: 32,
-    borderRadius: 7,
-    background: "none", border: "none",
-    cursor: "pointer",
+    width: 34, height: 34, borderRadius: 7,
+    background: "none", border: "none", cursor: "pointer",
     color: "var(--ds-muted)",
     display: "flex", alignItems: "center", justifyContent: "center",
     flexShrink: 0,
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "var(--ds-bg)" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--ds-bg)" }}>
 
-      {/* ── Top Nav Bar ── */}
-      <header style={{
-        flexShrink: 0,
-        height: 60,
-        background: "var(--ds-surface)",
-        borderBottom: "1px solid var(--ds-border)",
-        display: "flex", alignItems: "center",
-        padding: "0 20px",
-        gap: 0,
-        position: "sticky", top: 0, zIndex: 40,
-      }}>
+      {/* ── Sidebar desktop ── */}
+      <aside style={{ width: 210, flexShrink: 0, background: "var(--ds-sidebar)", borderRight: "1px solid var(--ds-border)" }} className="ds-sidebar-desktop">
+        <SidebarContent pathname={pathname} pendingCount={pendingCount} newEnqCount={newEnqCount} session={session} onNav={undefined} />
+      </aside>
 
-        {/* Brand */}
-        <div style={{ display: "flex", flexDirection: "column", marginRight: 24, flexShrink: 0 }}>
-          <span style={{
-            fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 19, fontWeight: 700,
-            letterSpacing: "3.5px",
-            color: "var(--ds-gold)",
-            textTransform: "uppercase",
-            lineHeight: 1,
-          }}>
-            BLACKROCK
-          </span>
-          <span style={{
-            fontSize: 9, fontWeight: 600,
-            letterSpacing: "2.2px",
-            color: "var(--ds-muted)",
-            textTransform: "uppercase",
-            marginTop: 4,
-          }}>
-            Admin Console
-          </span>
-        </div>
-
-        {/* Divider */}
-        <div style={{ width: 1, height: 26, background: "var(--ds-border)", marginRight: 20, flexShrink: 0 }} />
-
-        {/* Nav links — hidden on mobile */}
-        <nav style={{ display: "flex", alignItems: "center", gap: 3, flex: 1 }} className="ds-topnav">
-          {NAV_ITEMS.map((item) => (
-            <TopNavLink
-              key={item.to}
-              item={item}
-              pathname={pathname}
-              pendingCount={pendingCount}
-              newEnqCount={newEnqCount}
-            />
-          ))}
-        </nav>
-
-        {/* Right controls */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto", flexShrink: 0 }}>
-
-          {/* Date & time — hide on narrow */}
-          <div style={{ fontSize: 12, color: "var(--ds-muted)", whiteSpace: "nowrap", marginRight: 6 }} className="ds-datetime">
-            {dateStr}
-            <span style={{ margin: "0 4px", opacity: 0.4 }}>·</span>
-            <span style={{ fontWeight: 500, color: "var(--ds-text)" }}>{clock}</span>
-          </div>
-
-          {/* Bell */}
-          <button style={{ ...iconBtn, position: "relative" }} aria-label="Notifications">
-            <Bell size={16} />
-            {totalBadge > 0 && (
-              <span style={{
-                position: "absolute", top: 4, right: 4,
-                width: 14, height: 14, borderRadius: "50%",
-                background: "#ef4444",
-                border: "1.5px solid var(--ds-surface)",
-                fontSize: 8, fontWeight: 700, color: "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {totalBadge > 99 ? "99" : totalBadge}
-              </span>
-            )}
-          </button>
-
-          {/* Dark mode */}
-          <button
-            onClick={toggleDark}
-            style={iconBtn}
-            aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-            onMouseEnter={(e) => { e.currentTarget.style.color = "var(--ds-gold)"; e.currentTarget.style.background = "var(--ds-input-bg)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--ds-muted)"; e.currentTarget.style.background = "none"; }}
-          >
-            {isDark ? <Sun size={15} /> : <Moon size={15} />}
-          </button>
-
-          {/* Divider */}
-          <div style={{ width: 1, height: 20, background: "var(--ds-border)", margin: "0 4px" }} />
-
-          {/* Admin chip */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "5px 10px 5px 6px",
-            borderRadius: 8,
-            border: "1px solid var(--ds-border)",
-            background: "var(--ds-input-bg)",
-            flexShrink: 0,
-          }}>
-            {/* Avatar */}
-            <div style={{
-              width: 28, height: 28, borderRadius: "50%",
-              background: "rgba(200,169,110,0.15)",
-              border: "1.5px solid var(--ds-gold)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 10.5, fontWeight: 600, color: "var(--ds-gold)",
-              flexShrink: 0,
-            }}>
-              {initials}
-            </div>
-            {/* Name + role */}
-            <div style={{ lineHeight: 1 }}>
-              <div style={{
-                fontSize: 12.5, fontWeight: 500,
-                color: "var(--ds-text)",
-                whiteSpace: "nowrap",
-                maxWidth: 120,
-                overflow: "hidden", textOverflow: "ellipsis",
-              }}>
-                {displayName}
-              </div>
-              <div style={{ fontSize: 10, color: "var(--ds-muted)", marginTop: 2, letterSpacing: "0.3px" }}>
-                Administrator
-              </div>
-            </div>
-          </div>
-
-          {/* Sign out */}
-          <button
-            onClick={handleSignOut}
-            style={iconBtn}
-            title="Sign out"
-            aria-label="Sign out"
-            onMouseEnter={(e) => { e.currentTarget.style.color = "#ef4444"; e.currentTarget.style.background = "rgba(239,68,68,0.07)"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.color = "var(--ds-muted)"; e.currentTarget.style.background = "none"; }}
-          >
-            <LogOut size={15} />
-          </button>
-
-          {/* Hamburger (mobile only) */}
-          <button
-            onClick={() => setMobileOpen(true)}
-            style={{ ...iconBtn, display: "none" }}
-            className="ds-hamburger"
-            aria-label="Open menu"
-          >
-            <Menu size={18} />
-          </button>
-        </div>
-      </header>
-
-      {/* ── Mobile Drawer ── */}
+      {/* ── Mobile drawer ── */}
       {mobileOpen && (
         <div style={{ position: "fixed", inset: 0, zIndex: 50, display: "flex" }}>
-          <div
-            style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }}
-            onClick={() => setMobileOpen(false)}
-          />
-          <aside style={{
-            position: "relative",
-            width: 230,
-            background: "var(--ds-surface)",
-            borderRight: "1px solid var(--ds-border)",
-            display: "flex", flexDirection: "column",
-            padding: "16px 12px",
-            gap: 4,
-          }}>
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-              paddingBottom: 12, borderBottom: "1px solid var(--ds-border)", marginBottom: 8,
-            }}>
-              <span style={{
-                fontFamily: "'Cormorant Garamond', serif",
-                fontSize: 16, fontWeight: 700,
-                letterSpacing: "3px",
-                color: "var(--ds-gold)",
-                textTransform: "uppercase",
-              }}>
-                BLACKROCK
-              </span>
-              <button
-                onClick={() => setMobileOpen(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)", display: "flex" }}
-                aria-label="Close"
-              >
-                <X size={18} />
-              </button>
+          <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} onClick={() => setMobileOpen(false)} />
+          <aside style={{ position: "relative", width: 240, background: "var(--ds-sidebar)", borderRight: "1px solid var(--ds-border)", display: "flex", flexDirection: "column" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", padding: "12px 16px" }}>
+              <button onClick={() => setMobileOpen(false)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)", display: "flex" }} aria-label="Close"><X size={18} /></button>
             </div>
-            {NAV_ITEMS.map((item) => (
-              <TopNavLink
-                key={item.to}
-                item={item}
-                pathname={pathname}
-                pendingCount={pendingCount}
-                newEnqCount={newEnqCount}
-                onClick={() => setMobileOpen(false)}
-              />
-            ))}
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <SidebarContent pathname={pathname} pendingCount={pendingCount} newEnqCount={newEnqCount} session={session} onNav={() => setMobileOpen(false)} />
+            </div>
           </aside>
         </div>
       )}
 
-      {/* ── Page content ── */}
-      <main style={{ flex: 1, overflowY: "auto", background: "var(--ds-bg)" }}>
-        {children}
-      </main>
+      {/* ── Right column ── */}
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0, overflow: "hidden" }}>
+
+        {/* Topbar */}
+        <header style={{
+          height: 56, flexShrink: 0,
+          background: "var(--ds-surface)",
+          borderBottom: "1px solid var(--ds-border)",
+          display: "flex", alignItems: "center",
+          padding: "0 20px", gap: 12,
+        }}>
+          {/* Hamburger mobile */}
+          <button onClick={() => setMobileOpen(true)} style={{ ...iconBtn, display: "none" }} className="ds-hamburger" aria-label="Open menu">
+            <Menu size={19} />
+          </button>
+
+          {/* Breadcrumb */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0, fontSize: 13 }}>
+            <Home size={13} style={{ color: "var(--ds-muted)" }} />
+            <span style={{ color: "var(--ds-muted)" }}>/</span>
+            <span style={{ color: "var(--ds-text)", fontWeight: 500 }}>{pageName}</span>
+          </div>
+
+          {/* Search */}
+          <div style={{ flex: 1, maxWidth: 380, margin: "0 auto", position: "relative" }}>
+            <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ds-muted)", pointerEvents: "none" }} />
+            <input
+              type="text"
+              placeholder="Search reservations, guests, menu…"
+              style={{
+                width: "100%",
+                background: "var(--ds-input-bg)",
+                border: "1px solid var(--ds-border)",
+                borderRadius: 7,
+                padding: "7px 12px 7px 32px",
+                fontSize: 12.5,
+                color: "var(--ds-text)",
+                fontFamily: "'DM Sans', sans-serif",
+                outline: "none",
+              }}
+            />
+          </div>
+
+          {/* Right controls */}
+          <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
+            {/* Bell */}
+            <button style={{ ...iconBtn, position: "relative" }} aria-label="Notifications">
+              <Bell size={17} />
+              {totalBadge > 0 && (
+                <span style={{
+                  position: "absolute", top: 5, right: 5,
+                  width: 15, height: 15, borderRadius: "50%",
+                  background: "#ef4444", border: "1.5px solid var(--ds-surface)",
+                  fontSize: 8.5, fontWeight: 700, color: "#fff",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {totalBadge > 99 ? "99" : totalBadge}
+                </span>
+              )}
+            </button>
+
+            {/* Dark mode */}
+            <button
+              onClick={toggleDark}
+              style={iconBtn}
+              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--ds-gold)"; e.currentTarget.style.background = "var(--ds-input-bg)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--ds-muted)"; e.currentTarget.style.background = "none"; }}
+            >
+              {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+
+            {/* Divider */}
+            <div style={{ width: 1, height: 18, background: "var(--ds-border)", margin: "0 6px" }} />
+
+            {/* Date & time */}
+            <div style={{ fontSize: 12, color: "var(--ds-muted)", whiteSpace: "nowrap" }}>
+              {dateStr} <span style={{ opacity: 0.4 }}>·</span>{" "}
+              <span style={{ fontWeight: 500, color: "var(--ds-text)" }}>{clock}</span>
+            </div>
+
+            {/* Divider */}
+            <div style={{ width: 1, height: 18, background: "var(--ds-border)", margin: "0 6px" }} />
+
+            {/* Sign out */}
+            <button
+              onClick={handleSignOut}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "var(--ds-text)"; e.currentTarget.style.background = "var(--ds-input-bg)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--ds-muted)"; e.currentTarget.style.background = "none"; }}
+              style={{
+                fontSize: 12.5, color: "var(--ds-muted)",
+                padding: "6px 10px", borderRadius: 6,
+                background: "none", border: "none", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 5,
+                fontFamily: "'DM Sans', sans-serif",
+              }}
+            >
+              <LogOut size={13} />
+              Sign out
+            </button>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main style={{ flex: 1, overflowY: "auto", background: "var(--ds-bg)" }}>
+          {children}
+        </main>
+      </div>
 
       <style>{`
-        @media (max-width: 720px) {
-          .ds-topnav   { display: none !important; }
-          .ds-datetime { display: none !important; }
+        @media (min-width: 768px) {
+          .ds-sidebar-desktop { display: block !important; }
+          .ds-hamburger { display: none !important; }
+        }
+        @media (max-width: 767px) {
+          .ds-sidebar-desktop { display: none !important; }
           .ds-hamburger { display: flex !important; }
         }
       `}</style>
