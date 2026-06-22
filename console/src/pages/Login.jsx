@@ -1,8 +1,28 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { Loader2, Eye, EyeOff, AlertCircle, ArrowRight } from "lucide-react";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { Loader2, AlertCircle } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+
+const DM = "'DM Sans', system-ui, sans-serif";
+const LORA = "'Lora', Georgia, serif";
+const BURGUNDY = "#7a1c1c";
+
+function inputStyle(focused) {
+  return {
+    fontFamily: DM,
+    fontSize: "16px",
+    color: "#1a1a1a",
+    width: "100%",
+    padding: "15px 16px",
+    borderRadius: "10px",
+    border: focused ? `1.5px solid ${BURGUNDY}` : "1.5px solid #e3ddd2",
+    background: "#ffffff",
+    boxShadow: focused ? "0 0 0 4px rgba(122,28,28,0.08)" : "none",
+    transition: "border-color .15s, box-shadow .15s",
+    outline: "none",
+  };
+}
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -10,6 +30,8 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [focusedField, setFocusedField] = useState("");
+  const [hoverBtn, setHoverBtn] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const shouldReduceMotion = useReducedMotion();
@@ -26,167 +48,239 @@ export default function Login() {
 
   return (
     <main
-      className="min-h-screen flex flex-col items-center justify-center px-4 relative overflow-hidden"
+      style={{
+        minHeight: "100vh",
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "32px",
+        background: "#1a1a1a",
+        backgroundImage: `linear-gradient(rgba(122,28,28,0.20), rgba(122,28,28,0.20)), url('/heroimage.png')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        fontFamily: DM,
+      }}
     >
-      {/* Background */}
-      <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('/heroimage.png')" }} />
-      <div className="absolute inset-0" style={{ background: "#3d0a0a", opacity: 0.3 }} />
-      <div className="absolute inset-0 bg-black/30" />
-
-      {/* Portal label */}
-      <motion.p
-        className="relative z-10 text-xs uppercase tracking-[0.3em] mb-5"
-        style={{ color: "rgba(245,240,232,0.45)" }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: shouldReduceMotion ? 0.15 : 0.6, delay: shouldReduceMotion ? 0 : 0.1 }}
-      >
-        Admin Console
-      </motion.p>
-
-      {/* Card */}
       <motion.div
-        className="relative z-10 w-full"
-        style={{ maxWidth: "420px" }}
-        initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 24 }}
+        style={{ width: "100%", maxWidth: "452px", display: "flex", flexDirection: "column", gap: "18px" }}
+        initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: shouldReduceMotion ? 0.15 : 0.5, ease: [0.16, 1, 0.3, 1], delay: shouldReduceMotion ? 0 : 0.15 }}
+        transition={{ duration: shouldReduceMotion ? 0.15 : 0.5, ease: [0.16, 1, 0.3, 1] }}
       >
+        {/* Card */}
         <div
           style={{
-            background: "var(--warm-white)",
-            border: "1px solid rgba(201,168,76,0.25)",
-            padding: "40px 44px 36px",
+            background: "#faf8f5",
+            borderRadius: "27.5px",
+            boxShadow: "0 30px 70px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,169,110,0.12)",
+            padding: "48px 44px 32px",
+            position: "relative",
+            width: "100%",
+            opacity: 0.93,
           }}
         >
-          {/* Brand mark */}
-          <div className="mb-8">
-            <div
-              className="text-2xl text-[var(--charcoal)]"
-              style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, letterSpacing: "0.04em" }}
+          {/* ADMIN CONSOLE badge */}
+          <p
+            style={{
+              position: "absolute",
+              top: "14px",
+              left: 0,
+              right: 0,
+              textAlign: "center",
+              margin: 0,
+              fontFamily: DM,
+              fontSize: "10px",
+              fontWeight: 800,
+              letterSpacing: "0.28em",
+              textTransform: "uppercase",
+              color: "#581919",
+            }}
+          >
+            Admin Console
+          </p>
+
+          {/* Brand */}
+          <div style={{ marginBottom: "34px" }}>
+            <span
+              style={{
+                fontFamily: LORA,
+                fontWeight: 700,
+                fontSize: "22px",
+                letterSpacing: "0.14em",
+                color: "#1a1a1a",
+                display: "block",
+              }}
             >
               BLACKROCK
-            </div>
-            <div
-              className="text-xs uppercase tracking-[0.2em] mt-1"
-              style={{ color: "rgba(15,13,10,0.4)" }}
+            </span>
+            <span
+              style={{
+                fontFamily: DM,
+                fontSize: "12px",
+                color: "#9a9388",
+                letterSpacing: "0.05em",
+                marginTop: "3px",
+                display: "block",
+              }}
             >
-              Restaurant & Lounge
-            </div>
-            <div className="mt-5 w-8 h-px" style={{ background: "rgba(201,168,76,0.5)" }} />
+              Restaurant &amp; Lounge
+            </span>
           </div>
 
           {/* Heading */}
-          <div className="mb-7">
-            <h1
-              className="text-[22px] font-semibold"
-              style={{ color: "var(--charcoal)", letterSpacing: "-0.01em", lineHeight: 1.2 }}
-            >
+          <div style={{ marginBottom: "28px" }}>
+            <h1 style={{ fontFamily: DM, fontSize: "24px", fontWeight: 700, color: "#1a1a1a", margin: 0, letterSpacing: "-0.01em" }}>
               Welcome back
             </h1>
-            <p className="text-sm mt-1.5" style={{ color: "rgba(15,13,10,0.45)" }}>
+            <p style={{ fontFamily: DM, fontSize: "14px", color: "#9a9388", margin: "6px 0 0" }}>
               Sign in to manage your restaurant.
             </p>
           </div>
 
           {/* Form */}
-          <form onSubmit={submit} className="space-y-5" aria-label="Sign in to admin console">
-            <div>
-              <label className="login-label" htmlFor="login-email">Email address</label>
+          <form onSubmit={submit} aria-label="Sign in to admin console">
+
+            {/* Email */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
+              <label
+                htmlFor="login-email"
+                style={{ fontFamily: DM, fontSize: "11px", fontWeight: 600, letterSpacing: "0.13em", textTransform: "uppercase", color: "#6f685d" }}
+              >
+                Email Address
+              </label>
               <input
                 id="login-email"
                 type="email"
                 required
                 autoComplete="email"
                 autoFocus
-                className="login-input"
-                placeholder="you@example.com"
+                placeholder="you@blackrockrestaurantng.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onFocus={() => setFocusedField("email")}
+                onBlur={() => setFocusedField("")}
+                style={inputStyle(focusedField === "email")}
                 disabled={loading}
               />
             </div>
 
-            <div>
-              <label className="login-label" htmlFor="login-password">Password</label>
-              <div className="relative">
+            {/* Password */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "28px" }}>
+              <label
+                htmlFor="login-password"
+                style={{ fontFamily: DM, fontSize: "11px", fontWeight: 600, letterSpacing: "0.13em", textTransform: "uppercase", color: "#6f685d" }}
+              >
+                Password
+              </label>
+              <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
                 <input
                   id="login-password"
                   type={showPassword ? "text" : "password"}
                   required
                   autoComplete="current-password"
-                  className="login-input"
-                  placeholder="Enter your password"
-                  style={{ paddingRight: "44px" }}
+                  placeholder="••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  onFocus={() => setFocusedField("password")}
+                  onBlur={() => setFocusedField("")}
+                  style={{ ...inputStyle(focusedField === "password"), paddingRight: "70px" }}
                   disabled={loading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-0 top-0 h-full px-3 transition-opacity duration-150"
-                  style={{ color: "rgba(15,13,10,0.4)" }}
                   aria-label={showPassword ? "Hide password" : "Show password"}
-                  tabIndex={-1}
+                  style={{
+                    position: "absolute",
+                    right: "14px",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: DM,
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: BURGUNDY,
+                    padding: "6px",
+                  }}
                 >
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
             </div>
 
-            <AnimatePresence>
-              {error && (
-                <motion.div
-                  role="alert"
-                  initial={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  className="flex items-center gap-2.5 px-3.5 py-2.5 text-xs"
-                  style={{
-                    background: "rgba(239,68,68,0.08)",
-                    border: "1px solid rgba(239,68,68,0.2)",
-                    color: "#b91c1c",
-                  }}
-                >
-                  <AlertCircle size={13} className="shrink-0" />
-                  {error}
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* CTA */}
-            <div className="pt-1">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full flex items-center justify-center gap-2 py-3.5 text-xs font-bold uppercase tracking-[0.1em] transition-opacity duration-150"
+            {/* Error */}
+            {error && (
+              <div
+                role="alert"
                 style={{
-                  background: loading ? "rgba(201,168,76,0.7)" : "var(--gold)",
-                  color: "var(--charcoal)",
-                  border: "none",
-                  cursor: loading ? "not-allowed" : "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "20px",
+                  padding: "12px 14px",
+                  borderRadius: "10px",
+                  background: "rgba(122,28,28,0.07)",
+                  border: "1px solid rgba(122,28,28,0.18)",
+                  fontFamily: DM,
+                  fontSize: "13px",
+                  color: BURGUNDY,
                 }}
               >
-                {loading ? (
-                  <>
-                    <Loader2 size={13} className="animate-spin" />
-                    Signing in…
-                  </>
-                ) : (
-                  <>
-                    Sign In
-                    <ArrowRight size={13} />
-                  </>
-                )}
-              </button>
-            </div>
+                <AlertCircle size={14} style={{ flexShrink: 0 }} />
+                {error}
+              </div>
+            )}
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              onMouseEnter={() => setHoverBtn(true)}
+              onMouseLeave={() => setHoverBtn(false)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "10px",
+                width: "100%",
+                padding: "17px",
+                borderRadius: "10px",
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                fontFamily: DM,
+                fontSize: "16px",
+                fontWeight: 600,
+                letterSpacing: "0.01em",
+                color: "#faf8f5",
+                background: loading ? "rgba(122,28,28,0.6)" : hoverBtn ? "#681717" : BURGUNDY,
+                boxShadow: hoverBtn && !loading
+                  ? "0 12px 28px -8px rgba(122,28,28,0.55)"
+                  : "0 8px 20px -10px rgba(122,28,28,0.45)",
+                transition: "background .15s, box-shadow .15s",
+              }}
+            >
+              {loading
+                ? <><Loader2 size={16} className="animate-spin" /> Signing in…</>
+                : <><span>Sign in to Console</span><span style={{ fontSize: "18px", lineHeight: 1 }}>→</span></>
+              }
+            </button>
           </form>
 
           {/* Footer */}
-          <p className="mt-6 text-center text-xs" style={{ color: "rgba(15,13,10,0.35)" }}>
-            Access is restricted to authorised staff only.
+          <p
+            style={{
+              fontFamily: DM,
+              fontSize: "13px",
+              lineHeight: 1.55,
+              color: "#9a9388",
+              textAlign: "center",
+              margin: "26px 0 0",
+            }}
+          >
+            Access is by invitation only. Contact Super Admin if you need help.
           </p>
         </div>
       </motion.div>
