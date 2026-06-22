@@ -24,8 +24,8 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
       <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url('/heroimage.png')" }} />
-      <div className="absolute inset-0" style={{ background: "var(--burgundy)", opacity: 0.75 }} />
-      <div className="absolute inset-0 bg-black/40" />
+      <div className="absolute inset-0" style={{ background: "var(--burgundy)", opacity: 0.375 }} />
+      <div className="absolute inset-0 bg-black/20" />
       <div className="w-full max-w-sm relative z-10">
         {/* Brand */}
         <div className="text-center mb-10">
