@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Inter:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+
+:root {
+  --gold: #C9A84C;
+  --gold-light: #e0c890;
+  --burgundy: #8B1A2B;
+  --charcoal: #0f0d0a;
+  --charcoal-soft: #1a1612;
+  --charcoal-mid: #252018;
+  --warm-white: #F5F0E8;
+  --muted: #9C8E7A;
+  --border-soft: #2e2820;
+  --surface: #1a1612;
+  --surface-raised: #222018;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--charcoal);
+  color: var(--warm-white);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-soft); border-radius: 2px; }
+
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+.badge-pending  { background: rgba(201,168,76,0.15); color: var(--gold); border: 1px solid rgba(201,168,76,0.3); }
+.badge-confirmed { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+.badge-cancelled { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.25); }
+.badge-rescheduled { background: rgba(139,92,246,0.12); color: #a78bfa; border: 1px solid rgba(139,92,246,0.25); }
+.badge-concierge { background: rgba(139,26,43,0.2); color: #f4a4b0; border: 1px solid rgba(139,26,43,0.4); }
+.badge-new { background: rgba(201,168,76,0.15); color: var(--gold); border: 1px solid rgba(201,168,76,0.3); }
+.badge-read { background: rgba(156,142,122,0.12); color: var(--muted); border: 1px solid rgba(156,142,122,0.2); }
+.badge-responded { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.25); }
+
+.btn-gold { display: inline-flex; align-items: center; gap: 6px; background: var(--gold); color: var(--charcoal); padding: 8px 18px; font-size: 12px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; border: none; cursor: pointer; transition: opacity 0.2s; }
+.btn-gold:hover { opacity: 0.88; }
+.btn-ghost { display: inline-flex; align-items: center; gap: 6px; background: transparent; color: var(--muted); padding: 8px 16px; font-size: 12px; font-weight: 500; border: 1px solid var(--border-soft); cursor: pointer; transition: all 0.2s; }
+.btn-ghost:hover { border-color: var(--gold); color: var(--warm-white); }
+.btn-danger { display: inline-flex; align-items: center; gap: 6px; background: transparent; color: #f87171; padding: 8px 16px; font-size: 12px; font-weight: 500; border: 1px solid rgba(239,68,68,0.3); cursor: pointer; transition: all 0.2s; }
+.btn-danger:hover { background: rgba(239,68,68,0.1); }
+.btn-success { display: inline-flex; align-items: center; gap: 6px; background: transparent; color: #4ade80; padding: 8px 16px; font-size: 12px; font-weight: 500; border: 1px solid rgba(34,197,94,0.3); cursor: pointer; transition: all 0.2s; }
+.btn-success:hover { background: rgba(34,197,94,0.1); }
+
+.console-input { width: 100%; background: var(--charcoal-mid); border: 1px solid var(--border-soft); color: var(--warm-white); padding: 10px 14px; font-size: 14px; outline: none; transition: border-color 0.2s; font-family: inherit; }
+.console-input:focus { border-color: var(--gold); }
+.console-input::placeholder { color: var(--muted); }
+.console-label { display: block; font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+
+.console-table { width: 100%; border-collapse: collapse; }
+.console-table th { text-align: left; padding: 10px 16px; font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border-soft); white-space: nowrap; }
+.console-table td { padding: 14px 16px; font-size: 13px; border-bottom: 1px solid var(--border-soft); color: var(--warm-white); }
+.console-table tr:last-child td { border-bottom: none; }
+.console-table tbody tr:hover td { background: var(--surface-raised); }
+
+.console-card { background: var(--surface); border: 1px solid var(--border-soft); padding: 20px; }
