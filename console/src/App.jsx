@@ -11,6 +11,8 @@ import SiteContent from "./pages/content/SiteContent";
 import Enquiries from "./pages/enquiries/Enquiries";
 import UserManagement from "./pages/users/UserManagement";
 import ResetPassword from "./pages/ResetPassword";
+import ContentHub from "./pages/content-hub/ContentHub";
+import AssetDetail from "./pages/content-hub/AssetDetail";
 
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth();
@@ -36,8 +38,10 @@ function AppRoutes() {
       <Route path="/media"       element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
       <Route path="/content"     element={<ProtectedRoute><SiteContent /></ProtectedRoute>} />
       <Route path="/enquiries"   element={<ProtectedRoute><Enquiries /></ProtectedRoute>} />
-      <Route path="/users"       element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
-      <Route path="*"            element={<Navigate to="/" replace />} />
+      <Route path="/users"              element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
+      <Route path="/content-hub"        element={<ProtectedRoute><ContentHub /></ProtectedRoute>} />
+      <Route path="/content-hub/asset/:id" element={<ProtectedRoute><AssetDetail /></ProtectedRoute>} />
+      <Route path="*"                   element={<Navigate to="/" replace />} />
     </Routes>
   );
 }
