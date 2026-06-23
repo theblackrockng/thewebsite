@@ -74,6 +74,20 @@ body {
   --ds-burgundy: #7a1c1c;
   --ds-shadow: 0 1px 4px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
   --ds-input-bg: #f3f0ec;
+
+  /* Status badge tokens — light */
+  --badge-confirmed-bg: #f0fdf4;
+  --badge-confirmed-color: #166534;
+  --badge-confirmed-border: #bbf7d0;
+  --badge-pending-bg: #fffbeb;
+  --badge-pending-color: #92400e;
+  --badge-pending-border: #fde68a;
+  --badge-rescheduled-bg: #eff6ff;
+  --badge-rescheduled-color: #1d4ed8;
+  --badge-rescheduled-border: #bfdbfe;
+  --badge-cancelled-bg: #fef2f2;
+  --badge-cancelled-color: #991b1b;
+  --badge-cancelled-border: #fecaca;
 }
 [data-theme="dark"] {
   --ds-bg: #1a1a1a;
@@ -85,6 +99,20 @@ body {
   --ds-nav-active: #2b2418;
   --ds-shadow: 0 1px 4px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.25);
   --ds-input-bg: #1e1e1e;
+
+  /* Status badge tokens — dark */
+  --badge-confirmed-bg: rgba(34,197,94,0.12);
+  --badge-confirmed-color: #4ade80;
+  --badge-confirmed-border: rgba(34,197,94,0.25);
+  --badge-pending-bg: rgba(245,158,11,0.12);
+  --badge-pending-color: #fbbf24;
+  --badge-pending-border: rgba(245,158,11,0.25);
+  --badge-rescheduled-bg: rgba(99,102,241,0.12);
+  --badge-rescheduled-color: #818cf8;
+  --badge-rescheduled-border: rgba(99,102,241,0.25);
+  --badge-cancelled-bg: rgba(239,68,68,0.12);
+  --badge-cancelled-color: #f87171;
+  --badge-cancelled-border: rgba(239,68,68,0.25);
 }
 
 html, body { height: 100%; }
