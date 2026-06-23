@@ -2,9 +2,111 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import {
   Plus, Pencil, Trash2, ImageOff, UtensilsCrossed,
-  X, AlertTriangle, Check,
+  X, AlertTriangle, Check, Download,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+
+/* ─── Seed Data ─── */
+const SEED_MENU = [
+  // Starters
+  { name: "Vegetable Spring Roll (2pcs)", description: "Two pieces. Crisp, golden, served with sweet chilli dip.", price: 4500, category: "Starters", available: true },
+  { name: "Chicken Spring Roll (2pcs)", description: "Two pieces. Hand-rolled, lightly spiced, properly crisp.", price: 5500, category: "Starters", available: true },
+  { name: "Naan Bread (Cheese)", description: "Soft, pulled, oozing. Straight from the tandoor.", price: 3500, category: "Starters", available: true },
+  { name: "Naan Bread (Garlic & Plain)", description: "Brushed with garlic butter and fresh herbs.", price: 3000, category: "Starters", available: true },
+  { name: "Cream of Sweet Corn", description: "Velvety, warming, finished with chive oil.", price: 4000, category: "Starters", available: true },
+  { name: "Tomato Cream Soup", description: "Slow-roasted plum tomato, basil, a swirl of cream.", price: 4000, category: "Starters", available: true },
+  { name: "Cream of Mushroom Soup", description: "Wild mushroom, thyme, truffle scent.", price: 4500, category: "Starters", available: true },
+  { name: "Chicken Corn Soup", description: "Light, comforting. The kind your mother would approve of.", price: 4500, category: "Starters", available: true },
+  { name: "Gizzard in Plantain Sauce", description: "Tender gizzard, ripe plantain, a Lagos signature.", price: 6500, category: "Starters", available: true },
+  { name: "Steam Veg/Potato + Protein Chops", description: "Choice of chicken, fish or beef. Clean. Honest.", price: 7500, category: "Starters", available: true },
+  // Salads
+  { name: "Chicken Caesar Salad", description: "Grilled chicken, romaine, parmesan, anchovy dressing.", price: 6500, category: "Salads", available: true },
+  { name: "Greek Salad", description: "Tomato, cucumber, olive, feta, oregano, good oil.", price: 5500, category: "Salads", available: true },
+  { name: "Shrimps Cocktail Salad", description: "Chilled shrimp, gem leaves, Marie Rose sauce.", price: 8500, category: "Salads", available: true },
+  { name: "Tuna Salad", description: "Line-caught tuna, capers, red onion, lemon.", price: 6500, category: "Salads", available: true },
+  { name: "Potato Salad", description: "Soft potatoes, boiled egg, mayo, mustard, dill.", price: 4500, category: "Salads", available: true },
+  { name: "Pasta Salad", description: "Penne, peppers, sweetcorn, herb vinaigrette.", price: 5000, category: "Salads", available: true },
+  { name: "Mixed Vegetable Salad", description: "Garden vegetables, house dressing.", price: 4500, category: "Salads", available: true },
+  { name: "Calamari Salad", description: "Lightly fried calamari over crisp greens.", price: 7500, category: "Salads", available: true },
+  { name: "Mixed Avocado Salad", description: "Avocado, mixed leaves, citrus, toasted seed.", price: 6000, category: "Salads", available: true },
+  // Rice
+  { name: "Jollof Rice", description: "Smoky, party-style, the way Lagos taught us.", price: 5500, category: "Rice", available: true },
+  { name: "Fried Rice", description: "Green pepper, carrot, liver, prawn, the proper way.", price: 5500, category: "Rice", available: true },
+  { name: "Ofada Rice/Sauce", description: "Steamed ofada, ayamase sauce, assorted meat, boiled egg.", price: 7500, category: "Rice", available: true },
+  { name: "Chicken Stir Fried Rice", description: "Wok-tossed with chicken, soy, garlic, scallion.", price: 6500, category: "Rice", available: true },
+  { name: "Beef Stir Fried Rice", description: "Tender beef strips, wok-charred vegetables.", price: 7500, category: "Rice", available: true },
+  { name: "Seafood Stir Fried Rice", description: "Prawn, calamari, fish. The catch in your rice.", price: 9500, category: "Rice", available: true },
+  { name: "Vegetarian Rice", description: "Seasonal vegetables, herbed butter, simple, perfect.", price: 5500, category: "Rice", available: true },
+  // Noodles
+  { name: "Alfredo Noodles", description: "Cream, parmesan, cracked pepper, parsley.", price: 6500, category: "Noodles", available: true },
+  { name: "Chicken Stir Fry Noodles", description: "Wok-tossed egg noodles, chicken, julienned veg.", price: 6500, category: "Noodles", available: true },
+  { name: "Beef Stir Fry Noodles", description: "Strips of beef, ginger, garlic, dark soy.", price: 7500, category: "Noodles", available: true },
+  { name: "Seafood Stir Fry Noodles", description: "Prawn and calamari, scallion, sesame.", price: 9000, category: "Noodles", available: true },
+  { name: "Bolognese Noodles", description: "Slow-cooked beef ragu, herbed tomato, parmesan.", price: 7000, category: "Noodles", available: true },
+  { name: "Nigerian Vegetable Noodles", description: "Indomie-meets-elevated. Pepper, scotch bonnet, crayfish.", price: 5500, category: "Noodles", available: true },
+  // Pepper Soup & Specials
+  { name: "Goat Meat Pepper Soup", description: "Bone-in goat, uziza leaf, scotch bonnet. Pure fire and soul.", price: 7500, category: "Pepper Soup & Specials", available: true },
+  { name: "Assorted Meat Pepper Soup", description: "Cow foot, tripe, shaki. For the brave.", price: 8500, category: "Pepper Soup & Specials", available: true },
+  { name: "Chicken Pepper Soup", description: "Native chicken, full-flavoured broth, scent leaves.", price: 6500, category: "Pepper Soup & Specials", available: true },
+  { name: "Nkwobi", description: "Cow foot in spicy palm-oil sauce, garden egg, utazi.", price: 8500, category: "Pepper Soup & Specials", available: true },
+  { name: "Isi Ewu", description: "Goat head, slow-simmered, palm-oil sauce, the works.", price: 9500, category: "Pepper Soup & Specials", available: true },
+  { name: "Catfish Pepper Soup (Full)", description: "Whole point-and-kill catfish, fiery broth.", price: 12500, category: "Pepper Soup & Specials", available: true },
+  { name: "Croaker Pepper Soup (Full)", description: "Whole croaker, scent leaves, scotch bonnet.", price: 14500, category: "Pepper Soup & Specials", available: true },
+  { name: "Whole Chicken Native (Smoked)", description: "Hours over wood, served whole, eat with your hands.", price: 16500, category: "Pepper Soup & Specials", available: true },
+  { name: "Chicken in Vegetable Sauce (Full)", description: "Full chicken, smothered in spiced vegetable stew.", price: 15000, category: "Pepper Soup & Specials", available: true },
+  // Continental
+  { name: "Prawn Butterfly in Tartar Sauce", description: "Butterflied prawn, panko crust, lemon tartar.", price: 11500, category: "Continental", available: true },
+  { name: "Prawn Butterfly with Potato Wedge or Parsley Potato", description: "Your choice of side. Both excellent.", price: 12500, category: "Continental", available: true },
+  { name: "Battered Fish with Potato Wedge or Parsley Potato", description: "Crisp batter, flaky fish, golden wedges or parsley potato.", price: 9500, category: "Continental", available: true },
+  { name: "Grilled Beef Steak Fillet in Black Pepper Sauce", description: "Black pepper sauce, choice of rice or chips.", price: 14500, category: "Continental", available: true },
+  { name: "Grilled T-Bone Steak Fillet in Black Pepper Sauce", description: "Black pepper sauce, choice of rice or chips. For meat people.", price: 18500, category: "Continental", available: true },
+  { name: "Fillet Fish and Chips with Tartar Sauce", description: "Battered fillet, hand-cut chips, tartar.", price: 9000, category: "Continental", available: true },
+  // Sauces
+  { name: "Chicken in Mushroom Sauce (Hot Pot)", description: "Marinated chicken, mushroom cream, served sizzling.", price: 9500, category: "Sauces", available: true },
+  { name: "Beef Stroganoff in Hot Pot with Rice", description: "Tender beef, sour cream, mushroom, paprika.", price: 11500, category: "Sauces", available: true },
+  { name: "Beef Vegetable Sauce", description: "Slow-cooked beef in spiced vegetable stew.", price: 8500, category: "Sauces", available: true },
+  { name: "Chicken in Black Beans Sauce", description: "Wok-finished, fermented black bean, ginger.", price: 8500, category: "Sauces", available: true },
+  { name: "Beef in Black Beans Sauce", description: "Tender strips, salty-sweet black bean glaze.", price: 9500, category: "Sauces", available: true },
+  { name: "Chicken Curry Sauce", description: "Coconut curry, fresh ginger, lime leaf.", price: 8500, category: "Sauces", available: true },
+  { name: "Chicken in Vegetable Sauce", description: "Garden vegetables, house pepper, soft chicken.", price: 8000, category: "Sauces", available: true },
+  { name: "Heart in Black Beans Sauce", description: "Beef heart, properly handled, properly seasoned.", price: 7500, category: "Sauces", available: true },
+  { name: "Seafood Vegetable Sauce", description: "Prawn, fish, calamari in a fragrant vegetable stew.", price: 11000, category: "Sauces", available: true },
+  // Charcoal Grills
+  { name: "Chicken Wings", description: "Charred, glazed, finger-licking.", price: 6500, category: "Charcoal Grills", available: true },
+  { name: "Buffalo Wings", description: "Tossed in our house buffalo, blue cheese on the side.", price: 7500, category: "Charcoal Grills", available: true },
+  { name: "Quarter Chicken", description: "Spice-rubbed, over open charcoal.", price: 5500, category: "Charcoal Grills", available: true },
+  { name: "Quarter Chicken with Chips", description: "Same chicken, hand-cut chips.", price: 7000, category: "Charcoal Grills", available: true },
+  { name: "Grilled Turkey with Chips", description: "Smoked turkey, slow-grilled, chips on the side.", price: 9500, category: "Charcoal Grills", available: true },
+  { name: "Fish: Catfish/Croaker/Tilapia", description: "Whole fish, charred, scotch bonnet, lime.", price: 14500, category: "Charcoal Grills", available: true },
+  { name: "Grilled Prawn", description: "Head-on prawns, garlic butter, charred lemon.", price: 12500, category: "Charcoal Grills", available: true },
+  { name: "Peppered Gizzard with Chips", description: "Soft gizzard, pepper sauce, hand-cut chips.", price: 8500, category: "Charcoal Grills", available: true },
+  { name: "Peppered Gizzard Alone", description: "Just the gizzard. The way it should be.", price: 6500, category: "Charcoal Grills", available: true },
+  { name: "Asun Only", description: "Smoked goat, scotch bonnet, onion, lime.", price: 9500, category: "Charcoal Grills", available: true },
+  { name: "Asun & Fries", description: "Smoked goat, peppered, fries to soak it up.", price: 11500, category: "Charcoal Grills", available: true },
+  { name: "Yam Fries", description: "Hand-cut yam, golden, sea-salted.", price: 4500, category: "Charcoal Grills", available: true },
+  { name: "Potato Fries", description: "Hand-cut, double-cooked, properly salted.", price: 4000, category: "Charcoal Grills", available: true },
+  { name: "Chicken (Native) Whole", description: "Charcoal-grilled, served whole. Built to share.", price: 16500, category: "Charcoal Grills", available: true },
+  { name: "Guinea Fowl (Whole)", description: "Spice-rubbed, charcoal-grilled, lean and rich.", price: 18500, category: "Charcoal Grills", available: true },
+  // National Dishes
+  { name: "Assorted Beef", description: "House stew, oxtail, tripe, shaki. A proper plate.", price: 8500, category: "National Dishes", available: true },
+  { name: "Goat", description: "Slow-braised in our signature stew.", price: 9500, category: "National Dishes", available: true },
+  { name: "Cow Tail", description: "Soft, falling-off-the-bone oxtail.", price: 9500, category: "National Dishes", available: true },
+  { name: "Native Chicken", description: "Free-range, deeper flavour, served in stew.", price: 8500, category: "National Dishes", available: true },
+  { name: "Fish (Croaker/Tilapia)", description: "Whole fish, stewed or grilled. Your choice.", price: 12500, category: "National Dishes", available: true },
+  { name: "Turkey", description: "Smoked or stewed. Both quietly excellent.", price: 8500, category: "National Dishes", available: true },
+  { name: "Dry Fish", description: "Sun-dried fish, soft in the stew, deep umami.", price: 7500, category: "National Dishes", available: true },
+  { name: "Stock Fish", description: "Properly soaked, properly cooked. Deep umami, richly satisfying.", price: 8500, category: "National Dishes", available: true },
+  { name: "Snail", description: "Cleaned, peppered, slow-cooked. A delicacy.", price: 10500, category: "National Dishes", available: true },
+  { name: "Guinea Fowl", description: "Lean, gamey, served in our house stew.", price: 11500, category: "National Dishes", available: true },
+  // Traditional Specials
+  { name: "Seafood Okro", description: "Fresh okro, prawn, fish, periwinkle. Coastal in a bowl.", price: 9500, category: "Traditional Specials", available: true },
+  { name: "Banga", description: "Palm-fruit extract, beletientien, fish. Warmly aromatic.", price: 8500, category: "Traditional Specials", available: true },
+  { name: "Pocho", description: "Bitter leaf, scent leaf, assorted meat. Rich and deeply flavoured.", price: 8500, category: "Traditional Specials", available: true },
+  { name: "Ikokore/Eberipo", description: "Pounded water yam, slowly stewed in pepper.", price: 8000, category: "Traditional Specials", available: true },
+  { name: "Miyan & Kuka", description: "Baobab leaf soup, deep and earthy.", price: 7500, category: "Traditional Specials", available: true },
+  { name: "Fisherman Soup", description: "Catfish, prawn, periwinkle, crab. The catch of the day.", price: 11500, category: "Traditional Specials", available: true },
+  { name: "Ofensala/White Soup", description: "Pepper soup spiced, no palm-oil, deeply satisfying.", price: 8500, category: "Traditional Specials", available: true },
+];
 
 /* ─── Constants ─── */
 const CATEGORIES = [
@@ -381,6 +483,22 @@ export default function MenuManagement() {
   const [showPanel, setShowPanel] = useState(false);
   const [deletingDish, setDeletingDish] = useState(null);
   const [confirmDeleting, setConfirmDeleting] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+  const [seedDone, setSeedDone] = useState(false);
+
+  const handleSeedMenu = async () => {
+    setSeeding(true);
+    try {
+      const { error } = await supabase.from("menu_items").insert(SEED_MENU);
+      if (error) throw error;
+      setSeedDone(true);
+      await fetchDishes();
+    } catch (e) {
+      alert("Import failed: " + (e.message ?? "Unknown error"));
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const fetchDishes = useCallback(async () => {
     setLoading(true);
@@ -418,7 +536,18 @@ export default function MenuManagement() {
           <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 32, fontWeight: 600, color: "var(--ds-text)", margin: "0 0 4px" }}>Menu Management</h1>
           <p style={{ fontSize: 13, color: "var(--ds-muted)", margin: 0 }}>Add, edit, and manage dishes on the public website</p>
         </div>
-        <button style={GOLD_BTN} onClick={openAdd}><Plus size={15} /> Add New Dish</button>
+        <div style={{ display: "flex", gap: 8 }}>
+          {!seedDone && dishes.length === 0 && (
+            <button
+              style={{ ...GOLD_BTN, background: "var(--ds-input-bg)", color: "var(--ds-text)", border: "1px solid var(--ds-border)", opacity: seeding ? 0.7 : 1 }}
+              onClick={handleSeedMenu}
+              disabled={seeding}
+            >
+              <Download size={15} /> {seeding ? "Importing…" : "Import from Website"}
+            </button>
+          )}
+          <button style={GOLD_BTN} onClick={openAdd}><Plus size={15} /> Add New Dish</button>
+        </div>
       </div>
 
       {/* Category Filter */}
@@ -436,10 +565,19 @@ export default function MenuManagement() {
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: 14 }}>
           <UtensilsCrossed size={40} strokeWidth={1.2} style={{ color: "var(--ds-muted)", opacity: 0.4 }} />
           <p style={{ color: "var(--ds-muted)", fontSize: 14, margin: 0, textAlign: "center" }}>
-            {activeCategory === "All" ? "No dishes yet. Add your first dish to get started." : `No dishes in "${activeCategory}" yet.`}
+            {activeCategory === "All" ? "No dishes yet." : `No dishes in "${activeCategory}" yet.`}
           </p>
           {activeCategory === "All" && (
-            <button style={GOLD_BTN} onClick={openAdd}><Plus size={14} /> Add New Dish</button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+              <button
+                style={{ ...GOLD_BTN, opacity: seeding ? 0.7 : 1 }}
+                onClick={handleSeedMenu}
+                disabled={seeding}
+              >
+                <Download size={14} /> {seeding ? "Importing…" : "Import All 88 Dishes"}
+              </button>
+              <button style={{ ...GHOST_BTN }} onClick={openAdd}><Plus size={14} /> Add Single Dish</button>
+            </div>
           )}
         </div>
       ) : (
