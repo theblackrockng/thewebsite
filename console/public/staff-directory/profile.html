@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Staff Profile</title>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Nunito+Sans:wght@300;400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Nunito Sans',sans-serif;background:#f0f4f0;min-height:100vh;}
+@keyframes spin{to{transform:rotate(360deg)}}
+:root{
+  --green:#1b5e20;--green-mid:#2e7d32;--green-light:#e8f5e9;
+  --gold:#f9a825;--text-dark:#1a2e1a;--text-mid:#4a5e4a;--text-muted:#7a8e7a;
+  --border:#d0e0d0;--inactive-bg:#fde8e8;--inactive-text:#b71c1c;
+  --font-heading:'Libre Baskerville',Georgia,serif;
+}
+.top-bar{background:var(--green);height:58px;display:flex;align-items:center;padding:0 24px;gap:12px;}
+.top-bar-logo{height:36px;max-width:44px;border-radius:8px;overflow:hidden;background:#f9a825;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;color:var(--green);flex-shrink:0;}
+.top-bar-logo img{width:100%;height:100%;object-fit:contain;}
+.top-bar-name{color:white;font-family:var(--font-heading);font-size:17px;font-weight:700;}
+.page{max-width:680px;margin:0 auto;padding:28px 20px 60px;}
+
+.loading-state{text-align:center;padding:60px 24px;}
+.spinner{width:40px;height:40px;border:4px solid #c8e6c9;border-top-color:var(--green);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;}
+.loading-text{font-size:14px;color:var(--text-muted);}
+
+.not-found{text-align:center;padding:60px 24px;}
+.not-found-icon{font-size:56px;margin-bottom:16px;}
+.not-found-title{font-family:var(--font-heading);font-size:22px;font-weight:700;color:var(--text-dark);margin-bottom:8px;}
+.not-found-sub{font-size:14px;color:var(--text-muted);}
+
+.profile-hero{background:var(--green);border-radius:16px 16px 0 0;padding:28px 28px 24px;position:relative;overflow:hidden;display:flex;gap:20px;align-items:flex-end;}
+.profile-hero::before{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.04);}
+.profile-logo-corner{position:absolute;top:16px;right:20px;display:flex;align-items:center;gap:8px;}
+.profile-logo-corner img{height:28px;object-fit:contain;filter:brightness(0) invert(1);opacity:0.9;}
+.profile-logo-corner-text{color:rgba(255,255,255,0.85);font-size:13px;font-weight:700;font-family:var(--font-heading);}
+.profile-photo-wrap{width:90px;height:90px;border-radius:50%;overflow:hidden;border:3px solid rgba(255,255,255,0.5);flex-shrink:0;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;}
+.profile-photo-wrap img{width:100%;height:100%;object-fit:cover;object-position:center top;}
+.profile-photo-initials{font-size:30px;font-weight:700;color:white;}
+.profile-meta{flex:1;}
+.profile-name{font-size:22px;font-weight:700;color:white;font-family:var(--font-heading);}
+.profile-role{font-size:13px;color:rgba(255,255,255,0.8);margin-top:4px;}
+.profile-status{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;margin-top:10px;}
+.profile-status.active{background:rgba(255,255,255,0.2);color:white;}
+.profile-status.inactive{background:rgba(183,28,28,0.3);color:#ffcdd2;}
+.profile-body{background:white;border-radius:0 0 16px 16px;border:1px solid var(--border);border-top:none;}
+.profile-section{padding:20px 24px;border-bottom:1px solid var(--border);}
+.profile-section:last-child{border-bottom:none;}
+.section-label{font-size:13px;font-weight:700;color:var(--text-dark);margin-bottom:14px;}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f5f5f5;}
+.info-row:last-child{border-bottom:none;}
+.info-key{font-size:13px;color:var(--text-muted);}
+.info-val{font-size:13px;font-weight:600;color:var(--text-dark);text-align:right;}
+.info-val a{color:var(--green);text-decoration:none;}
+.info-val a:hover{text-decoration:underline;}
+.bio-text{font-size:14px;color:var(--text-mid);line-height:1.7;}
+.inactive-banner{background:var(--inactive-bg);border:1px solid var(--inactive-text);padding:14px 20px;margin:16px 24px 0;border-radius:8px;font-size:13px;color:var(--inactive-text);font-weight:600;}
+.powered-by{text-align:center;margin-top:28px;font-size:12px;color:var(--text-muted);}
+.powered-by a{color:var(--green);font-weight:600;text-decoration:none;}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="top-bar-logo">
+    <img src="logo.png" alt="" id="top-logo-img">
+  </div>
+  <div class="top-bar-name" id="top-brand-name"></div>
+</div>
+
+<div class="page" id="page-content">
+  <div class="loading-state">
+    <div class="spinner"></div>
+    <div class="loading-text">Loading profile…</div>
+  </div>
+</div>
+
+<script>
+const { createClient } = supabase;
+const sb = createClient(DIRECTORY_CONFIG.supabaseUrl, DIRECTORY_CONFIG.supabaseKey);
+
+/* ── APPLY CONFIG ── */
+document.getElementById('top-brand-name').textContent = DIRECTORY_CONFIG.brandName;
+document.getElementById('top-logo-img').alt = DIRECTORY_CONFIG.brandName;
+document.getElementById('top-logo-img').onerror = function() {
+  this.outerHTML = DIRECTORY_CONFIG.logoFallback;
+};
+
+const COLORS = ['#1b5e20','#0277bd','#6a1b9a','#ad1457','#e65100','#00695c','#283593','#4e342e'];
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function initials(s) { return ((s.firstname||'?')[0] + (s.lastname||'?')[0]).toUpperCase(); }
+function avatarColor(id) { const n=(id||'').split('').reduce((a,c)=>a+c.charCodeAt(0),0); return COLORS[n%COLORS.length]; }
+function fmtDate(d) { if(!d) return 'N/A'; const[y,m,day]=d.split('-'); return `${day}/${m}/${y}`; }
+
+async function render() {
+  const page = document.getElementById('page-content');
+  const param = new URLSearchParams(window.location.search).get('staff');
+
+  if (!param) {
+    page.innerHTML = `<div class="not-found"><div class="not-found-icon">🔍</div>
+      <div class="not-found-title">No staff specified</div>
+      <div class="not-found-sub">Scan a staff ID card QR code to view a profile.</div></div>`;
+    return;
+  }
+
+  const { data, error } = await sb.from('staff').select('*').eq('id', param).single();
+
+  if (error || !data) {
+    page.innerHTML = `<div class="not-found"><div class="not-found-icon">❓</div>
+      <div class="not-found-title">Staff member not found</div>
+      <div class="not-found-sub">The ID "<strong>${esc(param)}</strong>" doesn't match any current staff record.</div></div>`;
+    return;
+  }
+
+  const s = data;
+  document.title = esc(s.firstname) + ' ' + esc(s.lastname) + ' — ' + DIRECTORY_CONFIG.brandName;
+
+  const active = s.status === 'active';
+  const ini = initials(s);
+  const col = avatarColor(s.id);
+
+  const photoHTML = s.photo_url
+    ? `<img src="${s.photo_url}" alt="${esc(s.firstname)}" onerror="this.outerHTML='<div class=profile-photo-initials style=background:${col}>${ini}</div>'">`
+    : `<div class="profile-photo-initials" style="background:${col}">${ini}</div>`;
+
+  page.innerHTML = `
+    <div class="profile-hero">
+      <div class="profile-logo-corner">
+        <img src="logo.png" alt="${esc(DIRECTORY_CONFIG.brandName)}"
+             onerror="this.parentElement.innerHTML='<span class=profile-logo-corner-text>${esc(DIRECTORY_CONFIG.logoFallback)} ${esc(DIRECTORY_CONFIG.brandName)}</span>'">
+      </div>
+      <div class="profile-photo-wrap">${photoHTML}</div>
+      <div class="profile-meta">
+        <div class="profile-name">${esc(s.firstname)} ${esc(s.lastname)}</div>
+        <div class="profile-role">${esc(s.role)} · ${esc(s.dept)}</div>
+        <span class="profile-status ${s.status}">
+          <span style="width:7px;height:7px;border-radius:50%;background:currentColor;display:inline-block"></span>
+          ${active ? 'Active Employee' : 'No Longer Active'}
+        </span>
+      </div>
+    </div>
+    <div class="profile-body">
+      ${!active ? `<div class="inactive-banner">⚠ This person is no longer an active employee of ${esc(DIRECTORY_CONFIG.brandName)}.</div>` : ''}
+      <div class="profile-section">
+        <div class="section-label">About</div>
+        <p class="bio-text">${esc(s.bio) || 'No bio available.'}</p>
+      </div>
+      <div class="profile-section">
+        <div class="section-label">Details</div>
+        <div class="info-row"><span class="info-key">Employee ID</span><span class="info-val">${esc(s.id)}</span></div>
+        <div class="info-row"><span class="info-key">Department</span><span class="info-val">${esc(s.dept)}</span></div>
+        <div class="info-row"><span class="info-key">Joined</span><span class="info-val">${fmtDate(s.join_date)}</span></div>
+        <div class="info-row"><span class="info-key">Status</span><span class="info-val">${active ? '✅ Active' : '❌ Inactive'}</span></div>
+      </div>
+      <div class="profile-section">
+        <div class="section-label">Contact</div>
+        <div class="info-row"><span class="info-key">Email</span><span class="info-val"><a href="mailto:${esc(s.email)}">${esc(s.email)}</a></span></div>
+        <div class="info-row"><span class="info-key">Phone</span><span class="info-val"><a href="tel:${s.phone.replace(/\s/g,'')}">${esc(s.phone)}</a></span></div>
+      </div>
+      <div class="profile-section" style="background:#f9fbf9;border-radius:0 0 16px 16px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <img src="logo.png" style="height:26px;object-fit:contain"
+               onerror="this.outerHTML='<div style=background:var(--gold);color:var(--green);width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900>${esc(DIRECTORY_CONFIG.logoFallback)}</div>'">
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--green);font-family:'Libre Baskerville',serif;">${esc(DIRECTORY_CONFIG.brandName)}</div>
+            <div style="font-size:11px;color:var(--text-muted);">${esc(DIRECTORY_CONFIG.website)} · ${esc(DIRECTORY_CONFIG.email)}</div>
+            <div style="font-size:10px;color:var(--text-muted);margin-top:2px;">${esc(DIRECTORY_CONFIG.address)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="powered-by">Verified staff profile · <a href="https://${esc(DIRECTORY_CONFIG.website)}" target="_blank" rel="noopener">${esc(DIRECTORY_CONFIG.website)}</a></div>`;
+}
+
+render();
+</script>
+</body>
+</html>
