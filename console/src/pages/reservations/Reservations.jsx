@@ -661,6 +661,33 @@ export default function Reservations() {
 
   useEffect(() => { load(); }, [load]);
 
+  /* ── Realtime: notify + prepend new reservations from the website ── */
+  useEffect(() => {
+    const channel = supabase
+      .channel("reservations-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "reservations" }, (payload) => {
+        const r = payload.new;
+        setRows((prev) => [r, ...prev]);
+        const dateStr = r.date
+          ? new Date(r.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+          : "—";
+        notifyTelegram([
+          "🍽 <b>New Reservation — BLACKROCK</b>",
+          "",
+          `👤 <b>${r.name}</b>`,
+          `📅 ${dateStr} at ${r.time || "—"}`,
+          `👥 Party of ${r.party || "—"}`,
+          r.occasion ? `🎉 ${r.occasion}` : null,
+          "",
+          r.phone ? `📞 ${r.phone}` : null,
+          r.email ? `✉️ ${r.email}` : null,
+          r.notes ? `\n📝 ${r.notes}` : null,
+        ].filter(Boolean).join("\n"));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   /* ── Summary counts (all rows, no filter) ── */
   const todayStr = new Date().toISOString().split("T")[0];
   const todayCount     = rows.filter((r) => r.date === todayStr).length;

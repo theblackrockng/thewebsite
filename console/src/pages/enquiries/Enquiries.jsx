@@ -1,5 +1,18 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "../../lib/supabase";
+
+async function notifyTelegram(text) {
+  const token  = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+  const chatId = import.meta.env.VITE_TELEGRAM_CHAT_ID;
+  if (!token || !chatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML" }),
+    });
+  } catch {}
+}
 import {
   RefreshCw, Loader2, Search, Eye, MessageSquare, Trash2,
   Send, X, AlertTriangle, Mail,
@@ -438,6 +451,28 @@ export default function Enquiries() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  /* ── Realtime: notify + prepend new enquiries ── */
+  useEffect(() => {
+    const channel = supabase
+      .channel("enquiries-realtime")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "enquiries" }, (payload) => {
+        const e = payload.new;
+        setRows((prev) => [e, ...prev]);
+        const preview = e.message ? (e.message.length > 200 ? e.message.slice(0, 200) + "…" : e.message) : "—";
+        notifyTelegram([
+          "💬 <b>New Enquiry — BLACKROCK</b>",
+          "",
+          `👤 <b>${e.name}</b>`,
+          e.email ? `✉️ ${e.email}` : null,
+          e.phone ? `📞 ${e.phone}` : null,
+          "",
+          `📩 ${preview}`,
+        ].filter(Boolean).join("\n"));
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
 
   /* ── Summary counts ── */
   const totalCount     = rows.length;

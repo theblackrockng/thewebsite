@@ -4,6 +4,7 @@ import { Phone, Mail, MapPin, MessageCircle, Clock, Send, Check } from "lucide-r
 import { BRAND } from "../lib/data";
 import SectionHeader from "../components/SectionHeader";
 import { supabase } from "../lib/supabase";
+import { notifyTelegram, enquiryMessage } from "../lib/telegram";
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
@@ -23,6 +24,7 @@ export default function Contact() {
     });
     setSending(false);
     if (error) { setSendError("Something went wrong. Please try again or email us directly."); return; }
+    notifyTelegram(enquiryMessage(form));
     setSent(true);
     setTimeout(() => {
       setSent(false);

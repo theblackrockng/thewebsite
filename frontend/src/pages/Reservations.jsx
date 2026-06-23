@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Check, Phone, MessageCircle, X, ArrowRight, ArrowLeft } from "lucide-react";
 import { OCCASIONS, BRAND, IMAGES } from "../lib/data";
 import { supabase } from "../lib/supabase";
+import { notifyTelegram, reservationMessage } from "../lib/telegram";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -75,6 +76,7 @@ export default function Reservations() {
 
     setSubmitting(false);
     if (error) { setSubmitError("Something went wrong. Please try again or call us directly."); return; }
+    notifyTelegram(reservationMessage({ name: form.name, email: form.email, phone: form.phone, date: form.date, time: form.time, party: form.party === "other" ? form.partyOther : form.party, occasion: selectedOcc?.label || occasion, notes: notes || null }));
     setSubmitted(true);
   };
 
