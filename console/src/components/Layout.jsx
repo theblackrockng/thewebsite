@@ -2,7 +2,7 @@ import { useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
-  FileText, Users, UserCircle, Settings, Home, Search,
+  Image, FileEdit, Users, UserCircle, Settings, Home, Search,
   Bell, Sun, Moon, LogOut, Menu, X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -30,7 +30,7 @@ function useTheme() {
 /* ─── useCurrentPage ─── */
 function useCurrentPage() {
   const { pathname } = useLocation();
-  const map = { "/": "Dashboard", "/reservations": "Reservations", "/menu": "Menu Editor", "/enquiries": "Enquiries" };
+  const map = { "/": "Dashboard", "/reservations": "Reservations", "/menu": "Menu Management", "/enquiries": "Enquiries", "/media": "Media Library", "/content": "Site Content" };
   return map[pathname] ?? "Console";
 }
 
@@ -47,8 +47,9 @@ const NAV_GROUPS = [
   {
     label: "Content",
     items: [
-      { to: "/menu", label: "Menu Editor",  icon: UtensilsCrossed },
-      { to: null,    label: "Content Hub",  icon: FileText },
+      { to: "/menu",    label: "Menu Management", icon: UtensilsCrossed },
+      { to: "/media",   label: "Media Library",   icon: Image },
+      { to: "/content", label: "Site Content",    icon: FileEdit },
     ],
   },
   {

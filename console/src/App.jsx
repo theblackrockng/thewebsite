@@ -4,7 +4,9 @@ import Layout from "./components/Layout";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Reservations from "./pages/reservations/Reservations";
-import MenuEditor from "./pages/menu/MenuEditor";
+import MenuManagement from "./pages/menu/MenuManagement";
+import MediaLibrary from "./pages/media/MediaLibrary";
+import SiteContent from "./pages/content/SiteContent";
 import Enquiries from "./pages/enquiries/Enquiries";
 
 function ProtectedRoute({ children }) {
@@ -26,7 +28,9 @@ function AppRoutes() {
       <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
-      <Route path="/menu" element={<ProtectedRoute><MenuEditor /></ProtectedRoute>} />
+      <Route path="/menu"    element={<ProtectedRoute><MenuManagement /></ProtectedRoute>} />
+      <Route path="/media"   element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
+      <Route path="/content" element={<ProtectedRoute><SiteContent /></ProtectedRoute>} />
       <Route path="/enquiries" element={<ProtectedRoute><Enquiries /></ProtectedRoute>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
