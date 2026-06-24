@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "@/App.css";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { useTheme } from "./hooks/useTheme";
 
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -51,10 +52,16 @@ function ContentHubLayout() {
   );
 }
 
+function ThemeLoader() {
+  useTheme();
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
+        <ThemeLoader />
         <ScrollToTop />
         <Routes>
           <Route path="/content-hub/*" element={<ContentHubLayout />} />
