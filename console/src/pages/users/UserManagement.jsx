@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
-import { UserPlus, Shield, Users, Edit2, ToggleLeft, ToggleRight, X, Check, Loader, Mail } from "lucide-react";
+import { UserPlus, Shield, Users, Edit2, ToggleLeft, ToggleRight, X, Check, Loader, Mail, Send, Copy, ExternalLink } from "lucide-react";
 
 const PERMISSIONS = [
   { key: "dashboard",    label: "Dashboard" },
@@ -322,8 +322,160 @@ function EditModal({ staff, onClose, onSave }) {
   );
 }
 
+/* ─── TelegramInviteModal ─── */
+function TelegramInviteModal({ member, onClose }) {
+  const [loading, setLoading] = useState(false);
+  const [link, setLink]       = useState("");
+  const [copied, setCopied]   = useState(false);
+  const [err, setErr]         = useState("");
+
+  const name = member.full_name || member.email.split("@")[0];
+
+  const generate = async () => {
+    setErr(""); setLink(""); setLoading(true);
+    try {
+      const res  = await fetch("/api/telegram-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to generate link");
+      setLink(data.link);
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copy = async () => {
+    await navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }} onClick={onClose} />
+      <div style={{
+        position: "relative", width: "100%", maxWidth: 440,
+        background: "var(--ds-surface)", border: "1px solid var(--ds-border)",
+        borderRadius: 12, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.4)",
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20 }}>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 7, background: "rgba(41,182,246,0.12)", border: "1px solid rgba(41,182,246,0.25)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <Send size={13} style={{ color: "#29b6f6" }} />
+              </div>
+              <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 19, fontWeight: 700, color: "var(--ds-text)" }}>
+                Telegram Invite
+              </div>
+            </div>
+            <div style={{ fontSize: 12, color: "var(--ds-muted)", paddingLeft: 36 }}>
+              Generate a one-time link for <strong style={{ color: "var(--ds-text)" }}>{name}</strong>
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)", display: "flex", marginTop: 2 }}>
+            <X size={17} />
+          </button>
+        </div>
+
+        {/* Info box */}
+        <div style={{ background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 8, padding: "12px 14px", marginBottom: 20, fontSize: 12.5, color: "var(--ds-muted)", lineHeight: 1.6 }}>
+          This generates a <strong style={{ color: "var(--ds-text)" }}>single-use</strong> invite link to the BLACKROCK staff Telegram group.
+          Share it with {name} via WhatsApp, SMS, or any channel — once they join, the link expires automatically.
+        </div>
+
+        {/* Generated link */}
+        {link && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "var(--ds-muted)", marginBottom: 8 }}>Invite Link</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{
+                flex: 1, background: "rgba(41,182,246,0.06)", border: "1px solid rgba(41,182,246,0.2)",
+                borderRadius: 7, padding: "9px 12px", fontSize: 12,
+                color: "#29b6f6", fontFamily: "monospace", overflow: "hidden",
+                textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                {link}
+              </div>
+              <button
+                onClick={copy}
+                title="Copy link"
+                style={{
+                  width: 38, flexShrink: 0, borderRadius: 7,
+                  border: copied ? "1px solid #4ade80" : "1px solid var(--ds-border)",
+                  background: copied ? "rgba(74,222,128,0.1)" : "var(--ds-input-bg)",
+                  color: copied ? "#4ade80" : "var(--ds-muted)",
+                  cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.2s",
+                }}
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
+              </button>
+              <a
+                href={link}
+                target="_blank"
+                rel="noreferrer"
+                title="Open in Telegram"
+                style={{
+                  width: 38, flexShrink: 0, borderRadius: 7,
+                  border: "1px solid var(--ds-border)",
+                  background: "var(--ds-input-bg)",
+                  color: "var(--ds-muted)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  textDecoration: "none", transition: "all 0.15s",
+                }}
+              >
+                <ExternalLink size={14} />
+              </a>
+            </div>
+            <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 8, opacity: 0.7 }}>
+              Link expires after 1 use. Generate a new one if needed.
+            </div>
+          </div>
+        )}
+
+        {err && (
+          <div style={{ fontSize: 12, color: "#ef4444", padding: "9px 12px", borderRadius: 7, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)", marginBottom: 16 }}>
+            {err}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div style={{ display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{
+            flex: 1, padding: "10px", borderRadius: 7, border: "1px solid var(--ds-border)",
+            background: "none", color: "var(--ds-muted)", fontSize: 13, cursor: "pointer",
+            fontFamily: "'DM Sans', sans-serif",
+          }}>
+            Close
+          </button>
+          <button onClick={generate} disabled={loading} style={{
+            flex: 2, padding: "10px", borderRadius: 7, border: "none",
+            background: loading ? "rgba(41,182,246,0.3)" : "rgba(41,182,246,0.15)",
+            color: loading ? "var(--ds-muted)" : "#29b6f6",
+            border: "1px solid rgba(41,182,246,0.3)",
+            fontSize: 13, fontWeight: 600, cursor: loading ? "default" : "pointer",
+            fontFamily: "'DM Sans', sans-serif",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+          }}>
+            {loading
+              ? <><Loader size={13} className="spin" /> Generating…</>
+              : <><Send size={13} /> {link ? "Generate New Link" : "Generate Invite Link"}</>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── StaffRow ─── */
-function StaffRow({ member, currentUserId, onEdit, onToggle }) {
+function StaffRow({ member, currentUserId, onEdit, onToggle, onTelegram }) {
   const name     = member.full_name || member.email.split("@")[0];
   const initials = name.slice(0, 2).toUpperCase();
   const isSelf   = member.id === currentUserId;
@@ -331,7 +483,7 @@ function StaffRow({ member, currentUserId, onEdit, onToggle }) {
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "40px 1fr 160px 1fr 100px 80px",
+      gridTemplateColumns: "40px 1fr 160px 1fr 100px 72px",
       gap: 16, alignItems: "center",
       padding: "14px 20px",
       borderBottom: "1px solid var(--ds-border)",
@@ -388,6 +540,21 @@ function StaffRow({ member, currentUserId, onEdit, onToggle }) {
       {/* Actions */}
       <div style={{ display: "flex", gap: 4 }}>
         <button
+          onClick={() => onTelegram(member)}
+          title="Send Telegram invite"
+          style={{
+            width: 30, height: 30, borderRadius: 6,
+            border: "1px solid rgba(41,182,246,0.25)",
+            background: "rgba(41,182,246,0.07)", cursor: "pointer",
+            color: "#29b6f6", display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(41,182,246,0.15)"; e.currentTarget.style.borderColor = "rgba(41,182,246,0.5)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(41,182,246,0.07)"; e.currentTarget.style.borderColor = "rgba(41,182,246,0.25)"; }}
+        >
+          <Send size={12} />
+        </button>
+        <button
           onClick={() => onEdit(member)}
           title="Edit"
           style={{
@@ -411,9 +578,10 @@ export default function UserManagement() {
   const { session } = useAuth();
   const [staff, setStaff]         = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [showInvite, setShowInvite] = useState(false);
-  const [editTarget, setEditTarget] = useState(null);
-  const [toast, setToast]         = useState("");
+  const [showInvite, setShowInvite]       = useState(false);
+  const [editTarget, setEditTarget]       = useState(null);
+  const [telegramTarget, setTelegramTarget] = useState(null);
+  const [toast, setToast]                 = useState("");
 
   const showToast = (msg) => {
     setToast(msg);
@@ -445,7 +613,7 @@ export default function UserManagement() {
   const tableHeader = (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "40px 1fr 160px 1fr 100px 80px",
+      gridTemplateColumns: "40px 1fr 160px 1fr 100px 72px",
       gap: 16, padding: "10px 20px",
       borderBottom: "1px solid var(--ds-border)",
       fontSize: 10, fontWeight: 600,
@@ -524,7 +692,7 @@ export default function UserManagement() {
               <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
                 {tableHeader}
                 {superAdmins.map(m => (
-                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} onEdit={setEditTarget} onToggle={toggleActive} />
+                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} />
                 ))}
               </div>
             </section>
@@ -539,7 +707,7 @@ export default function UserManagement() {
               <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
                 {tableHeader}
                 {managers.map(m => (
-                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} onEdit={setEditTarget} onToggle={toggleActive} />
+                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} />
                 ))}
               </div>
             </section>
@@ -554,7 +722,7 @@ export default function UserManagement() {
               <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
                 {tableHeader}
                 {regular.map(m => (
-                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} onEdit={setEditTarget} onToggle={toggleActive} />
+                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} />
                 ))}
               </div>
             </section>
@@ -567,6 +735,13 @@ export default function UserManagement() {
           currentUserId={session?.user?.id}
           onClose={() => setShowInvite(false)}
           onSuccess={() => { setShowInvite(false); fetchStaff(); showToast("Invite sent!"); }}
+        />
+      )}
+
+      {telegramTarget && (
+        <TelegramInviteModal
+          member={telegramTarget}
+          onClose={() => setTelegramTarget(null)}
         />
       )}
 
