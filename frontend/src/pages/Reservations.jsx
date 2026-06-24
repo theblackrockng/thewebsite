@@ -76,6 +76,24 @@ export default function Reservations() {
 
     setSubmitting(false);
     if (error) { setSubmitError("Something went wrong. Please try again or call us directly."); return; }
+
+    // Fire confirmation email (non-blocking — don't fail submission on email error)
+    if (form.email) {
+      fetch("/.netlify/functions/send-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          email: form.email,
+          date: form.date,
+          time: form.time,
+          party: form.party === "other" ? form.partyOther : form.party,
+          occasion: selectedOcc?.label || occasion,
+          notes: notes || null,
+        }),
+      }).catch(() => {}); // silent — reservation is already saved
+    }
+
     notifyTelegram(reservationMessage({ name: form.name, email: form.email, phone: form.phone, date: form.date, time: form.time, party: form.party === "other" ? form.partyOther : form.party, occasion: selectedOcc?.label || occasion, notes: notes || null }));
     setSubmitted(true);
   };

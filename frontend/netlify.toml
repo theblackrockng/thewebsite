@@ -2,7 +2,14 @@
   command = "npm install --legacy-peer-deps && npm run build"
   publish = "build"
 
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+[functions."scheduled-emails"]
+  schedule = "0 7 * * *"
