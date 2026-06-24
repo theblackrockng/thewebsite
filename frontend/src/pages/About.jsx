@@ -5,9 +5,9 @@ import { IMAGES } from "../lib/data";
 import SectionHeader from "../components/SectionHeader";
 
 const values = [
-  { num: "01", title: "Lagos on the plate", body: "Every dish on our menu traces back to a Nigerian market, a family kitchen, or a roadside that taught us how it should taste." },
-  { num: "02", title: "Hospitality with intention", body: "We don't believe in standard. Every guest, every table, every greeting, considered." },
-  { num: "03", title: "A room that listens", body: "Acoustics built so you can hear your dinner companion. Lighting that flatters everyone. Music that knows when to lift." },
+  { num: "01", title: "Roots on the plate", body: "Every dish traces back to a Nigerian market, a family kitchen, a recipe passed down without being written. We cook with memory and intention, not just ingredients." },
+  { num: "02", title: "Hospitality with soul", body: "We believe in you — your name, your mood, your unspoken need for a glass of water that arrives before you ask. You are considered before you walk in, attended to while you sit with us, and remembered long after you leave. Because to us, a guest is not a number. A guest is someone we get to take care of." },
+  { num: "03", title: "A room that was thought about", body: "The light falls softly — so everyone looks like they do on their best day. The music breathes with the room; it knows when to step forward and when to fade into the background. The table is set so you can lean in, laugh without strain, and stay longer than you planned. Nothing here is accidental. Every detail was chosen carefully to make you feel welcomed." },
 ];
 
 export default function About() {
@@ -131,7 +131,7 @@ export default function About() {
       {/* Values */}
       <section className="bg-[var(--charcoal)] text-[var(--warm-white)] py-24 md:py-36 grain" data-testid="values-section">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
-          <SectionHeader kicker="Our Philosophy" title="What we hold dear." dark />
+          <SectionHeader kicker="Our Philosophy" title="What We Hold Dear." dark />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8 mt-20">
             {values.map((v, i) => (
               <motion.div
