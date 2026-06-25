@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
-import { UserPlus, Shield, Users, Edit2, ToggleLeft, ToggleRight, X, Check, Loader, Mail, Send, Copy, ExternalLink } from "lucide-react";
+import { UserPlus, Shield, Users, Edit2, ToggleLeft, ToggleRight, X, Check, Loader, Mail, Send, Copy, ExternalLink, Trash2, AlertTriangle } from "lucide-react";
 
 const PERMISSIONS = [
   { key: "dashboard",    label: "Dashboard" },
@@ -476,8 +476,72 @@ function TelegramInviteModal({ member, onClose }) {
   );
 }
 
+/* ─── DeleteConfirmModal ─── */
+function DeleteConfirmModal({ member, onClose, onConfirm, deleting }) {
+  const name = member.full_name || member.email.split("@")[0];
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }} onClick={onClose} />
+      <div style={{
+        position: "relative", width: "100%", maxWidth: 420,
+        background: "var(--ds-surface)", border: "1px solid rgba(239,68,68,0.3)",
+        borderRadius: 12, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+      }}>
+        <div style={{ display: "flex", alignItems: "flex-start", gap: 14, marginBottom: 20 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+            background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <AlertTriangle size={18} style={{ color: "#ef4444" }} />
+          </div>
+          <div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700, color: "var(--ds-text)", marginBottom: 4 }}>
+              Remove staff member?
+            </div>
+            <div style={{ fontSize: 12.5, color: "var(--ds-muted)", lineHeight: 1.5 }}>
+              <strong style={{ color: "var(--ds-text)" }}>{name}</strong> ({member.email}) will lose all access immediately. This cannot be undone.
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: "flex", gap: 10 }}>
+          <button
+            onClick={onClose}
+            disabled={deleting}
+            style={{
+              flex: 1, padding: "10px", borderRadius: 7, border: "1px solid var(--ds-border)",
+              background: "none", color: "var(--ds-muted)", fontSize: 13, cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={deleting}
+            style={{
+              flex: 2, padding: "10px", borderRadius: 7, border: "none",
+              background: deleting ? "rgba(239,68,68,0.4)" : "#ef4444",
+              color: "#fff", fontSize: 13, fontWeight: 600,
+              cursor: deleting ? "default" : "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            }}
+          >
+            {deleting
+              ? <><Loader size={13} className="spin" /> Removing…</>
+              : <><Trash2 size={13} /> Remove Staff</>
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── StaffRow ─── */
-function StaffRow({ member, currentUserId, onEdit, onToggle, onTelegram }) {
+function StaffRow({ member, currentUserId, isSuperAdmin, onEdit, onToggle, onTelegram, onDelete }) {
   const name     = member.full_name || member.email.split("@")[0];
   const initials = name.slice(0, 2).toUpperCase();
   const isSelf   = member.id === currentUserId;
@@ -485,7 +549,7 @@ function StaffRow({ member, currentUserId, onEdit, onToggle, onTelegram }) {
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "40px 1fr 160px 1fr 100px 72px",
+      gridTemplateColumns: "40px 1fr 160px 1fr 100px 104px",
       gap: 16, alignItems: "center",
       padding: "14px 20px",
       borderBottom: "1px solid var(--ds-border)",
@@ -570,6 +634,23 @@ function StaffRow({ member, currentUserId, onEdit, onToggle, onTelegram }) {
         >
           <Edit2 size={12} />
         </button>
+        {isSuperAdmin && !isSelf && (
+          <button
+            onClick={() => onDelete(member)}
+            title="Remove staff"
+            style={{
+              width: 30, height: 30, borderRadius: 6,
+              border: "1px solid rgba(239,68,68,0.25)",
+              background: "rgba(239,68,68,0.06)", cursor: "pointer",
+              color: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(239,68,68,0.14)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.5)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(239,68,68,0.06)"; e.currentTarget.style.borderColor = "rgba(239,68,68,0.25)"; }}
+          >
+            <Trash2 size={12} />
+          </button>
+        )}
       </div>
     </div>
   );
@@ -583,6 +664,8 @@ export default function UserManagement() {
   const [showInvite, setShowInvite]       = useState(false);
   const [editTarget, setEditTarget]       = useState(null);
   const [telegramTarget, setTelegramTarget] = useState(null);
+  const [deleteTarget, setDeleteTarget]   = useState(null);
+  const [deleting, setDeleting]           = useState(false);
   const [toast, setToast]                 = useState("");
 
   const showToast = (msg) => {
@@ -608,6 +691,32 @@ export default function UserManagement() {
     showToast(`${member.full_name || "Staff"} ${!member.active ? "activated" : "deactivated"}`);
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/delete-staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: deleteTarget.id }),
+      });
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { throw new Error(`Server error (${res.status})`); }
+      if (!res.ok) throw new Error(data.error || "Failed to remove staff");
+      setStaff(s => s.filter(m => m.id !== deleteTarget.id));
+      showToast(`${deleteTarget.full_name || "Staff"} removed.`);
+      setDeleteTarget(null);
+    } catch (e) {
+      showToast(`Error: ${e.message}`);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const currentUserRole = staff.find(m => m.id === session?.user?.id)?.role;
+  const isSuperAdmin = currentUserRole === "super_admin";
+
   const superAdmins = staff.filter(m => m.role === "super_admin");
   const managers    = staff.filter(m => m.role === "manager");
   const regular     = staff.filter(m => m.role === "staff");
@@ -615,7 +724,7 @@ export default function UserManagement() {
   const tableHeader = (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "40px 1fr 160px 1fr 100px 72px",
+      gridTemplateColumns: "40px 1fr 160px 1fr 100px 104px",
       gap: 16, padding: "10px 20px",
       borderBottom: "1px solid var(--ds-border)",
       fontSize: 10, fontWeight: 600,
@@ -694,7 +803,7 @@ export default function UserManagement() {
               <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
                 {tableHeader}
                 {superAdmins.map(m => (
-                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} />
+                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} isSuperAdmin={isSuperAdmin} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} onDelete={setDeleteTarget} />
                 ))}
               </div>
             </section>
@@ -709,7 +818,7 @@ export default function UserManagement() {
               <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
                 {tableHeader}
                 {managers.map(m => (
-                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} />
+                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} isSuperAdmin={isSuperAdmin} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} onDelete={setDeleteTarget} />
                 ))}
               </div>
             </section>
@@ -724,7 +833,7 @@ export default function UserManagement() {
               <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
                 {tableHeader}
                 {regular.map(m => (
-                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} />
+                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} isSuperAdmin={isSuperAdmin} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} onDelete={setDeleteTarget} />
                 ))}
               </div>
             </section>
@@ -752,6 +861,15 @@ export default function UserManagement() {
           staff={editTarget}
           onClose={() => setEditTarget(null)}
           onSave={() => { setEditTarget(null); fetchStaff(); showToast("Staff updated."); }}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          member={deleteTarget}
+          deleting={deleting}
+          onClose={() => !deleting && setDeleteTarget(null)}
+          onConfirm={handleDelete}
         />
       )}
 
