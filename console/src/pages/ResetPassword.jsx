@@ -26,6 +26,7 @@ export default function ResetPassword() {
   const shouldReduceMotion = useReducedMotion();
 
   const [ready, setReady]       = useState(false);
+  const [isInvite, setIsInvite] = useState(false);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm]   = useState("");
   const [showPwd, setShowPwd]   = useState(false);
@@ -35,11 +36,15 @@ export default function ResetPassword() {
   const [error, setError]       = useState("");
 
   useEffect(() => {
-    // Supabase fires PASSWORD_RECOVERY when the reset link is clicked
+    // Detect invite vs password-reset from URL hash
+    const hash = window.location.hash;
+    const isInviteFlow = hash.includes("type=invite");
+    if (isInviteFlow) setIsInvite(true);
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") setReady(true);
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") setReady(true);
     });
-    // Also check if already in recovery session
+    // Already have a session (e.g. Supabase processed the hash before this mounted)
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) setReady(true);
     });
@@ -94,9 +99,11 @@ export default function ResetPassword() {
               <div style={{ width: 52, height: 52, borderRadius: "50%", background: "rgba(122,28,28,0.08)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 20px" }}>
                 <CheckCircle2 size={26} color={BURGUNDY} />
               </div>
-              <h2 style={{ fontFamily: DM, fontSize: "22px", fontWeight: 700, color: "#1a1a1a", margin: "0 0 10px" }}>Password updated</h2>
+              <h2 style={{ fontFamily: DM, fontSize: "22px", fontWeight: 700, color: "#1a1a1a", margin: "0 0 10px" }}>
+                {isInvite ? "Account activated" : "Password updated"}
+              </h2>
               <p style={{ fontFamily: DM, fontSize: "14px", color: "#9a9388", margin: 0, lineHeight: 1.6 }}>
-                You're all set. Redirecting you to the dashboard…
+                {isInvite ? "Your account is ready. Redirecting you to the dashboard…" : "You're all set. Redirecting you to the dashboard…"}
               </p>
             </div>
           ) : !ready ? (
@@ -107,8 +114,12 @@ export default function ResetPassword() {
           ) : (
             <>
               <div style={{ marginBottom: "28px" }}>
-                <h1 style={{ fontFamily: DM, fontSize: "24px", fontWeight: 700, color: "#1a1a1a", margin: 0, letterSpacing: "-0.01em" }}>Set new password</h1>
-                <p style={{ fontFamily: DM, fontSize: "14px", color: "#9a9388", margin: "6px 0 0" }}>Choose a strong password for your account.</p>
+                <h1 style={{ fontFamily: DM, fontSize: "24px", fontWeight: 700, color: "#1a1a1a", margin: 0, letterSpacing: "-0.01em" }}>
+                  {isInvite ? "Create your password" : "Set new password"}
+                </h1>
+                <p style={{ fontFamily: DM, fontSize: "14px", color: "#9a9388", margin: "6px 0 0" }}>
+                  {isInvite ? "Welcome to BLACKROCK Admin. Set a password to activate your account." : "Choose a strong password for your account."}
+                </p>
               </div>
 
               <form onSubmit={submit}>

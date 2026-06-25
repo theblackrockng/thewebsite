@@ -40,6 +40,9 @@ export default async function handler(req, res) {
 
     const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
       data: { full_name: full_name || email.split("@")[0] },
+      options: {
+        redirectTo: "https://console.blackrockrestaurantng.com/reset-password",
+      },
     });
 
     if (error) return res.status(400).json({ error: error.message });
