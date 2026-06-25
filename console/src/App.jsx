@@ -52,7 +52,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route path="/welcome" element={<ProtectedRoute><Welcome /></ProtectedRoute>} />
+      <Route path="/welcome" element={<Welcome />} />
       <Route path="/"            element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
       <Route path="/menu"        element={<ProtectedRoute><MenuManagement /></ProtectedRoute>} />

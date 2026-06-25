@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
 import { ShieldCheck, ArrowRight, Loader2, Lock, Eye, CalendarCheck, MessageSquare, UtensilsCrossed, Image, FileText, Users, Settings, LayoutDashboard } from "lucide-react";
@@ -33,7 +33,7 @@ const PERMISSION_META = {
 };
 
 export default function Welcome() {
-  const { session } = useAuth();
+  const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -61,6 +61,9 @@ export default function Welcome() {
   const activePermissions = isSuperAdmin
     ? Object.keys(PERMISSION_META)
     : Object.keys(PERMISSION_META).filter(key => profile?.permissions?.[key]);
+
+  if (authLoading) return null;
+  if (!session) return <Navigate to="/login" replace />;
 
   if (loading) {
     return (
