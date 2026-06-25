@@ -56,8 +56,8 @@ export default function MenuPage() {
             alt="BlackRock dishes"
             className="w-full h-full object-cover object-center"
           />
-          <div className="absolute inset-0" style={{ background: "rgba(20,20,20,0.82)" }} />
-          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(20,20,20,0.5) 0%, rgba(20,20,20,0.6) 60%, rgba(20,20,20,1) 100%)" }} />
+          <div className="absolute inset-0" style={{ background: "rgba(20,20,20,0.72)" }} />
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to bottom, rgba(20,20,20,0.4) 0%, rgba(20,20,20,0.5) 60%, rgba(20,20,20,1) 100%)" }} />
         </div>
         <div className="relative z-10 max-w-[1440px] mx-auto px-6 md:px-12 text-center pt-32 pb-24 md:pt-44 md:pb-32">
           <motion.span
