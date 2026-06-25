@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+
 import "@/App.css";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
@@ -58,6 +59,30 @@ function ThemeLoader() {
   return null;
 }
 
+function MainLayout() {
+  const { pathname } = useLocation();
+  const isReservations = pathname === "/reservations";
+  return (
+    <>
+      <Navbar />
+      <main>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/menu" element={<MenuPage />} />
+          <Route path="/reservations" element={<Reservations />} />
+          <Route path="/gallery" element={<Gallery />} />
+          <Route path="/contact" element={<Contact />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blog/:slug" element={<BlogPost />} />
+        </Routes>
+      </main>
+      {!isReservations && <Footer />}
+      <FloatingWhatsApp />
+    </>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -66,28 +91,7 @@ function App() {
         <ScrollToTop />
         <Routes>
           <Route path="/content-hub/*" element={<ContentHubLayout />} />
-          <Route
-            path="*"
-            element={
-              <>
-                <Navbar />
-                <main>
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/about" element={<About />} />
-                    <Route path="/menu" element={<MenuPage />} />
-                    <Route path="/reservations" element={<Reservations />} />
-                    <Route path="/gallery" element={<Gallery />} />
-                    <Route path="/contact" element={<Contact />} />
-                    <Route path="/blog" element={<Blog />} />
-                    <Route path="/blog/:slug" element={<BlogPost />} />
-                  </Routes>
-                </main>
-                <Footer />
-                <FloatingWhatsApp />
-              </>
-            }
-          />
+          <Route path="*" element={<MainLayout />} />
         </Routes>
       </AuthProvider>
     </BrowserRouter>

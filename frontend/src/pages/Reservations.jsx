@@ -13,10 +13,30 @@ const timeSlots = [
   "8:00 PM", "8:30 PM", "9:00 PM", "9:30 PM", "10:00 PM",
 ];
 
+const OCCASION_TINTS = {
+  "date-night":    "linear-gradient(135deg, rgba(139,26,43,0.32) 0%, rgba(15,13,10,0.88) 100%)",
+  "birthday":      "linear-gradient(135deg, rgba(201,140,76,0.28) 0%, rgba(15,13,10,0.88) 100%)",
+  "family":        "linear-gradient(135deg, rgba(76,139,76,0.22) 0%, rgba(15,13,10,0.88) 100%)",
+  "corporate":     "linear-gradient(135deg, rgba(76,100,139,0.25) 0%, rgba(15,13,10,0.88) 100%)",
+  "anniversary":   "linear-gradient(135deg, rgba(100,18,32,0.38) 0%, rgba(15,13,10,0.88) 100%)",
+  "proposal":      "linear-gradient(135deg, rgba(201,168,76,0.22) 0%, rgba(15,13,10,0.88) 100%)",
+  "private-dining":"linear-gradient(135deg, rgba(25,22,18,0.95) 0%, rgba(15,13,10,0.98) 100%)",
+  "special":       "linear-gradient(135deg, rgba(156,142,122,0.22) 0%, rgba(15,13,10,0.88) 100%)",
+};
+
+const pageVariants = {
+  enter: (dir) => ({ opacity: 0, x: dir * 60 }),
+  center: { opacity: 1, x: 0 },
+  exit: (dir) => ({ opacity: 0, x: dir * -60 }),
+};
+
+const pageTransition = { duration: 0.28, ease: "easeInOut" };
+
 export default function Reservations() {
   const [searchParams] = useSearchParams();
   const initialOcc = searchParams.get("occasion") || "";
   const [step, setStep] = useState(initialOcc ? 2 : 1);
+  const [dir, setDir] = useState(1);
   const [occasion, setOccasion] = useState(initialOcc);
   const [form, setForm] = useState({
     name: "",
@@ -27,7 +47,6 @@ export default function Reservations() {
     party: 2,
     partyOther: "",
     special: "",
-    // dynamic
     whoseBirthday: "",
     ageTurning: "",
     companyName: "",
@@ -46,6 +65,9 @@ export default function Reservations() {
   const isConcierge = selectedOcc?.concierge;
 
   const handleChange = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const goForward = () => { setDir(1); setStep(2); };
+  const goBack = () => { setDir(-1); setStep(1); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -77,7 +99,6 @@ export default function Reservations() {
     setSubmitting(false);
     if (error) { setSubmitError("Something went wrong. Please try again or call us directly."); return; }
 
-    // Fire confirmation email (non-blocking — don't fail submission on email error)
     if (form.email) {
       fetch("/api/send-confirmation", {
         method: "POST",
@@ -91,18 +112,29 @@ export default function Reservations() {
           occasion: selectedOcc?.label || occasion,
           notes: notes || null,
         }),
-      }).catch(() => {}); // silent — reservation is already saved
+      }).catch(() => {});
     }
 
     notifyTelegram(reservationMessage({ name: form.name, email: form.email, phone: form.phone, date: form.date, time: form.time, party: form.party === "other" ? form.partyOther : form.party, occasion: selectedOcc?.label || occasion, notes: notes || null }));
     setSubmitted(true);
   };
 
+  const indicatorStep = submitted ? 3 : step >= 2 ? 2 : 1;
+
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
-      {/* Header */}
-      <section className="bg-[var(--charcoal)] pt-12 pb-8 md:pt-20" data-testid="reservation-header">
-        <div className="max-w-[1200px] mx-auto px-6 md:px-12 text-center">
+      {/* Hero — full-width background image with dark overlay */}
+      <section
+        className="relative pt-12 pb-10 md:pt-20 md:pb-14 overflow-hidden"
+        style={{
+          backgroundImage: `url('${IMAGES.heroRooftop}')`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+        data-testid="reservation-header"
+      >
+        <div className="absolute inset-0" style={{ background: "rgba(15,13,10,0.82)" }} />
+        <div className="relative z-10 max-w-[1200px] mx-auto px-6 md:px-12 text-center">
           <span className="gold-line">Reserve</span>
           <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--warm-white)]">
             Tell us about <span className="font-serif-italic text-[var(--gold)]">your night.</span>
@@ -113,64 +145,140 @@ export default function Reservations() {
         </div>
       </section>
 
+      {/* Gold decorative transition line */}
+      <div className="w-full h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.45) 30%, rgba(201,168,76,0.45) 70%, transparent 100%)" }} />
+
       <section className="bg-[var(--charcoal)] pb-24 md:pb-32">
         <div className="max-w-[1200px] mx-auto px-6 md:px-12">
-          {/* Step indicator */}
-          <div className="flex items-center justify-center gap-3 mb-10 md:mb-16">
-            {[1, 2, 3].map((s) => (
-              <div key={s} className="flex items-center gap-3">
-                <div
-                  className={`w-7 h-7 md:w-8 md:h-8 flex items-center justify-center text-xs tracking-wider transition-all ${
-                    step >= s
-                      ? "bg-[var(--gold)] text-[var(--charcoal)]"
-                      : "bg-transparent border border-[var(--border-soft)] text-[var(--muted)]"
-                  }`}
-                >
-                  {step > s ? <Check size={14} /> : s}
+
+          {/* Step progress bar */}
+          <div className="flex items-start justify-center pt-10 mb-5 md:mb-6">
+            {["Your Occasion", "Your Details", "Confirm"].map((label, i) => {
+              const n = i + 1;
+              const isCompleted = indicatorStep > n;
+              const isActive = indicatorStep === n;
+              return (
+                <div key={n} className="flex items-center">
+                  <div className="flex flex-col items-center gap-1.5 min-w-[64px] md:min-w-[80px]">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
+                      style={{
+                        background: isCompleted || isActive ? "var(--gold)" : "transparent",
+                        border: isCompleted || isActive ? "none" : "1px solid #3a3228",
+                        color: isCompleted || isActive ? "var(--charcoal)" : "var(--muted)",
+                        transition: "all 0.2s ease",
+                      }}
+                    >
+                      {isCompleted ? <Check size={12} strokeWidth={3} /> : n}
+                    </div>
+                    <span
+                      className="text-[9px] md:text-[10px] uppercase tracking-[0.18em] text-center whitespace-nowrap"
+                      style={{
+                        color: isActive || isCompleted ? "var(--gold)" : "var(--muted)",
+                        transition: "color 0.2s ease",
+                      }}
+                    >
+                      {label}
+                    </span>
+                  </div>
+                  {n < 3 && (
+                    <div
+                      className="w-12 md:w-20 h-px mx-1 mb-5"
+                      style={{
+                        background: isCompleted ? "var(--gold)" : "var(--border-soft)",
+                        transition: "background 0.5s ease",
+                      }}
+                    />
+                  )}
                 </div>
-                {s < 3 && <div className={`w-12 h-px ${step > s ? "bg-[var(--gold)]" : "bg-[var(--border-soft)]"}`} />}
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          <AnimatePresence mode="wait">
+          <AnimatePresence mode="wait" custom={dir}>
             {step === 1 && (
               <motion.div
                 key="step1"
-                initial={{ opacity: 0, x: 30 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -30 }}
-                transition={{ duration: 0.5 }}
+                custom={dir}
+                variants={pageVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={pageTransition}
                 data-testid="step-occasion"
               >
-                <div className="text-center mb-12">
+                <div className="text-center mb-8">
                   <h2 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
                     What are you celebrating?
                   </h2>
                 </div>
+
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {OCCASIONS.map((o) => (
                     <button
                       key={o.id}
-                      onClick={() => { setOccasion(o.id); setStep(2); }}
+                      onClick={() => setOccasion(o.id)}
                       className={`occasion-card text-left ${occasion === o.id ? "selected" : ""}`}
                       data-testid={`occasion-${o.id}`}
+                      style={{ background: OCCASION_TINTS[o.id] }}
                     >
+                      <AnimatePresence>
+                        {occasion === o.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.6 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.6 }}
+                            transition={{ duration: 0.15 }}
+                            className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full flex items-center justify-center"
+                            style={{ background: "var(--gold)" }}
+                          >
+                            <Check size={10} strokeWidth={3} style={{ color: "var(--charcoal)" }} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                       <h3 className="font-serif-display text-lg md:text-3xl mb-2">{o.label}</h3>
                       <p className="text-xs leading-relaxed opacity-70">{o.note}</p>
                     </button>
                   ))}
                 </div>
+
+                {/* Continue to Details button — animates in on card select */}
+                <AnimatePresence>
+                  {occasion && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 14 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 8 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className="flex justify-center mt-8"
+                    >
+                      <button
+                        onClick={goForward}
+                        className="flex items-center gap-3 px-8 py-4 text-sm uppercase tracking-[0.24em] font-medium transition-colors duration-200"
+                        style={{
+                          background: "var(--gold)",
+                          color: "var(--charcoal)",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--gold-light)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "var(--gold)")}
+                      >
+                        Continue to Details <ArrowRight size={15} />
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             )}
 
             {step === 2 && isConcierge && (
               <motion.div
                 key="concierge"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.5 }}
+                custom={dir}
+                variants={pageVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={pageTransition}
                 data-testid="step-concierge"
               >
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
@@ -228,7 +336,7 @@ export default function Reservations() {
                         <ArrowRight size={16} className="text-[var(--muted)] group-hover:translate-x-1 transition-transform" />
                       </button>
                     </div>
-                    <button onClick={() => setStep(1)} className="btn-ghost-dark mt-12" data-testid="concierge-back">
+                    <button onClick={goBack} className="btn-ghost-dark mt-12" data-testid="concierge-back">
                       <ArrowLeft size={14} /> Change occasion
                     </button>
                   </div>
@@ -239,10 +347,13 @@ export default function Reservations() {
             {(step === 2 && !isConcierge && occasion) || step === 2.5 ? (
               <motion.form
                 key="step2"
+                custom={dir}
+                variants={pageVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={pageTransition}
                 onSubmit={handleSubmit}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
                 className="max-w-3xl mx-auto"
                 data-testid="reservation-form"
               >
@@ -398,7 +509,7 @@ export default function Reservations() {
                   <p className="text-sm text-red-400 border border-red-400/20 bg-red-400/5 px-4 py-3 mb-2">{submitError}</p>
                 )}
                 <div className="flex items-center justify-between flex-wrap gap-4">
-                  <button type="button" onClick={() => setStep(1)} className="btn-ghost-dark" data-testid="form-back">
+                  <button type="button" onClick={goBack} className="btn-ghost-dark" data-testid="form-back">
                     <ArrowLeft size={14} /> Change occasion
                   </button>
                   <button type="submit" disabled={submitting} className="btn-burgundy" data-testid="form-submit">
@@ -465,7 +576,6 @@ function SuccessModal({ form, occasion, onClose }) {
               className="w-16 h-16 rounded-full bg-[var(--gold)] flex items-center justify-center mx-auto mb-8"
             >
               <Check size={28} className="text-[var(--charcoal)]" strokeWidth={2.5} />
-
             </motion.div>
             <div className="gold-line mb-4">Confirmed</div>
             <h3 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
