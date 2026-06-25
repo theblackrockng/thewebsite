@@ -239,16 +239,16 @@ export default function Home() {
       </section>
 
       {/* SIGNATURE EXPERIENCE - SPLIT */}
-      <section className="bg-[var(--charcoal)] overflow-hidden" data-testid="signature-section">
-        <div className="grid grid-cols-1 lg:grid-cols-2 items-stretch">
+      <section className="bg-[var(--charcoal)] py-24 md:py-36" data-testid="signature-section">
+        <div className="max-w-[1440px] mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
 
-          {/* Crossfade image carousel — full bleed to left edge, no padding */}
+          {/* Crossfade image carousel */}
           <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.9 }}
-            className="relative min-h-[420px] lg:min-h-0 order-2 lg:order-1 overflow-hidden"
+            className="relative aspect-[4/5] overflow-hidden order-2 lg:order-1"
           >
             {KITCHEN_IMAGES.map((img, i) => (
               <img
@@ -270,44 +270,42 @@ export default function Home() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.9 }}
-            className="order-1 lg:order-2 flex items-center py-24 md:py-36 px-6 md:px-12 lg:px-16 xl:px-20"
+            className="order-1 lg:order-2"
           >
-            <div className="max-w-lg w-full">
-              <span className="gold-line left mb-6">The Kitchen</span>
-              <h2 className="font-serif-display text-4xl md:text-5xl lg:text-6xl leading-tight mt-6 text-[var(--warm-white)]">
-                From Mile 12 to
-                <br />
-                <span className="font-serif-italic text-[var(--burgundy)]">your table.</span>
-              </h2>
-              <p className="text-[var(--muted)] text-base md:text-lg leading-relaxed mt-8 max-w-xl font-light">
-                Jollof smoked over open fire. Pepper soup that clears the head.
-                Goat that falls off the bone. Suya the way Sabo intended.
-                Our menu is a tour of Nigeria, cooked with respect, plated with pride.
-              </p>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.7, delay: 0.3 }}
-                className="mt-8 grid grid-cols-3 gap-4 md:gap-6 max-w-md"
-              >
-                <div>
-                  <div className="font-serif-display text-4xl text-[var(--burgundy)]">85+</div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Dishes On Menu</div>
-                </div>
-                <div>
-                  <div className="font-serif-display text-4xl text-[var(--burgundy)]">100%</div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Local Sourced</div>
-                </div>
-                <div>
-                  <div className="font-serif-display text-xl leading-tight text-[var(--burgundy)]">Every Guest,<br />Remembered</div>
-                  <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Our Promise</div>
-                </div>
-              </motion.div>
-              <Link to="/menu" className="btn-ghost-dark mt-12 inline-flex" data-testid="explore-menu-link">
-                Explore the Menu <ArrowRight size={14} />
-              </Link>
-            </div>
+            <span className="gold-line left mb-6">The Kitchen</span>
+            <h2 className="font-serif-display text-4xl md:text-5xl lg:text-6xl leading-tight mt-6 text-[var(--warm-white)]">
+              From Mile 12 to
+              <br />
+              <span className="font-serif-italic text-[var(--burgundy)]">your table.</span>
+            </h2>
+            <p className="text-[var(--muted)] text-base md:text-lg leading-relaxed mt-8 max-w-xl font-light">
+              Jollof smoked over open fire. Pepper soup that clears the head.
+              Goat that falls off the bone. Suya the way Sabo intended.
+              Our menu is a tour of Nigeria, cooked with respect, plated with pride.
+            </p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.7, delay: 0.3 }}
+              className="mt-8 grid grid-cols-3 gap-4 md:gap-6 max-w-md"
+            >
+              <div>
+                <div className="font-serif-display text-4xl text-[var(--burgundy)]">85+</div>
+                <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Dishes On Menu</div>
+              </div>
+              <div>
+                <div className="font-serif-display text-4xl text-[var(--burgundy)]">100%</div>
+                <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Local Sourced</div>
+              </div>
+              <div>
+                <div className="font-serif-display text-xl leading-tight text-[var(--burgundy)]">Every Guest,<br />Remembered</div>
+                <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Our Promise</div>
+              </div>
+            </motion.div>
+            <Link to="/menu" className="btn-ghost-dark mt-12 inline-flex" data-testid="explore-menu-link">
+              Explore the Menu <ArrowRight size={14} />
+            </Link>
           </motion.div>
 
         </div>
