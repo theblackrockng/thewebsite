@@ -73,6 +73,8 @@ export default function Contact() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: i * 0.08 }}
+              whileHover={{ y: -6, scale: 1.01, transition: { duration: 0.2 } }}
+              whileTap={{ scale: 0.98 }}
               className="block p-5 md:p-8 bg-[var(--charcoal-soft)] hover:bg-[var(--burgundy)] hover:text-[var(--warm-white)] transition-all duration-500 group border border-[var(--border-soft)] hover:border-[var(--burgundy)] overflow-hidden"
               data-testid={`contact-${c.label.toLowerCase()}`}
             >
@@ -123,7 +125,13 @@ export default function Contact() {
           </div>
 
           {/* Form */}
-          <div className="lg:col-span-7">
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={{ duration: 0.8 }}
+            className="lg:col-span-7"
+          >
             <span className="gold-line left">Send a Note</span>
             <h2 className="font-serif-display text-4xl md:text-5xl mt-6 text-[var(--warm-white)]">
               General <span className="font-serif-italic text-[var(--gold)]">enquiries.</span>
@@ -181,7 +189,7 @@ export default function Contact() {
                 {sent ? (<><Check size={14} /> <span>Sent. We'll be in touch</span></>) : sending ? (<><span>Sending...</span></>) : (<><Send size={14} /> <span>Send Message</span></>)}
               </button>
             </form>
-          </div>
+          </motion.div>
         </div>
       </section>
 

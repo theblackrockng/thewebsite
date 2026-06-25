@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Instagram, MapPin, Phone, Mail } from "lucide-react";
 import { BRAND, NAV_LINKS } from "../lib/data";
 import BrandMark from "./BrandMark";
@@ -9,7 +10,13 @@ export default function Footer() {
       <div className="max-w-[1440px] mx-auto px-6 md:px-12 pt-20 pb-10">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12">
           {/* Brand */}
-          <div className="md:col-span-5">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="md:col-span-5"
+          >
             <BrandMark variant="dark" size="lg" className="mb-8" />
             <p className="font-serif-italic text-xl text-[var(--gold)] leading-snug max-w-md mb-6">
               "Flavor on a plate. Wine in the glass. Joy filling the air."
@@ -18,10 +25,16 @@ export default function Footer() {
               A restaurant, lounge and rooftop in the heart of Ikeja. From jollof to T-bone,
               pepper soup to palm wine. Every flavour of Lagos, under one roof.
             </p>
-          </div>
+          </motion.div>
 
           {/* Visit */}
-          <div className="md:col-span-3">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="md:col-span-3"
+          >
             <h4 className="gold-line left mb-6">Visit</h4>
             <div className="space-y-4 text-sm">
               <div className="flex items-start gap-3">
@@ -37,10 +50,16 @@ export default function Footer() {
                 <span className="text-white/80">{BRAND.email}</span>
               </a>
             </div>
-          </div>
+          </motion.div>
 
           {/* Hours */}
-          <div className="md:col-span-2">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="md:col-span-2"
+          >
             <h4 className="gold-line left mb-6">Hours</h4>
             <div className="space-y-2 text-sm">
               {BRAND.hours.map((h) => (
@@ -50,10 +69,16 @@ export default function Footer() {
                 </div>
               ))}
             </div>
-          </div>
+          </motion.div>
 
           {/* Navigate */}
-          <div className="md:col-span-2">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6, delay: 0.3 }}
+            className="md:col-span-2"
+          >
             <h4 className="gold-line left mb-6">Navigate</h4>
             <ul className="space-y-2 text-sm">
               {NAV_LINKS.map((l) => (
@@ -70,10 +95,16 @@ export default function Footer() {
                 <Link to="/reservations" className="text-[var(--gold)] hover:underline">Reserve a Table</Link>
               </li>
             </ul>
-          </div>
+          </motion.div>
         </div>
 
-        <div className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6, delay: 0.4 }}
+          className="mt-16 pt-8 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-4"
+        >
           <p className="text-xs text-white/40 tracking-wider">
             © {new Date().getFullYear()} BLACKROCK. All rights reserved.
           </p>
@@ -83,7 +114,7 @@ export default function Footer() {
             </a>
             <span className="text-xs text-white/40 tracking-[0.3em] uppercase">Crafted in Lagos</span>
           </div>
-        </div>
+        </motion.div>
       </div>
     </footer>
   );

@@ -193,6 +193,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.6, delay: i * 0.08 }}
+                whileHover={{ y: -6, transition: { duration: 0.25 } }}
               >
                 <Link
                   to={`/reservations?occasion=${o.id}`}
@@ -224,7 +225,13 @@ export default function Home() {
           >
             <img src={IMAGES.jollof} alt="Signature plate" loading="lazy" />
           </motion.div>
-          <div className="order-1 lg:order-2">
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.9 }}
+            className="order-1 lg:order-2"
+          >
             <span className="gold-line left mb-6">The Kitchen</span>
             <h2 className="font-serif-display text-4xl md:text-5xl lg:text-6xl leading-tight mt-6 text-[var(--warm-white)]">
               From Mile 12 to
@@ -236,7 +243,13 @@ export default function Home() {
               Goat that falls off the bone. Suya the way Sabo intended.
               Our menu is a tour of Nigeria, cooked with respect, plated with pride.
             </p>
-            <div className="mt-8 grid grid-cols-3 gap-4 md:gap-6 max-w-md">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.7, delay: 0.3 }}
+              className="mt-8 grid grid-cols-3 gap-4 md:gap-6 max-w-md"
+            >
               <div>
                 <div className="font-serif-display text-4xl text-[var(--burgundy)]">85+</div>
                 <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Dishes On Menu</div>
@@ -249,11 +262,11 @@ export default function Home() {
                 <div className="font-serif-display text-4xl text-[var(--burgundy)]">36</div>
                 <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">States Represented</div>
               </div>
-            </div>
+            </motion.div>
             <Link to="/menu" className="btn-ghost-dark mt-12 inline-flex" data-testid="explore-menu-link">
               Explore the Menu <ArrowRight size={14} />
             </Link>
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -277,6 +290,7 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-80px" }}
                 transition={{ duration: 0.8, delay: i * 0.15 }}
+                whileHover={{ y: -6, transition: { duration: 0.3 } }}
                 className="group relative"
                 data-testid={`space-${s.floor.toLowerCase().replace(" ", "-")}`}
               >
@@ -343,7 +357,12 @@ export default function Home() {
       {/* LOCATION / FIND US */}
       <section className="bg-[var(--charcoal)] text-[var(--warm-white)] py-24 md:py-36" data-testid="location-section">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div>
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.9 }}
+          >
             <span className="gold-line left mb-6">Find Us</span>
             <h2 className="font-serif-display text-4xl md:text-5xl lg:text-6xl leading-tight mt-6">
               In the heart of
@@ -372,7 +391,7 @@ export default function Home() {
                 Get Directions <ArrowRight size={14} />
               </a>
             </div>
-          </div>
+          </motion.div>
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             whileInView={{ opacity: 1, scale: 1 }}

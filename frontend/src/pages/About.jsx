@@ -159,18 +159,30 @@ export default function About() {
             { n: "1,800+", l: "Reviews" },
             { n: "48", l: "Seasonal Dishes" },
             { n: "2,400", l: "Bottles in Cellar" },
-          ].map((s) => (
-            <div key={s.l}>
+          ].map((s, i) => (
+            <motion.div
+              key={s.l}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.6, delay: i * 0.1 }}
+            >
               <div className="font-serif-display text-5xl md:text-6xl text-[var(--burgundy)]">{s.n}</div>
               <div className="text-xs uppercase tracking-[0.28em] text-[var(--muted)] mt-3">{s.l}</div>
-            </div>
+            </motion.div>
           ))}
         </div>
       </section>
 
       {/* Closing CTA */}
       <section className="bg-[var(--burgundy)] text-[var(--warm-white)] py-24 md:py-32 grain relative" data-testid="about-cta">
-        <div className="max-w-3xl mx-auto px-6 md:px-12 text-center relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.9 }}
+          className="max-w-3xl mx-auto px-6 md:px-12 text-center relative z-10"
+        >
           <span className="gold-line mb-8">Reserve</span>
           <h2 className="font-serif-display text-4xl md:text-6xl leading-tight mt-6">
             Come see for yourself.
@@ -181,7 +193,7 @@ export default function About() {
           <Link to="/reservations" className="btn-outline-gold mt-12 inline-flex" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
             Reserve a Table <ArrowRight size={14} />
           </Link>
-        </div>
+        </motion.div>
       </section>
     </div>
   );

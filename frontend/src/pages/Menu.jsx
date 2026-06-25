@@ -71,9 +71,12 @@ export default function MenuPage() {
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <div className="flex gap-2 overflow-x-auto no-scrollbar py-4">
             {categories.map((cat) => (
-              <button
+              <motion.button
                 key={cat}
                 onClick={() => setActive(cat)}
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                transition={{ duration: 0.15 }}
                 className={`flex-shrink-0 px-4 py-2 md:px-6 md:py-3 text-xs uppercase tracking-[0.22em] font-medium transition-all duration-300 border ${
                   active === cat
                     ? "bg-[var(--gold)] text-[var(--charcoal)] border-[var(--gold)]"
@@ -82,7 +85,7 @@ export default function MenuPage() {
                 data-testid={`menu-tab-${cat.toLowerCase()}`}
               >
                 {cat}
-              </button>
+              </motion.button>
             ))}
           </div>
         </div>
@@ -128,6 +131,7 @@ export default function MenuPage() {
                       initial={{ opacity: 0, y: 16 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: i * 0.08 }}
+                      whileHover={{ x: 4, transition: { duration: 0.2 } }}
                       className="py-8 border-b border-[var(--border-soft)] hover:bg-[var(--charcoal-soft)]/40 transition-colors px-2 -mx-2"
                       data-testid={`menu-item-${item.name.toLowerCase().replace(/\s+/g, "-")}`}
                     >

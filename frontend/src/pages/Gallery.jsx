@@ -89,9 +89,12 @@ export default function Gallery() {
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <div className="flex gap-2 overflow-x-auto no-scrollbar justify-start md:justify-center pb-2">
             {filters.map((f) => (
-              <button
+              <motion.button
                 key={f}
                 onClick={() => setFilter(f)}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.15 }}
                 className={`flex-shrink-0 px-5 py-2 text-xs uppercase tracking-[0.28em] transition-all duration-300 border ${
                   filter === f
                     ? "bg-[var(--gold)] text-[var(--charcoal)] border-[var(--gold)]"
@@ -100,7 +103,7 @@ export default function Gallery() {
                 data-testid={`gallery-filter-${f.toLowerCase()}`}
               >
                 {f}
-              </button>
+              </motion.button>
             ))}
           </div>
         </div>
@@ -116,6 +119,8 @@ export default function Gallery() {
                 layout
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ scale: 1.03, zIndex: 1, transition: { duration: 0.25 } }}
+                whileTap={{ scale: 0.98 }}
                 transition={{ duration: 0.5, delay: (i % 8) * 0.05 }}
                 onClick={() => setLightbox(g)}
                 className={`img-hover relative cursor-pointer overflow-hidden group ${
@@ -145,15 +150,23 @@ export default function Gallery() {
             {[
               { img: IMAGES.rooftopDay, title: "Daylight & Fresh", desc: "Sunday brunches, soft afternoon light, slow lunches that turn into dinner." },
               { img: IMAGES.rooftopNight, title: "After Dark", desc: "The city below, the night above. The rooftop at its best. Candlelit, open sky, you in the middle of it." },
-            ].map((c) => (
-              <div key={c.title} className="img-hover aspect-[4/3] relative">
+            ].map((c, i) => (
+              <motion.div
+                key={c.title}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.7, delay: i * 0.15 }}
+                whileHover={{ y: -6, transition: { duration: 0.3 } }}
+                className="img-hover aspect-[4/3] relative"
+              >
                 <img src={c.img} alt={c.title} loading="lazy" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12">
                   <h3 className="font-serif-display text-3xl md:text-5xl">{c.title}</h3>
                   <p className="text-white/70 mt-3 max-w-md font-light">{c.desc}</p>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
