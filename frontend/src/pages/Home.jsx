@@ -9,6 +9,17 @@ import BrandMark from "../components/BrandMark";
 
 const occasionPreview = OCCASIONS.slice(0, 4);
 
+const OCCASION_TINTS = {
+  "date-night":    "linear-gradient(135deg, rgba(139,26,43,0.32) 0%, rgba(15,13,10,0.88) 100%)",
+  "birthday":      "linear-gradient(135deg, rgba(201,140,76,0.28) 0%, rgba(15,13,10,0.88) 100%)",
+  "family":        "linear-gradient(135deg, rgba(76,139,76,0.22) 0%, rgba(15,13,10,0.88) 100%)",
+  "corporate":     "linear-gradient(135deg, rgba(76,100,139,0.25) 0%, rgba(15,13,10,0.88) 100%)",
+  "anniversary":   "linear-gradient(135deg, rgba(100,18,32,0.38) 0%, rgba(15,13,10,0.88) 100%)",
+  "proposal":      "linear-gradient(135deg, rgba(201,168,76,0.22) 0%, rgba(15,13,10,0.88) 100%)",
+  "private-dining":"linear-gradient(135deg, rgba(25,22,18,0.95) 0%, rgba(15,13,10,0.98) 100%)",
+  "special":       "linear-gradient(135deg, rgba(156,142,122,0.22) 0%, rgba(15,13,10,0.88) 100%)",
+};
+
 const FALLBACK_FOOD_REEL = [
   IMAGES.jollof, IMAGES.starter, IMAGES.pepperSoup, IMAGES.noodles,
   IMAGES.pasta, IMAGES.photo1, IMAGES.photo2, IMAGES.food3,
@@ -178,7 +189,7 @@ export default function Home() {
       </section>
 
       {/* OCCASIONS PREVIEW */}
-      <section className="bg-[var(--charcoal-soft)] py-24 md:py-32" data-testid="occasions-preview">
+      <section className="bg-[var(--charcoal)] py-24 md:py-32" data-testid="occasions-preview">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <SectionHeader
             kicker="Made for moments"
@@ -193,11 +204,11 @@ export default function Home() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{ duration: 0.6, delay: i * 0.08 }}
-                whileHover={{ y: -6, transition: { duration: 0.25 } }}
               >
                 <Link
                   to={`/reservations?occasion=${o.id}`}
                   className="occasion-card block h-full"
+                  style={{ background: OCCASION_TINTS[o.id] }}
                   data-testid={`occasion-preview-${o.id}`}
                 >
                   <div className="text-xs uppercase tracking-[0.3em] opacity-60 mb-4">0{i + 1}</div>
