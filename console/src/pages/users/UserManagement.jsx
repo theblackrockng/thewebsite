@@ -81,7 +81,9 @@ function InviteModal({ onClose, onSuccess, currentUserId }) {
           invited_by: currentUserId,
         }),
       });
-      const data = await res.json();
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch { throw new Error(`Server error (${res.status}). Please try again.`); }
       if (!res.ok) throw new Error(data.error || "Failed to invite user");
       onSuccess();
     } catch (e) {
