@@ -342,7 +342,7 @@ export default function Home() {
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-16">
             {[
-              { img: IMAGES.interior1, name: "The Restaurant", desc: "Continental and traditional. White linen, warm light, full flavours.", floor: "Ground Floor" },
+              { img: "/Restaurant interior.jpg", name: "The Restaurant", desc: "Continental and traditional. White linen, warm light, full flavours.", floor: "Ground Floor" },
               { img: "/rooftop.jpg", name: "The Rooftop Lounge", desc: "Open sky, the Ikeja skyline around you. Good company, longer pours, the night stretches.", floor: "Rooftop" },
             ].map((s, i) => (
               <motion.div
