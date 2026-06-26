@@ -43,8 +43,8 @@ export default function Contact() {
       {/* Header */}
       <section className="relative h-[420px] md:h-[520px] overflow-hidden flex items-center justify-center" data-testid="contact-header">
         <img src="/contactushero.jpg" alt="BlackRock dining room" className="absolute inset-0 w-full h-full object-cover" />
-        <div className="absolute inset-0 bg-[var(--charcoal)]/70" />
-        <div className="absolute inset-0 bg-gradient-to-b from-[var(--charcoal)]/40 via-transparent to-[var(--charcoal)]/80" />
+        <div className="absolute inset-0 bg-[var(--charcoal)]/85" />
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--charcoal)]/60 via-transparent to-[var(--charcoal)]/90" />
         <div className="relative z-10 text-center px-6 md:px-12">
           <span className="gold-line">Contact</span>
           <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--warm-white)]">
