@@ -57,7 +57,7 @@ export default function Contact() {
       <section className="bg-[var(--charcoal)] pt-12 md:pt-20" style={{ paddingBottom: "80px" }} data-testid="contact-methods">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {[
-            { icon: Phone,         label: "Call",     value: "+234 903 048 2774", href: `tel:${BRAND.phoneTel}`,  tag: "Fastest", newTab: false, external: false, bg: "linear-gradient(135deg, #3d1a1a 0%, #1a0f0f 100%)", border: "rgba(120,50,50,0.35)",  fontSize: "1.25rem", valueStyle: { wordBreak: "normal",   overflowWrap: "break-word" } },
+            { icon: Phone,         label: "Call",     value: "+234 903 048 2774", href: `tel:${BRAND.phoneTel}`,  tag: "Fastest", newTab: false, external: false, bg: "linear-gradient(135deg, #3d1a1a 0%, #1a0f0f 100%)", border: "rgba(120,50,50,0.35)",  fontSize: "1.1rem",  valueStyle: { fontFamily: "'Montserrat', sans-serif", fontWeight: 500, letterSpacing: "0.08em", wordBreak: "normal", overflowWrap: "break-word" } },
             { icon: MessageCircle, label: "WhatsApp", value: "Chat with a host",  href: BRAND.whatsapp,           tag: "Mobile",  newTab: true,  external: true,  bg: "linear-gradient(135deg, #2a2a1a 0%, #1a1a0f 100%)", border: "rgba(100,100,40,0.35)", fontSize: "1.25rem", valueStyle: { wordBreak: "normal",   overflowWrap: "break-word" } },
             { icon: Mail,          label: "Email",    value: BRAND.email,         href: `mailto:${BRAND.email}`,  tag: "Anytime", newTab: false, external: false, bg: "linear-gradient(135deg, #1a2a2a 0%, #0f1a1a 100%)", border: "rgba(40,100,100,0.35)", fontSize: "0.95rem", valueStyle: { whiteSpace: "nowrap",   overflow: "hidden",     textOverflow: "ellipsis" } },
             { icon: MapPin,        label: "Visit",    value: BRAND.address,       href: `https://maps.google.com/?q=${encodeURIComponent(BRAND.address)}`, tag: "Ikeja", newTab: true, external: false, bg: "linear-gradient(135deg, #1a1a2a 0%, #0f0f1a 100%)", border: "rgba(50,50,120,0.35)", fontSize: "1.1rem",  valueStyle: { wordBreak: "normal", overflowWrap: "break-word" } },
@@ -136,6 +136,7 @@ export default function Contact() {
             transition={{ duration: 0.8 }}
             className="lg:col-span-7"
           >
+            <div className="p-8 md:p-10" style={{ background: "linear-gradient(135deg, #1e1c18 0%, #161410 100%)", border: "1px solid rgba(200,169,110,0.15)" }}>
             <span className="gold-line left">Send a Note</span>
             <h2 className="font-serif-display text-4xl md:text-5xl mt-6 text-[var(--warm-white)]">
               General <span className="font-serif-italic text-[var(--gold)]">enquiries.</span>
@@ -223,6 +224,7 @@ export default function Contact() {
                 </motion.form>
               )}
             </AnimatePresence>
+            </div>
           </motion.div>
         </div>
       </section>
