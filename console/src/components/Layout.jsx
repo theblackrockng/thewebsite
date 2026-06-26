@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
@@ -200,6 +200,15 @@ function SidebarContent({ pathname, pendingCount, newEnqCount, staffProfile, ses
   );
 }
 
+function timeAgo(iso) {
+  const m = Math.floor((Date.now() - new Date(iso)) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+
 /* ─── Layout ─── */
 export default function Layout({ children }) {
   const { session, signOut } = useAuth();
@@ -209,21 +218,40 @@ export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [newEnqCount, setNewEnqCount] = useState(0);
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
   const [clock, setClock] = useState("");
   const [staffProfile, setStaffProfile] = useState(null);
   const pageName = useCurrentPage();
+  const notifRef = useRef(null);
 
   useEffect(() => {
     async function fetchCounts() {
-      const [r1, r2] = await Promise.all([
+      const [r1, r2, r3, r4] = await Promise.all([
         supabase.from("reservations").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("enquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
+        supabase.from("reservations").select("id, name, occasion, created_at").eq("status", "pending").order("created_at", { ascending: false }).limit(5),
+        supabase.from("enquiries").select("id, name, message, created_at").eq("status", "new").order("created_at", { ascending: false }).limit(5),
       ]);
       setPendingCount(r1.count ?? 0);
       setNewEnqCount(r2.count ?? 0);
+      const items = [
+        ...(r3.data || []).map(r => ({ type: "reservation", id: r.id, label: r.name || "Guest", sub: r.occasion || "Reservation request", time: r.created_at })),
+        ...(r4.data || []).map(e => ({ type: "enquiry", id: e.id, label: e.name || "Guest", sub: (e.message || "").slice(0, 55) || "New enquiry", time: e.created_at })),
+      ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 8);
+      setNotifications(items);
     }
     fetchCounts();
   }, []);
+
+  useEffect(() => {
+    if (!notifOpen) return;
+    function handleClick(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [notifOpen]);
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -325,15 +353,102 @@ export default function Layout({ children }) {
 
           {/* Right controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
-            {/* Bell */}
-            <button style={{ ...iconBtn, position: "relative" }} aria-label="Notifications">
-              <Bell size={17} />
-              {totalBadge > 0 && (
-                <span style={{ position: "absolute", top: 5, right: 5, width: 15, height: 15, borderRadius: "50%", background: "#ef4444", border: "1.5px solid var(--ds-surface)", fontSize: 8.5, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {totalBadge}
-                </span>
+            {/* Bell + dropdown */}
+            <div ref={notifRef} style={{ position: "relative" }}>
+              <button
+                onClick={() => setNotifOpen(v => !v)}
+                style={{ ...iconBtn, position: "relative", color: notifOpen ? "var(--ds-gold)" : "var(--ds-muted)", background: notifOpen ? "var(--ds-input-bg)" : "none" }}
+                aria-label="Notifications"
+              >
+                <Bell size={17} />
+                {totalBadge > 0 && (
+                  <span style={{ position: "absolute", top: 5, right: 5, width: 15, height: 15, borderRadius: "50%", background: "#ef4444", border: "1.5px solid var(--ds-surface)", fontSize: 8.5, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {totalBadge}
+                  </span>
+                )}
+              </button>
+
+              {notifOpen && (
+                <div style={{
+                  position: "absolute", top: "calc(100% + 8px)", right: 0, zIndex: 100,
+                  width: 320, background: "var(--ds-surface)",
+                  border: "1px solid var(--ds-border)", borderRadius: 10,
+                  boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+                  overflow: "hidden",
+                }}>
+                  {/* Header */}
+                  <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--ds-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-text)" }}>Notifications</span>
+                    {totalBadge > 0 && (
+                      <span style={{ fontSize: 10, color: "var(--ds-muted)" }}>{totalBadge} unread</span>
+                    )}
+                  </div>
+
+                  {/* List */}
+                  {notifications.length === 0 ? (
+                    <div style={{ padding: "24px 16px", textAlign: "center", fontSize: 12.5, color: "var(--ds-muted)" }}>
+                      No new notifications
+                    </div>
+                  ) : (
+                    <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                      {notifications.map((n, i) => (
+                        <button
+                          key={`${n.type}-${n.id}`}
+                          onClick={() => { setNotifOpen(false); navigate(n.type === "reservation" ? "/reservations" : "/enquiries"); }}
+                          style={{
+                            width: "100%", display: "flex", alignItems: "flex-start", gap: 10,
+                            padding: "11px 16px", background: "none", border: "none", cursor: "pointer",
+                            borderBottom: i < notifications.length - 1 ? "1px solid var(--ds-border)" : "none",
+                            textAlign: "left",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = "var(--ds-input-bg)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
+                        >
+                          {/* Type icon */}
+                          <div style={{
+                            width: 30, height: 30, borderRadius: 7, flexShrink: 0,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            background: n.type === "reservation" ? "rgba(245,158,11,0.12)" : "rgba(239,68,68,0.1)",
+                          }}>
+                            {n.type === "reservation"
+                              ? <CalendarDays size={14} style={{ color: "#d97706" }} />
+                              : <MessageSquare size={14} style={{ color: "#ef4444" }} />
+                            }
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ds-text)", display: "flex", justifyContent: "space-between", gap: 6 }}>
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{n.label}</span>
+                              <span style={{ fontSize: 10.5, color: "var(--ds-muted)", flexShrink: 0 }}>{timeAgo(n.time)}</span>
+                            </div>
+                            <div style={{ fontSize: 11.5, color: "var(--ds-muted)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {n.sub}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Footer links */}
+                  <div style={{ borderTop: "1px solid var(--ds-border)", display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                    <button onClick={() => { setNotifOpen(false); navigate("/reservations"); }}
+                      style={{ padding: "10px", fontSize: 11.5, color: "var(--ds-muted)", background: "none", border: "none", borderRight: "1px solid var(--ds-border)", cursor: "pointer" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "var(--ds-gold)"; e.currentTarget.style.background = "var(--ds-input-bg)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "var(--ds-muted)"; e.currentTarget.style.background = "none"; }}
+                    >
+                      All Reservations
+                    </button>
+                    <button onClick={() => { setNotifOpen(false); navigate("/enquiries"); }}
+                      style={{ padding: "10px", fontSize: 11.5, color: "var(--ds-muted)", background: "none", border: "none", cursor: "pointer" }}
+                      onMouseEnter={e => { e.currentTarget.style.color = "var(--ds-gold)"; e.currentTarget.style.background = "var(--ds-input-bg)"; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = "var(--ds-muted)"; e.currentTarget.style.background = "none"; }}
+                    >
+                      All Enquiries
+                    </button>
+                  </div>
+                </div>
               )}
-            </button>
+            </div>
 
             {/* Dark mode */}
             <button
