@@ -27,10 +27,12 @@ const OCCASION_TINTS = {
 };
 
 const FALLBACK_FOOD_REEL = [
-  IMAGES.jollof, IMAGES.starter, IMAGES.pepperSoup, IMAGES.noodles,
-  IMAGES.pasta, IMAGES.photo1, IMAGES.photo2, IMAGES.food3,
-  IMAGES.food4, IMAGES.food5, IMAGES.food7,
+  IMAGES.jollof, IMAGES.pepperSoup, IMAGES.noodles,
+  IMAGES.pasta, IMAGES.photo1, IMAGES.photo2, IMAGES.food7,
   IMAGES.food12, IMAGES.food13, IMAGES.food14, IMAGES.food15, IMAGES.food16,
+  "/images/menu/starters.jpg", "/images/menu/salads.jpg", "/images/menu/rice.jpg",
+  "/images/menu/noodles.jpg", "/images/menu/continental.jpg", "/images/menu/sauces.jpg",
+  "/images/menu/grills.jpg", "/images/menu/national.jpg", "/images/menu/traditional.jpg",
 ];
 
 export default function Home() {
@@ -147,7 +149,7 @@ export default function Home() {
       </section>
 
       {/* FOOD SHOWCASE */}
-      <section className="bg-[var(--charcoal)] py-20 md:py-28 overflow-hidden" data-testid="brand-statement">
+      <section style={{ background: "#111111", paddingTop: "80px", paddingBottom: "60px" }} className="overflow-hidden" data-testid="brand-statement">
         {/* Header */}
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 text-center mb-12">
           <motion.span
@@ -171,12 +173,23 @@ export default function Home() {
           </motion.p>
         </div>
 
-        {/* Marquee strip - same as Instagram section */}
-        <div className="overflow-hidden">
-          <div className="flex marquee gap-3 w-max">
+        {/* Scrollable image strip with edge bleed */}
+        <div
+          style={{
+            overflowX: "auto",
+            scrollBehavior: "smooth",
+            WebkitOverflowScrolling: "touch",
+            scrollbarWidth: "none",
+            msOverflowStyle: "none",
+            marginLeft: "-24px",
+            marginRight: "-24px",
+          }}
+          className="[&::-webkit-scrollbar]:hidden"
+        >
+          <div className="flex marquee gap-3 w-max px-6">
             {[...foodReel, ...foodReel].map((src, i) => (
-              <div key={i} className="img-hover w-[160px] h-[160px] md:w-[240px] md:h-[240px] flex-shrink-0">
-                <img src={src} alt="BlackRock dish" loading="lazy" />
+              <div key={i} className="img-hover flex-shrink-0" style={{ width: 200, height: 200 }}>
+                <img src={src} alt="BlackRock dish" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
             ))}
           </div>
@@ -191,12 +204,12 @@ export default function Home() {
             transition={{ duration: 0.8, delay: 0.3 }}
             className="flex flex-col sm:flex-row gap-4 justify-center mt-12"
           >
-            <Link to="/menu" className="btn-burgundy">
+            <Link to="/reservations" className="btn-burgundy">
+              <span>Reserve a Table</span>
+            </Link>
+            <Link to="/menu" className="btn-outline-gold">
               <span>Explore Full Menu</span>
               <ArrowRight size={14} />
-            </Link>
-            <Link to="/reservations" className="btn-outline-gold">
-              <span>Reserve a Table</span>
             </Link>
           </motion.div>
         </div>
@@ -206,7 +219,7 @@ export default function Home() {
       <div className="w-full h-px" style={{ background: "linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.45) 30%, rgba(201,168,76,0.45) 70%, transparent 100%)" }} />
 
       {/* OCCASIONS PREVIEW */}
-      <section className="bg-[var(--charcoal)] py-24 md:py-32" data-testid="occasions-preview">
+      <section className="bg-[var(--charcoal)] pt-12 pb-24 md:pt-16 md:pb-32" data-testid="occasions-preview">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <SectionHeader
             kicker="Made for moments"
