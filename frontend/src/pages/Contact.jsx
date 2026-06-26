@@ -54,13 +54,13 @@ export default function Contact() {
       </section>
 
       {/* Contact methods */}
-      <section className="bg-[var(--charcoal)] pt-12 pb-0 md:pt-20 md:pb-0" data-testid="contact-methods">
+      <section className="bg-[var(--charcoal)] pt-12 md:pt-20" style={{ paddingBottom: "80px" }} data-testid="contact-methods">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {[
-            { icon: Phone,         label: "Call",      value: <span>+234 903 048 2774</span>, href: `tel:${BRAND.phoneTel}`, tag: "Fastest",  newTab: false, external: false, valueStyle: { wordBreak: "normal",   overflowWrap: "break-word" } },
-            { icon: MessageCircle, label: "WhatsApp",  value: "Chat with a host",                                    href: BRAND.whatsapp,           tag: "Mobile",   newTab: true,  external: true,  valueStyle: { wordBreak: "normal",   overflowWrap: "break-word" } },
-            { icon: Mail,          label: "Email",     value: BRAND.email,                                           href: `mailto:${BRAND.email}`,  tag: "Anytime",  newTab: false, external: false, valueStyle: { wordBreak: "break-all", overflowWrap: "anywhere"   } },
-            { icon: MapPin,        label: "Visit",     value: BRAND.address,                                         href: `https://maps.google.com/?q=${encodeURIComponent(BRAND.address)}`, tag: "Ikeja", newTab: true, external: false, valueStyle: { wordBreak: "normal", overflowWrap: "break-word" } },
+            { icon: Phone,         label: "Call",     value: "+234 903 048 2774",  href: `tel:${BRAND.phoneTel}`, tag: "Fastest", newTab: false, external: false, valueStyle: { wordBreak: "normal",   overflowWrap: "break-word" } },
+            { icon: MessageCircle, label: "WhatsApp", value: "Chat with a host",   href: BRAND.whatsapp,          tag: "Mobile",  newTab: true,  external: true,  valueStyle: { wordBreak: "normal",   overflowWrap: "break-word" } },
+            { icon: Mail,          label: "Email",    value: BRAND.email,          href: `mailto:${BRAND.email}`, tag: "Anytime", newTab: false, external: false, valueStyle: { fontSize: "0.8rem",    wordBreak: "break-all",    overflowWrap: "anywhere"  } },
+            { icon: MapPin,        label: "Visit",    value: BRAND.address,        href: `https://maps.google.com/?q=${encodeURIComponent(BRAND.address)}`, tag: "Ikeja", newTab: true, external: false, valueStyle: { wordBreak: "normal", overflowWrap: "break-word" } },
           ].map((c, i) => (
             <motion.a
               key={c.label}
@@ -71,15 +71,18 @@ export default function Contact() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.6, delay: i * 0.08 }}
-              whileHover={{ y: -6, scale: 1.01, transition: { duration: 0.2 } }}
+              whileHover={{ y: -4, transition: { duration: 0.2, ease: "easeOut" } }}
               whileTap={{ scale: 0.98 }}
-              className="block p-5 md:p-8 bg-[var(--charcoal-soft)] hover:bg-[var(--burgundy)] hover:text-[var(--warm-white)] transition-all duration-500 group border border-[var(--border-soft)] hover:border-[var(--burgundy)] overflow-hidden"
+              className="block p-5 md:p-8 bg-[var(--charcoal-soft)] transition-all duration-200 group border border-[var(--border-soft)] overflow-hidden"
+              style={{ transition: "border-color 0.2s ease, box-shadow 0.2s ease" }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#c8a96e"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(200,169,110,0.15)"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = ""; e.currentTarget.style.boxShadow = ""; }}
               data-testid={`contact-${c.label.toLowerCase()}`}
             >
               <div className="flex items-start justify-between mb-8">
-                <c.icon size={22} className="text-[var(--gold)] group-hover:text-[var(--warm-white)] transition-colors" />
+                <c.icon size={22} className="text-[var(--gold)] transition-colors" />
                 <div className="flex items-center gap-2">
-                  {c.external && <ExternalLink size={12} className="text-[var(--gold)] group-hover:text-[var(--warm-white)] transition-colors opacity-60" />}
+                  {c.external && <ExternalLink size={12} className="text-[var(--gold)] opacity-60" />}
                   <span className="text-[10px] uppercase tracking-[0.28em] opacity-50">{c.tag}</span>
                 </div>
               </div>
@@ -91,7 +94,7 @@ export default function Contact() {
       </section>
 
       {/* Hours + Form */}
-      <section className="bg-[var(--charcoal-soft)] pt-[60px] pb-24 md:pb-32" data-testid="contact-form-section">
+      <section className="bg-[var(--charcoal-soft)] pt-16 pb-24 md:pt-20 md:pb-32" data-testid="contact-form-section">
         <div className="max-w-[1200px] mx-auto px-6 md:px-12 grid grid-cols-1 lg:grid-cols-12 gap-16">
           {/* Hours */}
           <div className="lg:col-span-5">
