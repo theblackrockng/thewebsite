@@ -233,7 +233,7 @@ function DeleteDialog({ enquiry, onConfirm, onClose, saving }) {
 const INPUT_STYLE = { width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 8, padding: "10px 12px", fontSize: 13.5, color: "var(--ds-text)", fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" };
 const LABEL_STYLE = { display: "block", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ds-muted)", marginBottom: 7 };
 
-function EnquiryCard({ e, expanded, replyDraft, onToggle, onReplyChange, onMarkRead, onClickReply, onSendReply, sendingReply, onDeleteClick, working }) {
+function EnquiryCard({ e, expanded, replyDraft, onToggle, onReplyChange, onMarkRead, onClickReply, onSendReply, sendingReply, replyError, onDeleteClick, working }) {
   const textareaRef = useRef(null);
   const isWorking = working === e.id;
 
@@ -389,6 +389,11 @@ function EnquiryCard({ e, expanded, replyDraft, onToggle, onReplyChange, onMarkR
                       style={{ ...INPUT_STYLE, resize: "vertical", lineHeight: 1.6 }}
                     />
                   </div>
+                  {replyError && (
+                    <div style={{ marginBottom: 10, padding: "8px 12px", borderRadius: 7, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", fontSize: 12.5, color: "#dc2626", display: "flex", alignItems: "center", gap: 7 }}>
+                      <AlertTriangle size={13} /> {replyError}
+                    </div>
+                  )}
                   <div style={{ display: "flex", gap: 10 }}>
                     <button
                       onClick={(ev) => { ev.stopPropagation(); onSendReply(e, replyDraft); }}
@@ -438,6 +443,7 @@ export default function Enquiries() {
   const [expandedId, setExpandedId] = useState(null);
   const [replyDrafts, setReplyDrafts] = useState({});
   const [sendingReply, setSendingReply] = useState(false);
+  const [replyError, setReplyError]   = useState(null);
   const [working, setWorking]     = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting]   = useState(false);
@@ -528,15 +534,27 @@ export default function Enquiries() {
   const handleSendReply = async (e, text) => {
     if (!text?.trim()) return;
     setSendingReply(true);
-    /* Opens the user's mail client with the composed reply */
-    const subject = encodeURIComponent("Re: Your enquiry to BLACKROCK Restaurant & Lounge");
-    const body    = encodeURIComponent(text);
-    window.open(`mailto:${e.email}?subject=${subject}&body=${body}`);
-    /* Update status */
-    await supabase.from("enquiries").update({ status: "responded" }).eq("id", e.id);
-    setRows((p) => p.map((x) => x.id === e.id ? { ...x, status: "responded" } : x));
-    setSendingReply(false);
-    setExpandedId(null);
+    setReplyError(null);
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: e.email,
+          subject: "Re: Your enquiry to BLACKROCK Restaurant & Lounge",
+          body: text,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to send email");
+      await supabase.from("enquiries").update({ status: "responded" }).eq("id", e.id);
+      setRows((p) => p.map((x) => x.id === e.id ? { ...x, status: "responded" } : x));
+      setExpandedId(null);
+    } catch (err) {
+      setReplyError(err.message);
+    } finally {
+      setSendingReply(false);
+    }
   };
 
   /* ── Delete ── */
@@ -639,6 +657,7 @@ export default function Enquiries() {
               onClickReply={handleClickReply}
               onSendReply={handleSendReply}
               sendingReply={sendingReply && expandedId === e.id}
+              replyError={expandedId === e.id ? replyError : null}
               onDeleteClick={setDeleteTarget}
               working={working}
             />

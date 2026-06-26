@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import {
   Check, X, RefreshCw, Loader2, Search, Plus,
-  CalendarDays, AlertTriangle,
+  CalendarDays, AlertTriangle, Mail, Send,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -222,8 +222,97 @@ function EmptyState({ message, onRefresh }) {
   );
 }
 
+/* ─── Email compose modal ─── */
+const INPUT_STYLE  = { width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 8, padding: "10px 12px", fontSize: 13.5, color: "var(--ds-text)", fontFamily: "'DM Sans', sans-serif", outline: "none", boxSizing: "border-box" };
+const LABEL_STYLE  = { display: "block", fontSize: 10.5, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ds-muted)", marginBottom: 7 };
+
+function reservationEmailBody(r) {
+  return `Dear ${r.name},\n\nThank you for your reservation at BLACKROCK Restaurant & Lounge.\n\n` +
+    `Your table is confirmed for ${fmtDate(r.date)}${r.time ? ` at ${fmtTime(r.time)}` : ""}, party of ${r.party === "other" ? (r.party_other ?? "—") : (r.party ?? "—")}.\n\n` +
+    `\n\nWarm regards,\nBLACKROCK Restaurant & Lounge\nIkeja, Lagos`;
+}
+
+function EmailModal({ reservation, onClose }) {
+  const [subject, setSubject] = useState(`Your reservation at BLACKROCK Restaurant & Lounge`);
+  const [body, setBody]       = useState(() => reservationEmailBody(reservation));
+  const [sending, setSending] = useState(false);
+  const [sent, setSent]       = useState(false);
+  const [error, setError]     = useState(null);
+
+  const handleSend = async () => {
+    if (!body.trim()) return;
+    setSending(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ to: reservation.email, subject, body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to send");
+      setSent(true);
+      setTimeout(onClose, 1800);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div style={{ background: "var(--ds-surface)", borderRadius: 14, border: "1px solid var(--ds-border)", boxShadow: "0 24px 64px rgba(0,0,0,0.22)", width: "100%", maxWidth: 540, overflow: "hidden" }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid var(--ds-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, color: "var(--ds-text)", margin: 0 }}>Send Email</h2>
+            <p style={{ fontSize: 12.5, color: "var(--ds-muted)", margin: "3px 0 0" }}>To: {reservation.email}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)", display: "flex" }}><X size={18} /></button>
+        </div>
+
+        {sent ? (
+          <div style={{ padding: "36px 24px", textAlign: "center" }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(34,197,94,0.1)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", color: "#16a34a" }}>
+              <Check size={22} />
+            </div>
+            <p style={{ fontSize: 14, fontWeight: 600, color: "var(--ds-text)", margin: "0 0 4px" }}>Email sent</p>
+            <p style={{ fontSize: 12.5, color: "var(--ds-muted)", margin: 0 }}>Message delivered to {reservation.email}</p>
+          </div>
+        ) : (
+          <div style={{ padding: "20px 24px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={LABEL_STYLE}>Subject</label>
+              <input value={subject} onChange={e => setSubject(e.target.value)} style={INPUT_STYLE} />
+            </div>
+            <div>
+              <label style={LABEL_STYLE}>Message</label>
+              <textarea value={body} onChange={e => setBody(e.target.value)} rows={9} style={{ ...INPUT_STYLE, resize: "vertical", lineHeight: 1.65 }} />
+            </div>
+            {error && (
+              <div style={{ padding: "8px 12px", borderRadius: 7, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", fontSize: 12.5, color: "#dc2626", display: "flex", alignItems: "center", gap: 7 }}>
+                <AlertTriangle size={13} /> {error}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={onClose} style={{ padding: "9px 16px", borderRadius: 8, border: "1px solid var(--ds-border)", background: "transparent", color: "var(--ds-text)", fontSize: 13, fontWeight: 500, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>Cancel</button>
+              <button
+                onClick={handleSend} disabled={sending || !body.trim()}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "9px 18px", borderRadius: 8, border: "none", background: sending || !body.trim() ? "var(--ds-muted)" : "var(--ds-gold)", color: "#1a1a1a", fontSize: 13, fontWeight: 600, cursor: sending || !body.trim() ? "not-allowed" : "pointer", fontFamily: "'DM Sans', sans-serif" }}
+              >
+                {sending ? <><Loader2 size={13} className="animate-spin" /> Sending…</> : <><Send size={13} /> Send Email</>}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </ModalBackdrop>
+  );
+}
+
 /* ─── Table row ─── */
-function TableRow({ r, idx, working, onConfirm, onReschedule, onCancel }) {
+function TableRow({ r, idx, working, onConfirm, onReschedule, onCancel, onEmail }) {
   const partyDisplay = r.party === "other" ? (r.party_other ?? "—") : (r.party ?? "—");
   const isWorking = working === r.id;
   const evenBg = "transparent";
@@ -313,6 +402,17 @@ function TableRow({ r, idx, working, onConfirm, onReschedule, onCancel }) {
               disabled={isWorking}
             >
               <X size={13} />
+            </ActionBtn>
+          )}
+          {r.email && (
+            <ActionBtn
+              onClick={() => onEmail(r)}
+              title="Send email to guest"
+              hoverColor="var(--ds-gold)"
+              hoverBg="rgba(200,169,110,0.12)"
+              disabled={isWorking}
+            >
+              <Mail size={13} />
             </ActionBtn>
           )}
         </div>
@@ -648,6 +748,7 @@ export default function Reservations() {
   const [working, setWorking]         = useState(null);
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [cancelTarget,     setCancelTarget]     = useState(null);
+  const [emailTarget,      setEmailTarget]      = useState(null);
   const [showNewModal,     setShowNewModal]     = useState(false);
   const [modalSaving,      setModalSaving]      = useState(false);
 
@@ -917,6 +1018,7 @@ export default function Reservations() {
                     onConfirm={handleConfirm}
                     onReschedule={setRescheduleTarget}
                     onCancel={setCancelTarget}
+                    onEmail={setEmailTarget}
                   />
                 ))}
               </tbody>
@@ -950,6 +1052,13 @@ export default function Reservations() {
             key="new"
             onSave={handleNewSave}
             onClose={() => setShowNewModal(false)}
+          />
+        )}
+        {emailTarget && (
+          <EmailModal
+            key="email"
+            reservation={emailTarget}
+            onClose={() => setEmailTarget(null)}
           />
         )}
       </AnimatePresence>
