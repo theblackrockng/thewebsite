@@ -198,8 +198,9 @@ export default function Contact() {
         <div className="w-full h-[280px] md:h-[450px] lg:h-[560px]">
           <iframe
             title="The BlackRock Location"
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3963.0!2d3.3441!3d6.6019!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2sIkeja+GRA+Lagos!5e0!3m2!1sen!2sng!4v0000000000"
-            className="w-full h-full border-0 grayscale contrast-110"
+            src="https://maps.google.com/maps?q=6.6018,3.3515&z=17&t=m&output=embed"
+            className="w-full h-full border-0"
+            style={{ filter: "invert(92%) hue-rotate(180deg) saturate(0.85) brightness(0.9)" }}
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           />

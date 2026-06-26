@@ -6,7 +6,7 @@ import BrandMark from "./BrandMark";
 
 export default function Footer() {
   return (
-    <footer className="bg-[var(--charcoal)] text-[var(--warm-white)] relative grain" data-testid="footer">
+    <footer className="bg-[var(--charcoal)] text-[var(--warm-white)] relative grain" style={{ borderTop: "1px solid rgba(200,169,110,0.3)" }} data-testid="footer">
       <div className="max-w-[1440px] mx-auto px-6 md:px-12 pt-20 pb-10">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-12">
           {/* Brand */}
@@ -22,8 +22,7 @@ export default function Footer() {
               "Flavor on a plate. Wine in the glass. Joy filling the air."
             </p>
             <p className="text-sm text-white/60 leading-relaxed max-w-md">
-              A restaurant, lounge and rooftop in the heart of Ikeja. From jollof to T-bone,
-              pepper soup to palm wine. Every flavour of Lagos, under one roof.
+              Where exceptional food meets beautiful ambience, and every meal feels like home.
             </p>
           </motion.div>
 
