@@ -91,27 +91,24 @@ export default function About() {
         </div>
 
         {/* Panels */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: 2, padding: "0 24px" }}>
           {[
-            { img: "/restaurant-interior.jpg", name: "The Restaurant",    floor: "Ground Floor", desc: "White linen, warm light, an open kitchen. Continental, traditional, and everything in between. From grilled T-bone to ofada and ayamase. The night begins here.", imgLeft: true,  num: "01" },
+            { img: "/restaurant-interior.jpg", name: "The Restaurant",     floor: "Ground Floor", desc: "White linen, warm light, an open kitchen. Continental, traditional, and everything in between. From grilled T-bone to ofada and ayamase. The night begins here.", imgLeft: true,  num: "01" },
             { img: "/rooftop.jpg",             name: "The Rooftop Lounge", floor: "Rooftop",      desc: "Open to the sky. The Ikeja skyline curling around you. Smaller plates, longer pours, conversations that stretch into morning.",                              imgLeft: false, num: "02" },
-          ].map((s, i) => (
-            <div
-              key={s.name}
-              className="flex flex-col lg:flex-row"
-              style={{ minHeight: 480 }}
-            >
+          ].map((s) => (
+            <div key={s.name} className="flex flex-col md:flex-row" style={{ height: 420 }}>
+
               {/* Image */}
               <motion.div
                 {...reveal(30, 0, 0.9)}
                 style={{ order: s.imgLeft ? 0 : 1, overflow: "hidden", flexShrink: 0 }}
-                className="w-full h-[280px] lg:h-auto lg:w-[55%]"
+                className="w-full md:w-[55%] h-[260px] md:h-full"
               >
                 <img
                   src={s.img}
                   alt={s.name}
                   loading="lazy"
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: 0 }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
                 />
               </motion.div>
 
@@ -124,21 +121,23 @@ export default function About() {
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "center",
-                  padding: "48px 48px",
+                  alignItems: "flex-start",
+                  padding: "48px",
                   background: "var(--charcoal)",
+                  height: "100%",
                 }}
-                className="px-8 py-10 md:px-12 md:py-16"
+                className="p-8 md:p-12"
               >
                 <span className="gold-line left">{s.floor}</span>
-                <h3 className="font-serif-display text-4xl md:text-5xl lg:text-6xl mt-6 text-[var(--warm-white)]">
+                <h3 className="font-serif-display text-3xl md:text-4xl lg:text-5xl mt-6 text-[var(--warm-white)]">
                   {s.name}
                 </h3>
-                <p className="text-[var(--muted)] text-base md:text-lg leading-relaxed mt-6 font-light" style={{ maxWidth: 420 }}>
+                <p className="text-[var(--muted)] text-sm md:text-base leading-relaxed mt-5 font-light" style={{ maxWidth: 380 }}>
                   {s.desc}
                 </p>
-                <div className="mt-10 flex items-center gap-3">
-                  <div className="font-serif-display text-5xl text-[var(--burgundy)] leading-none">{s.num}</div>
-                  <div className="w-10 h-px bg-[var(--gold)]" />
+                <div className="mt-8 flex items-center gap-3">
+                  <div className="font-serif-display text-4xl text-[var(--burgundy)] leading-none">{s.num}</div>
+                  <div className="w-8 h-px bg-[var(--gold)]" />
                   <div className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">Open Daily from 10:00 AM</div>
                 </div>
               </motion.div>
