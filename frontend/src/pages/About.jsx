@@ -147,10 +147,10 @@ export default function About() {
       </section>
 
       {/* Values */}
-      <section className="bg-[var(--charcoal)] text-[var(--warm-white)] py-24 md:py-36 grain" data-testid="values-section">
+      <section className="bg-[var(--charcoal)] text-[var(--warm-white)] pt-20 pb-16 grain" data-testid="values-section">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <SectionHeader kicker="Our Philosophy" title="What We Hold Dear." dark />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8 mt-20">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8 mt-16">
             {values.map((v, i) => (
               <motion.div
                 key={v.num}
@@ -158,8 +158,8 @@ export default function About() {
                 className="border-l border-[var(--gold)]/30 pl-8"
               >
                 <div className="font-serif-display text-6xl text-[var(--gold)] leading-none">{v.num}</div>
-                <h4 className="font-serif-display text-2xl md:text-3xl mt-6">{v.title}</h4>
-                <p className="text-white/65 text-base leading-relaxed font-light mt-4">{v.body}</p>
+                <h4 className="mt-6" style={{ fontSize: "1.15rem", fontWeight: 600, color: "var(--warm-white)" }}>{v.title}</h4>
+                <p className="text-white/65 font-light mt-4" style={{ fontSize: "0.95rem", lineHeight: 1.8 }}>{v.body}</p>
               </motion.div>
             ))}
           </div>
@@ -167,18 +167,15 @@ export default function About() {
       </section>
 
       {/* Social proof numbers */}
-      <section className="bg-[var(--charcoal)] py-24" data-testid="social-proof">
+      <section className="bg-[var(--charcoal)] py-20" data-testid="social-proof">
         <div className="max-w-[1200px] mx-auto px-6 md:px-12 grid grid-cols-2 md:grid-cols-4 gap-10 text-center">
           {[
-            { n: "4.9", l: "Google Rating" },
-            { n: "1,800+", l: "Reviews" },
-            { n: "48", l: "Seasonal Dishes" },
-            { n: "2,400", l: "Bottles in Cellar" },
+            { n: "4.2", l: "Customer Rating" },
+            { n: "255+", l: "Reviews" },
+            { n: "85+", l: "Dishes on Menu" },
+            { n: "2", l: "Floors of Experience" },
           ].map((s, i) => (
-            <motion.div
-              key={s.l}
-              {...reveal(20, i * 0.1, 0.6)}
-            >
+            <motion.div key={s.l} {...reveal(20, i * 0.1, 0.6)}>
               <div className="font-serif-display text-5xl md:text-6xl text-[var(--burgundy)]">{s.n}</div>
               <div className="text-xs uppercase tracking-[0.28em] text-[var(--muted)] mt-3">{s.l}</div>
             </motion.div>
@@ -197,11 +194,24 @@ export default function About() {
             Come see for yourself.
           </h2>
           <p className="text-white/80 mt-8 max-w-xl mx-auto font-light text-lg">
-            Tables open six nights a week. The good ones go quickly.
+            Open daily from 10:00 AM. The good tables go quickly.
           </p>
-          <Link to="/reservations" className="btn-outline-gold mt-12 inline-flex" style={{ borderColor: "var(--gold)", color: "var(--gold)" }}>
-            Reserve a Table <ArrowRight size={14} />
-          </Link>
+          <motion.div {...reveal(16, 0.2)} className="mt-12">
+            <Link
+              to="/reservations"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 10,
+                background: "#c8a96e", color: "#1a1612",
+                padding: "16px 40px",
+                fontSize: "0.85rem", fontWeight: 600,
+                letterSpacing: "0.1em", textTransform: "uppercase",
+                fontFamily: "'Montserrat', sans-serif",
+                textDecoration: "none",
+              }}
+            >
+              Reserve a Table <ArrowRight size={14} />
+            </Link>
+          </motion.div>
         </motion.div>
       </section>
     </div>
