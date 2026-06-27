@@ -20,10 +20,10 @@ export default function Footer() {
             <img
               src="/logo.png"
               alt="BLACKROCK Restaurant & Lounge"
-              className="h-20 w-auto object-contain mb-8"
-              style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.06))" }}
+              className="w-auto object-contain"
+              style={{ height: 100, filter: "drop-shadow(0 0 8px rgba(255,255,255,0.06))" }}
             />
-            <p className="font-serif-italic text-xl text-[var(--gold)] leading-snug max-w-md">
+            <p className="font-serif-italic text-xl text-[var(--gold)] leading-snug max-w-md" style={{ marginTop: 16 }}>
               "Flavor on a plate. Wine in your glass. Connection in the air."
             </p>
           </motion.div>

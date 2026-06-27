@@ -35,11 +35,11 @@ export default function Navbar({ onReserveClick }) {
       >
         <div className="max-w-[1440px] mx-auto px-4 md:px-12 flex items-center justify-between h-20 md:h-28 lg:h-36">
           {/* Logo */}
-          <Link to="/" className="flex items-center" data-testid="logo-link">
+          <Link to="/" className="flex items-center flex-shrink-0" style={{ minWidth: "fit-content" }} data-testid="logo-link">
             <img
               src="/logo.png"
               alt="BLACKROCK Restaurant & Lounge"
-              className="h-12 md:h-16 w-auto object-contain transition-transform duration-200 hover:scale-105"
+              className="h-12 md:h-20 w-auto object-contain transition-transform duration-200 hover:scale-105"
             />
           </Link>
 
