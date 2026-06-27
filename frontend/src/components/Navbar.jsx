@@ -40,7 +40,6 @@ export default function Navbar({ onReserveClick }) {
               src="/logo.png"
               alt="BLACKROCK Restaurant & Lounge"
               className="h-12 md:h-16 w-auto object-contain transition-transform duration-200 hover:scale-105"
-              style={{ mixBlendMode: "multiply", filter: "brightness(1.6) contrast(1.1)" }}
             />
           </Link>
 
@@ -95,7 +94,7 @@ export default function Navbar({ onReserveClick }) {
             data-testid="mobile-menu"
           >
             <div className="flex items-center justify-between px-6 h-20">
-              <img src="/logo.png" alt="BLACKROCK" className="h-10 w-auto object-contain" style={{ mixBlendMode: "multiply", filter: "brightness(1.6) contrast(1.1)" }} />
+              <img src="/logo.png" alt="BLACKROCK" className="h-10 w-auto object-contain" />
               <button onClick={() => setOpen(false)} data-testid="mobile-menu-close" aria-label="Close menu">
                 <X size={26} className="text-[var(--warm-white)]" />
               </button>

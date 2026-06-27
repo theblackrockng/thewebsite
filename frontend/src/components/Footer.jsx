@@ -21,7 +21,7 @@ export default function Footer() {
               src="/logo.png"
               alt="BLACKROCK Restaurant & Lounge"
               className="h-20 w-auto object-contain mb-8"
-              style={{ mixBlendMode: "multiply", filter: "brightness(1.6) contrast(1.1)" }}
+              style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.06))" }}
             />
             <p className="font-serif-italic text-xl text-[var(--gold)] leading-snug max-w-md">
               "Flavor on a plate. Wine in your glass. Connection in the air."
