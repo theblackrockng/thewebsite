@@ -45,7 +45,7 @@ export default function About() {
             style={{ marginBottom: 32 }}
           >
             BlackRock was born from a simple realization:
-            <span className="font-serif-italic text-[var(--gold)]"> great food deserves a great experience.</span>
+            <span className="font-serif-italic text-[var(--gold)]"> Great food deserves a great experience.</span>
           </motion.p>
 
           <div className="space-y-8" style={{ fontSize: "1.05rem", lineHeight: 1.85, color: "rgba(255,255,255,0.75)", fontWeight: 300 }}>
