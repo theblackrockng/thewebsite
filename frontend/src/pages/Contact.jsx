@@ -15,20 +15,20 @@ export default function Contact() {
     e.preventDefault();
     setSendError("");
     setSending(true);
-    const { data: enquiryRow, error } = await supabase.from("enquiries").insert({
+    const { error } = await supabase.from("enquiries").insert({
       name: form.name,
       email: form.email,
       message: form.message,
       status: "new",
-    }).select("id").single();
+    });
     setSending(false);
     if (error) { setSendError("Something went wrong. Please try again or email us directly."); return; }
 
-    // Auto-reply email + Telegram notification + message_id storage (all server-side, non-blocking)
+    // Auto-reply email + Telegram notification + message_id storage (all server-side)
     fetch("/api/send-enquiry-reply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, message: form.message, enquiry_id: enquiryRow?.id }),
+      body: JSON.stringify({ name: form.name, email: form.email, message: form.message }),
     }).catch(() => {});
 
     setSent(true);

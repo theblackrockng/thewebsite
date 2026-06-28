@@ -12,8 +12,19 @@ const supabase = createClient(
 const TELEGRAM_TOKEN   = process.env.TELEGRAM_BOT_TOKEN || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID   || process.env.REACT_APP_TELEGRAM_CHAT_ID;
 
-async function notifyTelegramAndStore({ name, email, message, enquiryId }) {
+async function notifyTelegramAndStore({ name, email, message }) {
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
+
+  // Look up the most recent enquiry for this email using service role key (bypasses RLS)
+  const { data: enquiryRow } = await supabase
+    .from('enquiries')
+    .select('id')
+    .eq('email', email)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const enquiryId = enquiryRow?.id ?? null;
 
   const preview = message && message.length > 200 ? message.slice(0, 200) + '…' : (message || '—');
   const text = [
@@ -36,19 +47,7 @@ async function notifyTelegramAndStore({ name, email, message, enquiryId }) {
     const data = await resp.json();
     const messageId = data?.result?.message_id;
 
-    const tgDebug = async (text) => {
-      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: `⚠️ DEBUG: ${text}`, parse_mode: 'HTML' }),
-      }).catch(() => {});
-    };
-
-    if (!messageId) {
-      await tgDebug(`messageId is null — Telegram API did not return a message_id. Response: ${JSON.stringify(data)}`);
-    } else if (!enquiryId) {
-      await tgDebug(`enquiryId is null — enquiry_id was not passed from Contact form. messageId=${messageId}`);
-    } else {
+    if (messageId) {
       const { error } = await supabase.from('enquiry_telegram_messages').insert({
         telegram_message_id: messageId,
         enquiry_id: enquiryId,
@@ -56,29 +55,22 @@ async function notifyTelegramAndStore({ name, email, message, enquiryId }) {
         guest_name: name,
       });
       if (error) {
-        await tgDebug(`Insert failed for msg_id ${messageId}: ${error.message} (code: ${error.code})`);
-      } else {
-        await tgDebug(`✅ Stored msg_id ${messageId} for enquiry ${enquiryId} — reply to this message to email ${email}`);
+        console.error('[send-enquiry-reply] enquiry_telegram_messages insert error:', error.message);
       }
     }
   } catch (err) {
     console.error('[send-enquiry-reply] Telegram notify error:', err.message);
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: `⚠️ DEBUG: notifyTelegramAndStore threw: ${err.message}`, parse_mode: 'HTML' }),
-    }).catch(() => {});
   }
 }
 
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
-  const { name, email, message, enquiry_id } = req.body || {};
+  const { name, email, message } = req.body || {};
   if (!email || !name) return res.status(400).json({ error: 'Missing required fields' });
 
-  // Send Telegram notification and store message_id mapping (non-blocking)
-  notifyTelegramAndStore({ name, email, message, enquiryId: enquiry_id }).catch(() => {});
+  // Telegram notification + message_id storage (non-blocking, server-side with service role key)
+  notifyTelegramAndStore({ name, email, message }).catch(() => {});
 
   try {
     const { subject, bodyHtml, guestName } = enquiryReplyEmail({ name, message });
