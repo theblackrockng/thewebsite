@@ -77,20 +77,25 @@ module.exports = async function handler(req, res) {
 
     const { guest_email, guest_name, enquiry_id } = rows[0];
 
+    // Staff member who replied
+    const staffFirst = message.from?.first_name || '';
+    const staffLast  = message.from?.last_name  || '';
+    const staffName  = [staffFirst, staffLast].filter(Boolean).join(' ') || message.from?.username || 'Staff';
+
     const escapedReplyText = replyText
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/\n/g, '<br>');
 
+    // No sign-off here — the email template wrapper adds "Warm regards, The BLACKROCK Team"
     const bodyHtml = `
-      <p style="margin:0 0 20px;color:#1a1a1a;">Thank you for getting in touch with BLACKROCK Restaurant &amp; Lounge.</p>
-      <p style="margin:0 0 20px;color:#1a1a1a;">${escapedReplyText}</p>
-      <p style="margin-top:24px;color:#555;font-size:14px;">
-        If you need further assistance, please reply to this email or contact us directly at
-        <a href="tel:+2349030482774" style="color:#c8a96e;">+234 903 048 2774</a>.
+      <p style="margin:0 0 20px;color:#333333;">Thank you for getting in touch with BLACKROCK Restaurant &amp; Lounge.</p>
+      <p style="margin:0 0 20px;color:#333333;">${escapedReplyText}</p>
+      <p style="margin:20px 0 0;color:#555555;font-size:14px;line-height:1.7;">
+        If you need further assistance, please reply to this email or call us on
+        <a href="tel:+2349030482774" style="color:#c8a96e;white-space:nowrap;">+234 903 048 2774</a>.
       </p>
-      <p style="margin-top:16px;font-style:italic;color:#666;">Warm regards,<br><strong style="color:#1a1a1a;">The BLACKROCK Team</strong></p>
     `;
 
     try {
@@ -102,7 +107,7 @@ module.exports = async function handler(req, res) {
         bodyHtml,
       });
 
-      await sendTelegram(`✅ Reply sent to <b>${guest_name}</b> (${guest_email})`);
+      await sendTelegram(`✅ Reply sent to <b>${guest_name}</b> (${guest_email}) by ${staffName}`);
 
       if (enquiry_id) {
         await db.from('enquiries').update({ status: 'responded' }).eq('id', enquiry_id);
