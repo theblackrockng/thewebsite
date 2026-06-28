@@ -19,13 +19,22 @@ const DEFAULT_PERMS = {
   menu: false, media: false, content: false, users: false, settings: false,
 };
 
-const ROLE_OPTIONS = ["staff", "manager", "super_admin"];
+const ROLE_OPTIONS = ["staff", "manager", "content_creator", "super_admin"];
 
 const ROLE_COLORS = {
-  super_admin: { bg: "rgba(200,169,110,0.15)", text: "var(--ds-gold)", label: "Super Admin" },
-  manager:     { bg: "rgba(99,179,237,0.15)",  text: "#63b3ed",        label: "Manager" },
-  staff:       { bg: "rgba(160,174,192,0.12)", text: "var(--ds-muted)", label: "Staff" },
+  super_admin:     { bg: "rgba(200,169,110,0.15)", text: "var(--ds-gold)",  label: "Super Admin" },
+  manager:         { bg: "rgba(99,179,237,0.15)",  text: "#63b3ed",         label: "Manager" },
+  content_creator: { bg: "rgba(139,92,246,0.15)",  text: "#a78bfa",         label: "Content Creator" },
+  staff:           { bg: "rgba(160,174,192,0.12)", text: "var(--ds-muted)", label: "Staff" },
 };
+
+const ROLE_PRESETS = {
+  content_creator: { ...Object.fromEntries(Object.keys(DEFAULT_PERMS).map(k => [k, false])), dashboard: true, content: true, media: true },
+};
+
+function roleLabel(r) {
+  return ROLE_COLORS[r]?.label ?? "Staff";
+}
 
 function RoleBadge({ role }) {
   const c = ROLE_COLORS[role] ?? ROLE_COLORS.staff;
@@ -66,6 +75,11 @@ function InviteModal({ onClose, onSuccess, currentUserId }) {
 
   const togglePerm = (key) => setPerms(p => ({ ...p, [key]: !p[key] }));
 
+  const handleRoleChange = (role) => {
+    setForm(f => ({ ...f, role }));
+    if (ROLE_PRESETS[role]) setPerms({ ...ROLE_PRESETS[role] });
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     setErr(""); setSaving(true);
@@ -93,7 +107,8 @@ function InviteModal({ onClose, onSuccess, currentUserId }) {
     }
   };
 
-  const isSuperAdmin = form.role === "super_admin";
+  const isSuperAdmin      = form.role === "super_admin";
+  const isContentCreator  = form.role === "content_creator";
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
@@ -139,16 +154,20 @@ function InviteModal({ onClose, onSuccess, currentUserId }) {
             <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ds-muted)", display: "block", marginBottom: 6 }}>Role</label>
             <select
               value={form.role}
-              onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+              onChange={e => handleRoleChange(e.target.value)}
               style={{ width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "var(--ds-text)", outline: "none", cursor: "pointer" }}
             >
               {ROLE_OPTIONS.map(r => (
-                <option key={r} value={r}>
-                  {r === "super_admin" ? "Super Admin" : r === "manager" ? "Manager" : "Staff"}
-                </option>
+                <option key={r} value={r}>{roleLabel(r)}</option>
               ))}
             </select>
           </div>
+
+          {isContentCreator && (
+            <div style={{ padding: "10px 14px", borderRadius: 7, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)", fontSize: 12, color: "#a78bfa" }}>
+              Content Creators have access to the Content Hub and Media Library only.
+            </div>
+          )}
 
           {!isSuperAdmin && (
             <div>
@@ -265,9 +284,7 @@ function EditModal({ staff, onClose, onSave }) {
               style={{ width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "var(--ds-text)", outline: "none", cursor: "pointer" }}
             >
               {ROLE_OPTIONS.map(r => (
-                <option key={r} value={r}>
-                  {r === "super_admin" ? "Super Admin" : r === "manager" ? "Manager" : "Staff"}
-                </option>
+                <option key={r} value={r}>{roleLabel(r)}</option>
               ))}
             </select>
           </div>
@@ -717,9 +734,10 @@ export default function UserManagement() {
   const currentUserRole = staff.find(m => m.id === session?.user?.id)?.role;
   const isSuperAdmin = currentUserRole === "super_admin";
 
-  const superAdmins = staff.filter(m => m.role === "super_admin");
-  const managers    = staff.filter(m => m.role === "manager");
-  const regular     = staff.filter(m => m.role === "staff");
+  const superAdmins    = staff.filter(m => m.role === "super_admin");
+  const managers       = staff.filter(m => m.role === "manager");
+  const contentCreators = staff.filter(m => m.role === "content_creator");
+  const regular        = staff.filter(m => m.role === "staff");
 
   const tableHeader = (
     <div style={{
@@ -823,6 +841,24 @@ export default function UserManagement() {
               <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
                 {tableHeader}
                 {managers.map(m => (
+                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} isSuperAdmin={isSuperAdmin} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} onDelete={setDeleteTarget} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Content Creators */}
+          {contentCreators.length > 0 && (
+            <section>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#a78bfa", flexShrink: 0 }} />
+                <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#a78bfa" }}>
+                  Content Creators
+                </span>
+              </div>
+              <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
+                {tableHeader}
+                {contentCreators.map(m => (
                   <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} isSuperAdmin={isSuperAdmin} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} onDelete={setDeleteTarget} />
                 ))}
               </div>
