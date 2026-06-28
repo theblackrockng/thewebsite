@@ -52,12 +52,12 @@ module.exports = async function handler(req, res) {
       .limit(1);
 
     if (dbErr) {
-      console.error('[telegram-webhook] Supabase lookup error:', dbErr);
+      await sendTelegram(`⚠️ DB lookup failed for msg ${replyToMsgId}: ${dbErr.message}`);
       return res.status(200).json({ ok: true });
     }
 
     if (!rows || rows.length === 0) {
-      // Not an enquiry message — ignore
+      await sendTelegram(`⚠️ No row found for msg_id ${replyToMsgId}. Check enquiry_telegram_messages table has a row with this ID.`);
       return res.status(200).json({ ok: true });
     }
 

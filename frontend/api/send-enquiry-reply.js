@@ -43,7 +43,19 @@ async function notifyTelegramAndStore({ name, email, message, enquiryId }) {
         guest_email: email,
         guest_name: name,
       });
-      if (error) console.error('[send-enquiry-reply] enquiry_telegram_messages insert error:', error.message);
+      if (error) {
+        console.error('[send-enquiry-reply] enquiry_telegram_messages insert error:', error.message);
+        // Notify group so we can see if the insert is failing
+        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: `⚠️ DEBUG: Failed to store msg mapping for ${name} (msg_id ${messageId}): ${error.message}`, parse_mode: 'HTML' }),
+        }).catch(() => {});
+      } else {
+        console.log(`[send-enquiry-reply] Stored telegram_message_id ${messageId} for enquiry ${enquiryId}`);
+      }
+    } else {
+      console.warn(`[send-enquiry-reply] Missing messageId (${messageId}) or enquiryId (${enquiryId}) — mapping not stored`);
     }
   } catch (err) {
     console.error('[send-enquiry-reply] Telegram notify error:', err.message);
