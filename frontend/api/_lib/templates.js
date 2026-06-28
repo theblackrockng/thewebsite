@@ -156,7 +156,7 @@ exports.thankYouEmail = ({ name, occasion }) => {
     <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:28px 0;">
       <tr>
         <td align="center">
-          <a href="${BRAND.googleReview}" style="background:#c8a96e;color:#1a1a1a;padding:14px 32px;border-radius:4px;font-weight:bold;text-decoration:none;display:inline-block;font-family:Georgia,'Times New Roman',serif;font-size:15px;">Leave a Review</a>
+          <a href="${BRAND.googleReview}" style="background:#1a1a1a;color:#c8a96e;padding:14px 36px;border-radius:4px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;display:inline-block;font-family:Arial,sans-serif;font-weight:600;">Leave a Review</a>
         </td>
       </tr>
     </table>
@@ -169,15 +169,12 @@ exports.thankYouEmail = ({ name, occasion }) => {
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
         <tr>
           <td align="center">
-            <a href="https://blackrockrestaurantng.com/reservations" style="display:inline-block;border:2px solid #c8a96e;color:#c8a96e;padding:12px 28px;border-radius:4px;text-decoration:none;font-family:Georgia,'Times New Roman',serif;font-size:14px;font-weight:bold;">Book Again</a>
+            <a href="https://blackrockrestaurantng.com/reservations" style="background:#1a1a1a;color:#c8a96e;padding:14px 36px;border-radius:4px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;display:inline-block;font-family:Arial,sans-serif;font-weight:600;">Book Again</a>
           </td>
         </tr>
       </table>
     </div>
 
-    <p style="margin:28px 0 0;color:#888;font-size:13px;font-style:italic;line-height:1.8;">
-      Until next time,<br><strong style="color:#1a1a1a;font-style:normal;">The BLACKROCK Team</strong>
-    </p>
   `;
 
   return {
@@ -206,9 +203,6 @@ exports.enquiryReplyEmail = ({ name, message }) => {
       If urgent, call: <a href="tel:+2349030482774" style="color:#c8a96e;text-decoration:none;font-weight:bold;">+234 903 048 2774</a>
     </p>
 
-    <p style="margin:24px 0 0;color:#888;font-size:13px;font-style:italic;line-height:1.8;">
-      Warm regards,<br><strong style="color:#1a1a1a;font-style:normal;">The BLACKROCK Team</strong>
-    </p>
   `;
 
   return {

@@ -42,10 +42,10 @@ export function buildTemplate({ guestName, bodyHtml, subject, preheader, ctaText
   const safePreheader = preheader || subject || '';
 
   const ctaBlock = (ctaText && ctaUrl)
-    ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:28px 0 8px;">
+    ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:28px 0;">
         <tr>
           <td align="center">
-            <a href="${ctaUrl}" style="background:#c8a96e;color:#1a1a1a;padding:14px 32px;border-radius:4px;font-weight:bold;text-decoration:none;display:inline-block;font-family:Georgia,'Times New Roman',serif;font-size:15px;">${ctaText}</a>
+            <a href="${ctaUrl}" style="background:#1a1a1a;color:#c8a96e;padding:14px 36px;border-radius:4px;font-size:13px;letter-spacing:0.08em;text-transform:uppercase;text-decoration:none;display:inline-block;font-family:Arial,sans-serif;font-weight:600;">${ctaText}</a>
           </td>
         </tr>
       </table>`
@@ -59,50 +59,41 @@ export function buildTemplate({ guestName, bodyHtml, subject, preheader, ctaText
 <meta name="x-apple-disable-message-reformatting">
 <title>BLACKROCK Restaurant &amp; Lounge</title>
 </head>
-<body style="margin:0;padding:0;background:#1a1a1a;-webkit-font-smoothing:antialiased;">
-<!-- preheader -->
+<body style="margin:0;padding:0;background:#f5f0eb;-webkit-font-smoothing:antialiased;">
 <div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${safePreheader}&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;</div>
 
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#1a1a1a;padding:32px 16px;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f5f0eb;padding:32px 16px;">
   <tr>
     <td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;">
+      <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;">
 
-        <!-- HEADER -->
+        <!-- HEADER: cream with gold top border -->
         <tr>
-          <td style="background:#1a1a1a;padding:32px 40px;text-align:center;">
-            <img src="https://blackrockrestaurantng.com/logo.png" height="60" alt="BLACKROCK Restaurant &amp; Lounge" style="display:block;margin:0 auto;height:60px;">
+          <td style="background:#faf8f5;border-top:4px solid #c8a96e;padding:32px 40px;text-align:center;border-radius:8px 8px 0 0;">
+            <img src="https://blackrockrestaurantng.com/logo.png" height="70" alt="BLACKROCK Restaurant &amp; Lounge" style="display:block;margin:0 auto;height:70px;">
+            <div style="border-top:1px solid rgba(200,169,110,0.4);margin-top:24px;font-size:0;line-height:0;">&nbsp;</div>
           </td>
         </tr>
 
-        <!-- GOLD ACCENT ROW -->
+        <!-- BODY: white reading area -->
         <tr>
-          <td style="background:#c8a96e;height:3px;font-size:0;line-height:0;">&nbsp;</td>
-        </tr>
-
-        <!-- BODY -->
-        <tr>
-          <td style="padding:40px;color:#1a1a1a;font-family:Georgia,'Times New Roman',serif;font-size:16px;line-height:1.7;">
-            <p style="margin:0 0 20px;"><strong style="color:#1a1a1a;">Dear ${guestName},</strong></p>
+          <td style="background:#ffffff;padding:40px 48px;font-family:Arial,sans-serif;font-size:15px;line-height:1.8;color:#333333;">
+            <p style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:18px;font-weight:bold;color:#1a1a1a;">Dear ${guestName},</p>
             ${bodyHtml}
             ${ctaBlock}
+            <div style="border-top:1px solid rgba(200,169,110,0.2);margin:32px 0;font-size:0;line-height:0;">&nbsp;</div>
+            <p style="margin:0 0 4px;font-family:Georgia,'Times New Roman',serif;font-style:italic;color:#666666;font-size:15px;">Warm regards,</p>
+            <p style="margin:0;font-family:Arial,sans-serif;font-weight:bold;color:#1a1a1a;font-size:15px;">The BLACKROCK Team</p>
           </td>
         </tr>
 
-        <!-- GOLD DIVIDER -->
+        <!-- FOOTER: dark charcoal -->
         <tr>
-          <td style="padding:0 40px;">
-            <div style="border-top:1px solid rgba(200,169,110,0.3);"></div>
-          </td>
-        </tr>
-
-        <!-- FOOTER -->
-        <tr>
-          <td style="background:#1a1a1a;padding:24px 40px;text-align:center;color:#888580;font-family:Arial,sans-serif;font-size:12px;line-height:1.7;border-radius:0 0 8px 8px;">
-            <p style="margin:0 0 4px;">📍 11 Ajao Road, off Adeniyi Jones Road, Ikeja, Lagos</p>
-            <p style="margin:0 0 4px;">📞 +234 903 048 2774</p>
-            <p style="margin:0 0 12px;">🌐 blackrockrestaurantng.com</p>
-            <p style="margin:0;font-size:11px;color:#666;">© 2026 BLACKROCK Restaurant &amp; Lounge. All rights reserved.</p>
+          <td style="background:#1a1a1a;border-top:2px solid rgba(200,169,110,0.3);padding:28px 40px;text-align:center;border-radius:0 0 8px 8px;">
+            <p style="margin:0 0 8px;font-family:Arial,sans-serif;font-size:13px;color:#aaaaaa;">📍 11 Ajao Road, off Adeniyi Jones Road, Ikeja, Lagos</p>
+            <p style="margin:0 0 8px;font-family:Arial,sans-serif;font-size:13px;color:#aaaaaa;">📞 +234 903 048 2774</p>
+            <p style="margin:0;font-family:Arial,sans-serif;font-size:13px;"><a href="https://blackrockrestaurantng.com" style="color:#c8a96e;text-decoration:none;">🌐 blackrockrestaurantng.com</a></p>
+            <p style="margin:16px 0 0;font-family:Arial,sans-serif;font-size:11px;color:#666666;">© 2026 BLACKROCK Restaurant &amp; Lounge. All rights reserved.</p>
           </td>
         </tr>
 
