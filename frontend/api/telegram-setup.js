@@ -22,5 +22,8 @@ module.exports = async function handler(req, res) {
     body: JSON.stringify({ url: webhookUrl }),
   });
   const data = await response.json();
-  return res.status(200).json({ webhookUrl, telegram: data });
+  if (!data.ok) {
+    return res.status(500).json({ ok: false, error: data.description || 'Telegram rejected the webhook', telegram: data });
+  }
+  return res.status(200).json({ ok: true, message: 'Webhook registered successfully', webhookUrl, telegram: data });
 };
