@@ -19,17 +19,21 @@ const DEFAULT_PERMS = {
   menu: false, media: false, content: false, users: false, settings: false,
 };
 
-const ROLE_OPTIONS = ["staff", "manager", "content_creator", "super_admin"];
+const ROLE_OPTIONS = ["staff", "manager", "content_creator", "social_media_manager", "super_admin"];
 
 const ROLE_COLORS = {
-  super_admin:     { bg: "rgba(200,169,110,0.15)", text: "var(--ds-gold)",  label: "Super Admin" },
-  manager:         { bg: "rgba(99,179,237,0.15)",  text: "#63b3ed",         label: "Manager" },
-  content_creator: { bg: "rgba(139,92,246,0.15)",  text: "#a78bfa",         label: "Content Creator" },
-  staff:           { bg: "rgba(160,174,192,0.12)", text: "var(--ds-muted)", label: "Staff" },
+  super_admin:          { bg: "rgba(200,169,110,0.15)", text: "var(--ds-gold)",  label: "Super Admin" },
+  manager:              { bg: "rgba(99,179,237,0.15)",  text: "#63b3ed",         label: "Manager" },
+  content_creator:      { bg: "rgba(139,92,246,0.15)",  text: "#a78bfa",         label: "Content Creator" },
+  social_media_manager: { bg: "rgba(236,72,153,0.13)",  text: "#f472b6",         label: "Social Media Manager" },
+  staff:                { bg: "rgba(160,174,192,0.12)", text: "var(--ds-muted)", label: "Staff" },
 };
 
+const CONTENT_ONLY_PERMS = { ...Object.fromEntries(Object.keys(DEFAULT_PERMS).map(k => [k, false])), dashboard: true, content: true, media: true };
+
 const ROLE_PRESETS = {
-  content_creator: { ...Object.fromEntries(Object.keys(DEFAULT_PERMS).map(k => [k, false])), dashboard: true, content: true, media: true },
+  content_creator:      CONTENT_ONLY_PERMS,
+  social_media_manager: CONTENT_ONLY_PERMS,
 };
 
 function roleLabel(r) {
@@ -108,7 +112,7 @@ function InviteModal({ onClose, onSuccess, currentUserId }) {
   };
 
   const isSuperAdmin      = form.role === "super_admin";
-  const isContentCreator  = form.role === "content_creator";
+  const isContentCreator  = form.role === "content_creator" || form.role === "social_media_manager";
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
@@ -734,10 +738,11 @@ export default function UserManagement() {
   const currentUserRole = staff.find(m => m.id === session?.user?.id)?.role;
   const isSuperAdmin = currentUserRole === "super_admin";
 
-  const superAdmins    = staff.filter(m => m.role === "super_admin");
-  const managers       = staff.filter(m => m.role === "manager");
-  const contentCreators = staff.filter(m => m.role === "content_creator");
-  const regular        = staff.filter(m => m.role === "staff");
+  const superAdmins        = staff.filter(m => m.role === "super_admin");
+  const managers           = staff.filter(m => m.role === "manager");
+  const contentCreators    = staff.filter(m => m.role === "content_creator");
+  const socialMediaManagers = staff.filter(m => m.role === "social_media_manager");
+  const regular            = staff.filter(m => m.role === "staff");
 
   const tableHeader = (
     <div style={{
@@ -859,6 +864,24 @@ export default function UserManagement() {
               <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
                 {tableHeader}
                 {contentCreators.map(m => (
+                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} isSuperAdmin={isSuperAdmin} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} onDelete={setDeleteTarget} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Social Media Managers */}
+          {socialMediaManagers.length > 0 && (
+            <section>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#f472b6", flexShrink: 0 }} />
+                <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "#f472b6" }}>
+                  Social Media Managers
+                </span>
+              </div>
+              <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
+                {tableHeader}
+                {socialMediaManagers.map(m => (
                   <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} isSuperAdmin={isSuperAdmin} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} onDelete={setDeleteTarget} />
                 ))}
               </div>
