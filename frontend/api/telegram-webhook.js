@@ -44,6 +44,12 @@ module.exports = async function handler(req, res) {
 
     if (!replyText) return res.status(200).json({ ok: true });
 
+    // DEBUG: confirm env vars are present
+    const hasSupabaseUrl  = !!process.env.SUPABASE_URL;
+    const hasServiceKey   = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const hasZohoPassword = !!(process.env.ZOHO_ENQUIRIES_PASSWORD || process.env.ZOHO_APP_PASSWORD);
+    console.log('[telegram-webhook] env check:', { hasSupabaseUrl, hasServiceKey, hasZohoPassword, replyToMsgId });
+
     // Look up the enquiry linked to the replied-to message
     const { data: rows, error: dbErr } = await supabase
       .from('enquiry_telegram_messages')
@@ -53,11 +59,13 @@ module.exports = async function handler(req, res) {
 
     if (dbErr) {
       console.error('[telegram-webhook] Supabase lookup error:', dbErr);
+      await sendTelegram(`⚠️ DEBUG: Supabase lookup failed — ${dbErr.message}\nenv: supabaseUrl=${hasSupabaseUrl} serviceKey=${hasServiceKey}`);
       return res.status(200).json({ ok: true });
     }
 
     if (!rows || rows.length === 0) {
-      // Not an enquiry message — ignore
+      // Not matched — could mean table missing or message_id never stored
+      await sendTelegram(`⚠️ DEBUG: No enquiry found for message_id ${replyToMsgId}. Table may not exist or enquiry was not stored.`);
       return res.status(200).json({ ok: true });
     }
 
