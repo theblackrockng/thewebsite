@@ -1,11 +1,16 @@
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 
-// ── Supabase client (for email_logs) ──────────────────────────────────────────
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL,
-  process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// ── Supabase client (lazy — only created when URL is available) ───────────────
+let _supabase = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.VITE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key);
+  return _supabase;
+}
 
 // ── Sender configuration by email type ───────────────────────────────────────
 function getSenderConfig(type) {
@@ -142,7 +147,7 @@ export async function sendBlackRockEmail({ to, subject, guestName, bodyHtml, typ
     console.error(`[sendBlackRockEmail] Failed to send to ${to}:`, err);
     // Log to Supabase before re-throwing
     try {
-      await supabase.from('email_logs').insert({
+      await getSupabase()?.from('email_logs').insert({
         to_email: to,
         guest_name: guestName || null,
         subject,
@@ -158,7 +163,7 @@ export async function sendBlackRockEmail({ to, subject, guestName, bodyHtml, typ
 
   // Log success
   try {
-    await supabase.from('email_logs').insert({
+    await getSupabase()?.from('email_logs').insert({
       to_email: to,
       guest_name: guestName || null,
       subject,

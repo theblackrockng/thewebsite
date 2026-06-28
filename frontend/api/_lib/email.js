@@ -3,11 +3,16 @@
 const nodemailer = require('nodemailer');
 const { createClient } = require('@supabase/supabase-js');
 
-// ── Supabase client (for email_logs) ──────────────────────────────────────────
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// ── Supabase client (lazy — only created when URL is available) ───────────────
+let _supabase = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key);
+  return _supabase;
+}
 
 // ── Sender configuration by email type ───────────────────────────────────────
 function getSenderConfig(type) {
@@ -144,7 +149,7 @@ async function sendBlackRockEmail({ to, subject, guestName, bodyHtml, type = 'ge
     console.error(`[sendBlackRockEmail] Failed to send to ${to}:`, err);
     // Log to Supabase before re-throwing
     try {
-      await supabase.from('email_logs').insert({
+      await getSupabase()?.from('email_logs').insert({
         to_email: to,
         guest_name: guestName || null,
         subject,
@@ -160,7 +165,7 @@ async function sendBlackRockEmail({ to, subject, guestName, bodyHtml, type = 'ge
 
   // Log success
   try {
-    await supabase.from('email_logs').insert({
+    await getSupabase()?.from('email_logs').insert({
       to_email: to,
       guest_name: guestName || null,
       subject,
