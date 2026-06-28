@@ -15,17 +15,6 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID   || process.env.REACT_APP
 async function notifyTelegramAndStore({ name, email, message }) {
   if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return;
 
-  // Look up the most recent enquiry for this email using service role key (bypasses RLS)
-  const { data: enquiryRow } = await supabase
-    .from('enquiries')
-    .select('id')
-    .eq('email', email)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const enquiryId = enquiryRow?.id ?? null;
-
   const preview = message && message.length > 200 ? message.slice(0, 200) + '…' : (message || '—');
   const text = [
     '💬 <b>New Enquiry — BLACKROCK</b>',
@@ -38,6 +27,8 @@ async function notifyTelegramAndStore({ name, email, message }) {
     '<i>Reply to this message to send a branded email reply to the guest.</i>',
   ].join('\n');
 
+  // Step 1: Send Telegram notification — always first, never blocked by DB
+  let messageId = null;
   try {
     const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       method: 'POST',
@@ -45,21 +36,39 @@ async function notifyTelegramAndStore({ name, email, message }) {
       body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text, parse_mode: 'HTML' }),
     });
     const data = await resp.json();
-    const messageId = data?.result?.message_id;
-
-    if (messageId) {
-      const { error } = await supabase.from('enquiry_telegram_messages').insert({
-        telegram_message_id: messageId,
-        enquiry_id: enquiryId,
-        guest_email: email,
-        guest_name: name,
-      });
-      if (error) {
-        console.error('[send-enquiry-reply] enquiry_telegram_messages insert error:', error.message);
-      }
-    }
+    messageId = data?.result?.message_id ?? null;
   } catch (err) {
-    console.error('[send-enquiry-reply] Telegram notify error:', err.message);
+    console.error('[send-enquiry-reply] Telegram send error:', err.message);
+    return;
+  }
+
+  if (!messageId) return;
+
+  // Step 2: Look up enquiry ID (best-effort — failure does not block anything)
+  let enquiryId = null;
+  try {
+    const { data: enquiryRow } = await supabase
+      .from('enquiries')
+      .select('id')
+      .eq('email', email)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    enquiryId = enquiryRow?.id ?? null;
+  } catch (err) {
+    console.error('[send-enquiry-reply] Enquiry lookup error:', err.message);
+  }
+
+  // Step 3: Store message mapping (enquiry_id may be null — webhook still works via guest_email)
+  try {
+    await supabase.from('enquiry_telegram_messages').insert({
+      telegram_message_id: messageId,
+      enquiry_id: enquiryId,
+      guest_email: email,
+      guest_name: name,
+    });
+  } catch (err) {
+    console.error('[send-enquiry-reply] enquiry_telegram_messages insert error:', err.message);
   }
 }
 
