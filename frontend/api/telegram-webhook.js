@@ -77,10 +77,7 @@ module.exports = async function handler(req, res) {
 
     const { guest_email, guest_name, enquiry_id } = rows[0];
 
-    // Staff member who replied
-    const staffFirst = message.from?.first_name || '';
-    const staffLast  = message.from?.last_name  || '';
-    const staffName  = [staffFirst, staffLast].filter(Boolean).join(' ') || message.from?.username || 'Staff';
+    const staffName = (message.from?.first_name + (message.from?.last_name ? ' ' + message.from.last_name : '')) || message.from?.username || 'Staff';
 
     const escapedReplyText = replyText
       .replace(/&/g, '&amp;')
@@ -114,7 +111,7 @@ module.exports = async function handler(req, res) {
       }
     } catch (emailErr) {
       console.error('[telegram-webhook] Failed to send email reply:', emailErr);
-      await sendTelegram(`❌ Failed to send reply to ${guest_email}\n\n<code>${emailErr.message}</code>`);
+      await sendTelegram(`❌ Reply by ${staffName} to <b>${guest_name}</b> (${guest_email}) failed to send. Please try again or email manually.`);
     }
   } catch (err) {
     console.error('[telegram-webhook] Unexpected error:', err);
