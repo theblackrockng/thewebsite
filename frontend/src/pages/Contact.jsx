@@ -4,7 +4,6 @@ import { Phone, Mail, MapPin, MessageCircle, Clock, Send, Check, ExternalLink } 
 import { BRAND } from "../lib/data";
 import SectionHeader from "../components/SectionHeader";
 import { supabase } from "../lib/supabase";
-import { notifyTelegram, enquiryMessage } from "../lib/telegram";
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "" });
@@ -25,22 +24,12 @@ export default function Contact() {
     setSending(false);
     if (error) { setSendError("Something went wrong. Please try again or email us directly."); return; }
 
-    // Auto-reply email (non-blocking)
+    // Auto-reply email + Telegram notification + message_id storage (all server-side, non-blocking)
     fetch("/api/send-enquiry-reply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, message: form.message }),
+      body: JSON.stringify({ name: form.name, email: form.email, message: form.message, enquiry_id: enquiryRow?.id }),
     }).catch(() => {});
-
-    const telegramMsgId = await notifyTelegram(enquiryMessage(form));
-    if (telegramMsgId && enquiryRow?.id) {
-      supabase.from("enquiry_telegram_messages").insert({
-        telegram_message_id: telegramMsgId,
-        enquiry_id: enquiryRow.id,
-        guest_email: form.email,
-        guest_name: form.name,
-      }).catch(() => {});
-    }
 
     setSent(true);
     setForm({ name: "", email: "", message: "" });
