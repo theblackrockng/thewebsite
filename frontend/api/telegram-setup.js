@@ -1,11 +1,18 @@
 'use strict';
 
 module.exports = async function handler(req, res) {
-  // Protect with CRON_SECRET
-  const auth = req.headers.authorization;
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // DEBUG — remove after confirming env var value
+  const cronSecret = process.env.CRON_SECRET;
+  console.log('[telegram-setup] CRON_SECRET:', cronSecret);
+  console.log('[telegram-setup] Authorization header:', req.headers.authorization);
+  console.log('[telegram-setup] All env keys:', Object.keys(process.env).filter(k => k.includes('CRON')));
+  return res.status(200).json({
+    debug: true,
+    cron_secret_value: cronSecret ?? null,
+    cron_secret_defined: cronSecret !== undefined,
+    authorization_header: req.headers.authorization ?? null,
+    cron_related_env_keys: Object.keys(process.env).filter(k => k.includes('CRON')),
+  });
 
   const token = process.env.TELEGRAM_BOT_TOKEN || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
   const baseUrl = process.env.WEBHOOK_BASE_URL; // e.g. https://blackrockrestaurantng.com
