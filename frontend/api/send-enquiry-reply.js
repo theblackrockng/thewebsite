@@ -36,7 +36,19 @@ async function notifyTelegramAndStore({ name, email, message, enquiryId }) {
     const data = await resp.json();
     const messageId = data?.result?.message_id;
 
-    if (messageId && enquiryId) {
+    const tgDebug = async (text) => {
+      await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: `⚠️ DEBUG: ${text}`, parse_mode: 'HTML' }),
+      }).catch(() => {});
+    };
+
+    if (!messageId) {
+      await tgDebug(`messageId is null — Telegram API did not return a message_id. Response: ${JSON.stringify(data)}`);
+    } else if (!enquiryId) {
+      await tgDebug(`enquiryId is null — enquiry_id was not passed from Contact form. messageId=${messageId}`);
+    } else {
       const { error } = await supabase.from('enquiry_telegram_messages').insert({
         telegram_message_id: messageId,
         enquiry_id: enquiryId,
@@ -44,21 +56,18 @@ async function notifyTelegramAndStore({ name, email, message, enquiryId }) {
         guest_name: name,
       });
       if (error) {
-        console.error('[send-enquiry-reply] enquiry_telegram_messages insert error:', error.message);
-        // Notify group so we can see if the insert is failing
-        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: `⚠️ DEBUG: Failed to store msg mapping for ${name} (msg_id ${messageId}): ${error.message}`, parse_mode: 'HTML' }),
-        }).catch(() => {});
+        await tgDebug(`Insert failed for msg_id ${messageId}: ${error.message} (code: ${error.code})`);
       } else {
-        console.log(`[send-enquiry-reply] Stored telegram_message_id ${messageId} for enquiry ${enquiryId}`);
+        await tgDebug(`✅ Stored msg_id ${messageId} for enquiry ${enquiryId} — reply to this message to email ${email}`);
       }
-    } else {
-      console.warn(`[send-enquiry-reply] Missing messageId (${messageId}) or enquiryId (${enquiryId}) — mapping not stored`);
     }
   } catch (err) {
     console.error('[send-enquiry-reply] Telegram notify error:', err.message);
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: `⚠️ DEBUG: notifyTelegramAndStore threw: ${err.message}`, parse_mode: 'HTML' }),
+    }).catch(() => {});
   }
 }
 
