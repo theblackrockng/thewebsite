@@ -16,7 +16,6 @@ function fmtDate(dateStr) {
   return d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
-// ── Internal helper: a two-column detail row for use in bodyHtml tables ──────
 function detailRow(label, value) {
   return `<tr>
     <td style="padding:12px 0;border-bottom:1px solid #e5e0d8;color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;width:120px;vertical-align:top;">${label}</td>
@@ -24,7 +23,6 @@ function detailRow(label, value) {
   </tr>`;
 }
 
-// ── Internal helper: wrap detail rows in a table ─────────────────────────────
 function detailTable(rows) {
   return `<table width="100%" style="border-collapse:collapse;margin:20px 0;">
     ${rows}

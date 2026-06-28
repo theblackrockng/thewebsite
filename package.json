@@ -1,0 +1,9 @@
+{
+  "author": {
+    "name": "Mealtap Technologies",
+    "email": "hello@mealtap.com.ng"
+  },
+  "dependencies": {
+    "framer-motion": "^12.41.0"
+  }
+}

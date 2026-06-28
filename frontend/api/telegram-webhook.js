@@ -6,7 +6,6 @@ const { sendBlackRockEmail } = require('./_lib/email');
 const TOKEN   = process.env.TELEGRAM_BOT_TOKEN   || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID     || process.env.REACT_APP_TELEGRAM_CHAT_ID;
 
-// Lazy Supabase client
 let _supabase = null;
 function getSupabase() {
   if (_supabase) return _supabase;

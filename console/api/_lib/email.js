@@ -1,7 +1,6 @@
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 
-// ── Supabase client (lazy — only created when URL is available) ───────────────
 let _supabase = null;
 function getSupabase() {
   if (_supabase) return _supabase;
@@ -12,7 +11,6 @@ function getSupabase() {
   return _supabase;
 }
 
-// ── Sender configuration by email type ───────────────────────────────────────
 function getSenderConfig(type) {
   switch (type) {
     case 'reservation':
@@ -37,7 +35,6 @@ function getSenderConfig(type) {
   }
 }
 
-// ── HTML template builder ─────────────────────────────────────────────────────
 export function buildTemplate({ guestName, bodyHtml, subject, preheader, ctaText, ctaUrl }) {
   const safePreheader = preheader || subject || '';
 
@@ -105,7 +102,6 @@ export function buildTemplate({ guestName, bodyHtml, subject, preheader, ctaText
 </html>`;
 }
 
-// ── Core send function ────────────────────────────────────────────────────────
 export async function sendBlackRockEmail({ to, subject, guestName, bodyHtml, type = 'general', ctaText, ctaUrl, preheader }) {
   const { fromName, fromEmail, password } = getSenderConfig(type);
 

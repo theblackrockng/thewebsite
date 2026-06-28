@@ -7,7 +7,6 @@ const { enquiryReplyEmail } = require('./_lib/templates');
 const TELEGRAM_TOKEN   = process.env.TELEGRAM_BOT_TOKEN || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID   || process.env.REACT_APP_TELEGRAM_CHAT_ID;
 
-// Lazy Supabase client
 let _supabase = null;
 function getSupabase() {
   if (_supabase) return _supabase;
@@ -44,7 +43,6 @@ async function notifyTelegramAndStore({ name, email, message }) {
     '<i>Reply to this message to send a branded email reply to the guest.</i>',
   ].join('\n');
 
-  // Step 1: Send Telegram notification
   let messageId = null;
   try {
     const resp = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
@@ -67,7 +65,6 @@ async function notifyTelegramAndStore({ name, email, message }) {
     return;
   }
 
-  // Step 2: Look up enquiry ID
   let enquiryId = null;
   try {
     const { data: enquiryRow } = await db
@@ -82,7 +79,6 @@ async function notifyTelegramAndStore({ name, email, message }) {
     console.error('[send-enquiry-reply] Enquiry lookup error:', err.message);
   }
 
-  // Step 3: Store message mapping
   try {
     const { error } = await db.from('enquiry_telegram_messages').insert({
       telegram_message_id: messageId,
