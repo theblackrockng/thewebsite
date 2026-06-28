@@ -108,7 +108,7 @@ module.exports = async function handler(req, res) {
     notifyTelegramAndStore({ name, email, message }),
     (async () => {
       const { subject, bodyHtml, guestName } = enquiryReplyEmail({ name, message });
-      await sendBlackRockEmail({ to: email, subject, guestName, bodyHtml, type: 'enquiry' });
+      await sendBlackRockEmail({ to: email, subject, guestName, bodyHtml, type: 'general' });
     })(),
   ]);
 

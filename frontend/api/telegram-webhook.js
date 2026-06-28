@@ -97,7 +97,7 @@ module.exports = async function handler(req, res) {
       await sendBlackRockEmail({
         to: guest_email,
         subject: `Re: Your enquiry — BLACKROCK Restaurant & Lounge`,
-        type: 'enquiry',
+        type: 'general',
         guestName: guest_name,
         bodyHtml,
       });
