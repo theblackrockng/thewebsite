@@ -52,6 +52,7 @@ export default function Reservations() {
     companyName: "",
     yearsAnniversary: "",
     celebratingWhat: "",
+    _hp: "",
   });
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -111,6 +112,7 @@ export default function Reservations() {
           party: form.party === "other" ? form.partyOther : form.party,
           occasion: selectedOcc?.label || occasion,
           notes: notes || null,
+          _hp: form._hp,
         }),
       }).catch(() => {});
     }
@@ -357,6 +359,19 @@ export default function Reservations() {
                 className="max-w-3xl mx-auto"
                 data-testid="reservation-form"
               >
+                {/* Honeypot — hidden from real users, bots fill it automatically */}
+                <div style={{ position: "absolute", left: "-9999px", top: "-9999px", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
+                  <label>Leave this empty</label>
+                  <input
+                    type="text"
+                    name="website"
+                    tabIndex="-1"
+                    autoComplete="off"
+                    value={form._hp}
+                    onChange={(e) => handleChange("_hp", e.target.value)}
+                  />
+                </div>
+
                 <div className="text-center mb-12">
                   <div className="text-xs uppercase tracking-[0.32em] text-[var(--burgundy)] mb-3">
                     {selectedOcc?.label}

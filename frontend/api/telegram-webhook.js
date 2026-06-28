@@ -2,6 +2,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { sendBlackRockEmail } = require('./_lib/email');
+const { applySecurityHeaders, SECURITY_HEADERS } = require('./_lib/security');
 
 const TOKEN   = process.env.TELEGRAM_BOT_TOKEN   || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID     || process.env.REACT_APP_TELEGRAM_CHAT_ID;
@@ -30,6 +31,7 @@ async function sendTelegram(text) {
 }
 
 module.exports = async function handler(req, res) {
+  applySecurityHeaders(res);
   // Always return 200 to Telegram to prevent retries
   if (req.method !== 'POST') {
     return res.status(200).json({ ok: true });

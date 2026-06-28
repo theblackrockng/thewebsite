@@ -6,7 +6,7 @@ import SectionHeader from "../components/SectionHeader";
 import { supabase } from "../lib/supabase";
 
 export default function Contact() {
-  const [form, setForm] = useState({ name: "", email: "", message: "" });
+  const [form, setForm] = useState({ name: "", email: "", message: "", _hp: "" });
   const [sent, setSent] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
@@ -28,7 +28,7 @@ export default function Contact() {
     fetch("/api/send-enquiry-reply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: form.name, email: form.email, message: form.message }),
+      body: JSON.stringify({ name: form.name, email: form.email, message: form.message, _hp: form._hp }),
     }).catch(() => {});
 
     setSent(true);
@@ -173,6 +173,19 @@ export default function Contact() {
                   className="mt-10 space-y-8"
                   data-testid="contact-form"
                 >
+                  {/* Honeypot — hidden from real users, bots fill it automatically */}
+                  <div style={{ position: "absolute", left: "-9999px", top: "-9999px", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
+                    <label>Leave this empty</label>
+                    <input
+                      type="text"
+                      name="website"
+                      tabIndex="-1"
+                      autoComplete="off"
+                      value={form._hp}
+                      onChange={(e) => setForm({ ...form, _hp: e.target.value })}
+                    />
+                  </div>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="tbr-label">Name</label>

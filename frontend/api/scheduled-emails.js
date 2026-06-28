@@ -7,6 +7,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendBlackRockEmail } = require('./_lib/email');
 const { reminderEmail, dayOfEmail, thankYouEmail } = require('./_lib/templates');
+const { applySecurityHeaders } = require('./_lib/security');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -32,6 +33,7 @@ async function markSent(id, column) {
 }
 
 module.exports = async function handler(req, res) {
+  applySecurityHeaders(res);
   // Vercel passes Authorization: Bearer <CRON_SECRET> for cron requests
   const authHeader = req.headers.authorization;
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {

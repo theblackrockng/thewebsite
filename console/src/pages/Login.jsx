@@ -41,7 +41,16 @@ function SignInView({ onForgot }) {
     setError(""); setLoading(true);
     const { error: err } = await signIn(email, password);
     setLoading(false);
-    if (err) { setError(err.message); return; }
+    if (err) {
+      // Log failure server-side for brute-force detection
+      fetch("/api/log-security-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventType: "login_failed", email }),
+      }).catch(() => {});
+      setError(err.message);
+      return;
+    }
     navigate("/");
   };
 

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
   Image, FileEdit, Users, UserCircle, Settings, Home, Search,
-  Bell, Sun, Moon, LogOut, Menu, X, Shield, Layers, BookUser, BookOpen,
+  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -34,7 +34,7 @@ function useCurrentPage() {
     "/menu": "Menu Management", "/enquiries": "Enquiries",
     "/media": "Media Library", "/content": "Site Content",
     "/users": "Staff Management", "/content-hub": "Content Hub",
-    "/settings": "Settings", "/blog": "Blog",
+    "/settings": "Settings", "/blog": "Blog", "/security": "Security Log",
   };
   return map[pathname] ?? "Console";
 }
@@ -69,7 +69,8 @@ const NAV_GROUPS = [
   {
     label: "System",
     items: [
-      { to: "/settings", label: "Settings", icon: Settings },
+      { to: "/settings",  label: "Settings",     icon: Settings },
+      { to: "/security",  label: "Security Log",  icon: ShieldAlert, superAdminOnly: true },
     ],
   },
 ];
@@ -166,7 +167,9 @@ function SidebarContent({ pathname, pendingCount, newEnqCount, staffProfile, ses
               {group.label}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-              {group.items.map(item => (
+              {group.items
+                .filter(item => !item.superAdminOnly || staffProfile?.role === 'super_admin')
+                .map(item => (
                 <NavItem key={item.label} item={item} pathname={pathname} pendingCount={pendingCount} newEnqCount={newEnqCount} onClick={onNav} />
               ))}
             </div>
