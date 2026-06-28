@@ -36,13 +36,18 @@ function SignInView({ onForgot }) {
   const [error, setError]       = useState("");
   const [loading, setLoading]   = useState(false);
 
+  const [twoFAStep, setTwoFAStep]   = useState(false);
+  const [otpCode, setOtpCode]       = useState("");
+  const [otpSending, setOtpSending] = useState(false);
+  const [otpError, setOtpError]     = useState("");
+  const [pendingUserId, setPendingUserId] = useState(null);
+
   const submit = async (e) => {
     e.preventDefault();
     setError(""); setLoading(true);
-    const { error: err } = await signIn(email, password);
+    const { data, error: err } = await signIn(email, password);
     setLoading(false);
     if (err) {
-      // Log failure server-side for brute-force detection
       fetch("/api/log-security-event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -51,8 +56,111 @@ function SignInView({ onForgot }) {
       setError(err.message);
       return;
     }
+
+    // Check if 2FA is enabled for this user
+    const userId = data?.user?.id;
+    if (userId) {
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const sb = createClient(
+          import.meta.env.VITE_SUPABASE_URL,
+          import.meta.env.VITE_SUPABASE_ANON_KEY
+        );
+        const { data: prof } = await sb.from("staff_profiles").select("two_fa_enabled, full_name").eq("id", userId).maybeSingle();
+        if (prof?.two_fa_enabled) {
+          // Send 2FA OTP and show the 2FA step
+          setOtpSending(true); setPendingUserId(userId);
+          await fetch("/api/send-otp", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId, purpose: "2fa_login", email, name: prof.full_name }),
+          });
+          setOtpSending(false); setTwoFAStep(true);
+          return;
+        }
+        // Update last_login_at
+        await sb.from("staff_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", userId);
+      } catch {}
+    }
     navigate("/");
   };
+
+  const submitOTP = async (e) => {
+    e.preventDefault();
+    setOtpError(""); setLoading(true);
+    try {
+      const r = await fetch("/api/verify-otp", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: pendingUserId, purpose: "2fa_login", code: otpCode.trim() }),
+      });
+      const d = await r.json();
+      if (!r.ok) { setOtpError(d.error || "Invalid code"); setLoading(false); return; }
+      // Update last_login_at
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
+        await sb.from("staff_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", pendingUserId);
+      } catch {}
+    } catch { setOtpError("Network error. Please try again."); setLoading(false); return; }
+    setLoading(false);
+    navigate("/");
+  };
+
+  if (twoFAStep) {
+    return (
+      <>
+        <div style={{ marginBottom: "28px" }}>
+          <h1 style={{ fontFamily: DM, fontSize: "22px", fontWeight: 700, color: "#1a1a1a", margin: 0, letterSpacing: "-0.01em" }}>
+            Verify your identity
+          </h1>
+          <p style={{ fontFamily: DM, fontSize: "14px", color: "#9a9388", margin: "6px 0 0" }}>
+            A 6-digit code was sent to <strong style={{ color: "#1a1a1a" }}>{email}</strong>.
+          </p>
+        </div>
+        <form onSubmit={submitOTP}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginBottom: "20px" }}>
+            <label style={{ fontFamily: DM, fontSize: "11px", fontWeight: 600, letterSpacing: "0.13em", textTransform: "uppercase", color: "#6f685d" }}>
+              Verification Code
+            </label>
+            <input
+              type="text" inputMode="numeric" maxLength={6} required autoFocus
+              placeholder="000000"
+              value={otpCode} onChange={e => setOtpCode(e.target.value.replace(/\D/g, ""))}
+              style={{ ...inputStyle(true), textAlign: "center", letterSpacing: "0.3em", fontSize: "22px", fontWeight: 700 }}
+              disabled={loading}
+            />
+          </div>
+          {otpError && (
+            <div role="alert" style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", padding: "12px 14px", borderRadius: "10px", background: "rgba(122,28,28,0.07)", border: "1px solid rgba(122,28,28,0.18)", fontFamily: DM, fontSize: "13px", color: BURGUNDY }}>
+              <AlertCircle size={14} style={{ flexShrink: 0 }} />{otpError}
+            </div>
+          )}
+          <button type="submit" disabled={loading || otpCode.length < 6}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+              width: "100%", padding: "17px", borderRadius: "10px", border: "none",
+              cursor: loading ? "not-allowed" : "pointer",
+              fontFamily: DM, fontSize: "16px", fontWeight: 600, color: "#faf8f5",
+              background: loading ? "rgba(122,28,28,0.6)" : BURGUNDY,
+              transition: "background .15s",
+            }}>
+            {loading ? <><Loader2 size={16} className="animate-spin" /> Verifying…</> : "Verify & Sign In"}
+          </button>
+        </form>
+        <p style={{ fontFamily: DM, fontSize: "13px", color: "#9a9388", textAlign: "center", margin: "18px 0 0" }}>
+          Didn't receive the code?{" "}
+          <button type="button" disabled={otpSending}
+            onClick={async () => {
+              setOtpSending(true); setOtpError("");
+              await fetch("/api/send-otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: pendingUserId, purpose: "2fa_login", email }) });
+              setOtpSending(false);
+            }}
+            style={{ background: "none", border: "none", cursor: "pointer", color: BURGUNDY, fontFamily: DM, fontSize: "13px", fontWeight: 500, padding: 0 }}>
+            {otpSending ? "Sending…" : "Resend"}
+          </button>
+        </p>
+      </>
+    );
+  }
 
   return (
     <>

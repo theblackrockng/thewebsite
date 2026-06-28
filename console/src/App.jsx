@@ -19,6 +19,7 @@ import Settings from "./pages/settings/Settings";
 import BlogManagement from "./pages/blog/BlogManagement";
 import BlogEditor from "./pages/blog/BlogEditor";
 import SecurityLog from "./pages/security/SecurityLog";
+import StaffProfile from "./pages/profile/StaffProfile";
 
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth();
@@ -67,6 +68,8 @@ function AppRoutes() {
       <Route path="/blog"               element={<ProtectedRoute><BlogManagement /></ProtectedRoute>} />
       <Route path="/blog/:id"           element={<ProtectedRoute><BlogEditor /></ProtectedRoute>} />
       <Route path="/security"           element={<ProtectedRoute><SecurityLog /></ProtectedRoute>} />
+      <Route path="/profile"            element={<ProtectedRoute><StaffProfile /></ProtectedRoute>} />
+      <Route path="/profile/:userId"    element={<ProtectedRoute><StaffProfile /></ProtectedRoute>} />
       <Route path="*"                   element={<Navigate to="/" replace />} />
     </Routes>
   );

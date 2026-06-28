@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
-import { UserPlus, Shield, Users, Edit2, ToggleLeft, ToggleRight, X, Check, Loader, Mail, Send, Copy, ExternalLink, Trash2, AlertTriangle } from "lucide-react";
+import { UserPlus, Shield, Users, Edit2, ToggleLeft, ToggleRight, X, Check, Loader, Mail, Send, Copy, ExternalLink, Trash2, AlertTriangle, UserCircle } from "lucide-react";
 
 const PERMISSIONS = [
   { key: "dashboard",    label: "Dashboard" },
@@ -563,6 +564,7 @@ function DeleteConfirmModal({ member, onClose, onConfirm, deleting }) {
 
 /* ─── StaffRow ─── */
 function StaffRow({ member, currentUserId, isSuperAdmin, onEdit, onToggle, onTelegram, onDelete }) {
+  const navigate = useNavigate();
   const name     = member.full_name || member.email.split("@")[0];
   const initials = name.slice(0, 2).toUpperCase();
   const isSelf   = member.id === currentUserId;
@@ -570,7 +572,7 @@ function StaffRow({ member, currentUserId, isSuperAdmin, onEdit, onToggle, onTel
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "40px 1fr 160px 1fr 100px 104px",
+      gridTemplateColumns: "40px 1fr 160px 1fr 100px 136px",
       gap: 16, alignItems: "center",
       padding: "14px 20px",
       borderBottom: "1px solid var(--ds-border)",
@@ -587,8 +589,13 @@ function StaffRow({ member, currentUserId, isSuperAdmin, onEdit, onToggle, onTel
         display: "flex", alignItems: "center", justifyContent: "center",
         fontSize: 12, fontWeight: 700,
         color: member.active ? "var(--ds-gold)" : "var(--ds-muted)",
-        flexShrink: 0,
-      }}>{initials}</div>
+        flexShrink: 0, overflow: "hidden",
+      }}>
+        {member.avatar_url
+          ? <img src={member.avatar_url} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : initials
+        }
+      </div>
 
       {/* Name + email */}
       <div style={{ minWidth: 0 }}>
@@ -655,6 +662,23 @@ function StaffRow({ member, currentUserId, isSuperAdmin, onEdit, onToggle, onTel
         >
           <Edit2 size={12} />
         </button>
+        {isSuperAdmin && (
+          <button
+            onClick={() => navigate(isSelf ? "/profile" : `/profile/${member.id}`)}
+            title="View profile"
+            style={{
+              width: 30, height: 30, borderRadius: 6,
+              border: "1px solid rgba(200,169,110,0.25)",
+              background: "rgba(200,169,110,0.07)", cursor: "pointer",
+              color: "var(--ds-gold)", display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(200,169,110,0.16)"; e.currentTarget.style.borderColor = "rgba(200,169,110,0.5)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(200,169,110,0.07)"; e.currentTarget.style.borderColor = "rgba(200,169,110,0.25)"; }}
+          >
+            <UserCircle size={12} />
+          </button>
+        )}
         {isSuperAdmin && !isSelf && (
           <button
             onClick={() => onDelete(member)}
@@ -747,7 +771,7 @@ export default function UserManagement() {
   const tableHeader = (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "40px 1fr 160px 1fr 100px 104px",
+      gridTemplateColumns: "40px 1fr 160px 1fr 100px 136px",
       gap: 16, padding: "10px 20px",
       borderBottom: "1px solid var(--ds-border)",
       fontSize: 10, fontWeight: 600,

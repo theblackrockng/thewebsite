@@ -1,5 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useMatch } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
   Image, FileEdit, Users, UserCircle, Settings, Home, Search,
@@ -35,7 +35,9 @@ function useCurrentPage() {
     "/media": "Media Library", "/content": "Site Content",
     "/users": "Staff Management", "/content-hub": "Content Hub",
     "/settings": "Settings", "/blog": "Blog", "/security": "Security Log",
+    "/profile": "My Profile",
   };
+  if (pathname.startsWith("/profile/")) return "Staff Profile";
   return map[pathname] ?? "Console";
 }
 
@@ -177,17 +179,23 @@ function SidebarContent({ pathname, pendingCount, newEnqCount, staffProfile, ses
         ))}
       </nav>
 
-      {/* Admin chip */}
+      {/* Admin chip — links to /profile */}
       <div style={{ padding: "14px 16px", borderTop: "1px solid var(--ds-border)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <div style={{
-            width: 34, height: 34, borderRadius: "50%",
-            background: "rgba(200,169,110,0.15)", border: "1.5px solid var(--ds-gold)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: "var(--ds-gold)",
-          }}>
-            {initials}
-          </div>
+        <Link to="/profile" onClick={onNav} style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0, textDecoration: "none", borderRadius: 8, padding: "4px 4px", transition: "background .15s" }}
+          onMouseEnter={e => { e.currentTarget.style.background = "var(--ds-nav-active)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}>
+          {staffProfile?.avatar_url ? (
+            <img src={staffProfile.avatar_url} alt={name} style={{ width: 34, height: 34, borderRadius: "50%", objectFit: "cover", border: "1.5px solid var(--ds-gold)", flexShrink: 0 }} />
+          ) : (
+            <div style={{
+              width: 34, height: 34, borderRadius: "50%",
+              background: "rgba(200,169,110,0.15)", border: "1.5px solid var(--ds-gold)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0, fontSize: 11.5, fontWeight: 600, color: "var(--ds-gold)",
+            }}>
+              {initials}
+            </div>
+          )}
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ds-text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
               {name}
@@ -197,7 +205,7 @@ function SidebarContent({ pathname, pendingCount, newEnqCount, staffProfile, ses
               {roleLabel}
             </div>
           </div>
-        </div>
+        </Link>
       </div>
     </div>
   );
