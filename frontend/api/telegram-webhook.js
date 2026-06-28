@@ -3,13 +3,19 @@
 const { createClient } = require('@supabase/supabase-js');
 const { sendBlackRockEmail } = require('./_lib/email');
 
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+const TOKEN   = process.env.TELEGRAM_BOT_TOKEN   || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
+const CHAT_ID = process.env.TELEGRAM_CHAT_ID     || process.env.REACT_APP_TELEGRAM_CHAT_ID;
 
-const TOKEN = process.env.TELEGRAM_BOT_TOKEN || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID || process.env.REACT_APP_TELEGRAM_CHAT_ID;
+// Lazy Supabase client
+let _supabase = null;
+function getSupabase() {
+  if (_supabase) return _supabase;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _supabase = createClient(url, key);
+  return _supabase;
+}
 
 async function sendTelegram(text) {
   if (!TOKEN || !CHAT_ID) return;
@@ -36,7 +42,7 @@ module.exports = async function handler(req, res) {
 
     if (!message) return res.status(200).json({ ok: true });
 
-    // Only process replies to existing messages
+    // Only process replies
     if (!message.reply_to_message) return res.status(200).json({ ok: true });
 
     const replyToMsgId = message.reply_to_message.message_id;
@@ -44,8 +50,14 @@ module.exports = async function handler(req, res) {
 
     if (!replyText) return res.status(200).json({ ok: true });
 
+    const db = getSupabase();
+    if (!db) {
+      await sendTelegram('⚠️ Webhook error: Supabase not configured. Check SUPABASE_URL env var.');
+      return res.status(200).json({ ok: true });
+    }
+
     // Look up the enquiry linked to the replied-to message
-    const { data: rows, error: dbErr } = await supabase
+    const { data: rows, error: dbErr } = await db
       .from('enquiry_telegram_messages')
       .select('*')
       .eq('telegram_message_id', replyToMsgId)
@@ -53,18 +65,18 @@ module.exports = async function handler(req, res) {
 
     if (dbErr) {
       console.error('[telegram-webhook] Supabase lookup error:', dbErr);
+      await sendTelegram(`⚠️ DB lookup failed: ${dbErr.message}`);
       return res.status(200).json({ ok: true });
     }
 
     if (!rows || rows.length === 0) {
-      // Not an enquiry message — ignore
+      // Not a tracked enquiry message — notify so staff know
+      await sendTelegram(`⚠️ No enquiry found for message #${replyToMsgId}. This reply was NOT sent.\n\nOnly replies to notifications with the italic instruction line are forwarded to guests.`);
       return res.status(200).json({ ok: true });
     }
 
-    const row = rows[0];
-    const { guest_email, guest_name, enquiry_id } = row;
+    const { guest_email, guest_name, enquiry_id } = rows[0];
 
-    // Escape reply text for HTML
     const escapedReplyText = replyText
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
@@ -90,25 +102,19 @@ module.exports = async function handler(req, res) {
         bodyHtml,
       });
 
-      // Notify success in Telegram
-      await sendTelegram(`✅ Reply sent to <b>${guest_name}</b> at ${guest_email}`);
+      await sendTelegram(`✅ Reply sent to <b>${guest_name}</b> (${guest_email})`);
 
-      // Update enquiry status to 'replied'
       if (enquiry_id) {
-        const { error: updateErr } = await supabase
-          .from('enquiries')
-          .update({ status: 'replied' })
-          .eq('id', enquiry_id);
-        if (updateErr) console.error('[telegram-webhook] Failed to update enquiry status:', updateErr);
+        await db.from('enquiries').update({ status: 'responded' }).eq('id', enquiry_id);
       }
     } catch (emailErr) {
       console.error('[telegram-webhook] Failed to send email reply:', emailErr);
-      await sendTelegram(`❌ Failed to send reply to ${guest_email}. Please try again or email manually.`);
+      await sendTelegram(`❌ Failed to send reply to ${guest_email}\n\n<code>${emailErr.message}</code>`);
     }
   } catch (err) {
     console.error('[telegram-webhook] Unexpected error:', err);
+    await sendTelegram(`⚠️ Webhook crashed: ${err.message}`);
   }
 
-  // Always return 200 to Telegram
   return res.status(200).json({ ok: true });
 };
