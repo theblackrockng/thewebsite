@@ -106,7 +106,7 @@ export default function Reservations() {
         }
         setMenuLoading(false);
       });
-  }, [step]);
+  }, [step, menuItems.length]);
 
   const selectedOcc = OCCASIONS.find((o) => o.id === occasion);
   const isConcierge = selectedOcc?.concierge;
