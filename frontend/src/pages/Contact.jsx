@@ -124,7 +124,7 @@ export default function Contact() {
             <div className="mt-10 p-6 bg-[var(--charcoal)] border-l-2 border-[var(--gold)]">
               <div className="text-xs uppercase tracking-[0.28em] text-[var(--gold)] mb-2">Kitchen closes</div>
               <div className="text-sm text-[var(--muted)] font-light leading-relaxed">
-                Last orders 90 minutes before closing. The bar runs a little longer. Always.
+                Last orders at 10:30 PM. The bar runs a little longer. Always.
               </div>
             </div>
             </div>

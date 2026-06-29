@@ -9,7 +9,7 @@ export const BRAND = {
   whatsapp: "https://wa.me/2348055238353?text=Hello%20BLACKROCK%2C%20I%27d%20like%20to%20enquire%20about%20a%20reservation.",
   address: "11 Ajao Road, off Adeniyi Jones Road, Ikeja, Lagos",
   hours: [
-    { day: "Daily", time: "10:00 AM — 1:00 AM" },
+    { day: "Daily", time: "10:00 AM — 11:59 PM" },
   ],
 };
 
@@ -22,10 +22,10 @@ export const NAV_LINKS = [
 ];
 
 export const OCCASIONS = [
-  { id: "date-night", label: "Date Night", note: "An intimate evening for two. Let us help you set the mood.", concierge: false },
-  { id: "birthday", label: "Birthday Celebration", note: "A night they'll remember. Cake, candles, full attention.", concierge: false },
+  { id: "date-night", label: "Date Night", note: "An intimate table for two. Let us help you set the mood.", concierge: false },
+  { id: "birthday", label: "Birthday Celebration", note: "A meal they'll remember. Cake, candles, full attention.", concierge: false },
   { id: "family", label: "Family Gathering", note: "Bring everyone together over a table that feels like home.", concierge: false },
-  { id: "corporate", label: "Corporate Dinner", note: "Refined hosting for clients, partners and teams.", concierge: false },
+  { id: "corporate", label: "Corporate Dining", note: "Refined hosting for clients, partners and teams — lunch or dinner.", concierge: false },
   { id: "anniversary", label: "Anniversary", note: "Mark the years with something quietly extraordinary.", concierge: false },
   { id: "proposal", label: "Proposal", note: "This one deserves a personal touch. Let us help you plan it.", concierge: true },
   { id: "private-dining", label: "Private Dining", note: "Our private dining experience is fully tailored to your group.", concierge: true },
