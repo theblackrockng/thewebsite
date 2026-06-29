@@ -225,12 +225,20 @@ export default function Reservations() {
 
   const indicatorStep = submitted ? 4 : step >= 3 ? 3 : step >= 2 ? 2 : 1;
 
-  // Group menu items by category
+  // Group menu items by category, normalised key
   const menuByCategory = menuItems.reduce((acc, item) => {
-    if (!acc[item.category]) acc[item.category] = [];
-    acc[item.category].push(item);
+    const cat = item.category?.trim() || "Other";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(item);
     return acc;
   }, {});
+
+  const CATEGORY_ORDER_LOWER = CATEGORY_ORDER.map((c) => c.toLowerCase());
+  const sortedCategories = Object.entries(menuByCategory).sort(([a], [b]) => {
+    const ai = CATEGORY_ORDER_LOWER.indexOf(a.toLowerCase());
+    const bi = CATEGORY_ORDER_LOWER.indexOf(b.toLowerCase());
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
 
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
@@ -596,11 +604,7 @@ export default function Reservations() {
                   </div>
                 ) : (
                   <div className="space-y-8">
-                    {Object.entries(menuByCategory).sort(([a], [b]) => {
-                        const ai = CATEGORY_ORDER.indexOf(a);
-                        const bi = CATEGORY_ORDER.indexOf(b);
-                        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-                      }).map(([category, items]) => (
+                    {sortedCategories.map(([category, items]) => (
                       <div key={category}>
                         <div className="flex items-center gap-3 mb-4">
                           <div className="h-px flex-1" style={{ background: "rgba(201,168,76,0.2)" }} />
