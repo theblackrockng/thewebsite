@@ -175,7 +175,7 @@ export default function Reservations() {
     const preSelectedMeals = skipMeals ? null : buildMealsPayload();
     const hasMeals = preSelectedMeals && preSelectedMeals.length > 0;
 
-    const { error } = await supabase.from("reservations").insert({
+    const { data: inserted, error } = await supabase.from("reservations").insert({
       name: form.name,
       email: form.email,
       phone: form.phone,
@@ -186,7 +186,7 @@ export default function Reservations() {
       notes: notes || null,
       status: "pending",
       pre_selected_meals: hasMeals ? preSelectedMeals : null,
-    });
+    }).select("id").single();
 
     setSubmitting(false);
     if (error) { setSubmitError("Something went wrong. Please try again or call us directly."); return; }
@@ -209,6 +209,16 @@ export default function Reservations() {
       }).catch(() => {});
     }
 
+    const reservationId = inserted?.id;
+    const actionKeyboard = reservationId ? {
+      inline_keyboard: [[
+        { text: "✓ Confirm",    callback_data: `confirm:${reservationId}` },
+        { text: "📅 Reschedule", callback_data: `reschedule:${reservationId}` },
+        { text: "✗ Cancel",     callback_data: `cancel:${reservationId}` },
+        { text: "✉️ Email",      callback_data: `email:${reservationId}` },
+      ]],
+    } : null;
+
     notifyTelegram(reservationMessage({
       name: form.name,
       email: form.email,
@@ -219,7 +229,7 @@ export default function Reservations() {
       occasion: selectedOcc?.label || occasion,
       notes: notes || null,
       preSelectedMeals: hasMeals ? preSelectedMeals : null,
-    }));
+    }), actionKeyboard);
     setSubmitted(true);
   };
 

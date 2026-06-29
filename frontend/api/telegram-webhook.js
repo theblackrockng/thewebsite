@@ -2,7 +2,8 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { sendBlackRockEmail } = require('./_lib/email');
-const { applySecurityHeaders, SECURITY_HEADERS } = require('./_lib/security');
+const { confirmationEmail } = require('./_lib/templates');
+const { applySecurityHeaders } = require('./_lib/security');
 
 const TOKEN   = process.env.TELEGRAM_BOT_TOKEN   || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID     || process.env.REACT_APP_TELEGRAM_CHAT_ID;
@@ -30,6 +31,80 @@ async function sendTelegram(text) {
   }
 }
 
+async function answerCallback(callbackQueryId, text, showAlert = false) {
+  if (!TOKEN) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${TOKEN}/answerCallbackQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, text, show_alert: showAlert }),
+    });
+  } catch {}
+}
+
+async function removeKeyboard(chatId, messageId) {
+  if (!TOKEN) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${TOKEN}/editMessageReplyMarkup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }),
+    });
+  } catch {}
+}
+
+async function handleCallbackQuery(callbackQuery) {
+  const { id: cbId, data, from, message } = callbackQuery;
+  const chatId   = message?.chat?.id;
+  const messageId = message?.message_id;
+  const staffName = [from?.first_name, from?.last_name].filter(Boolean).join(' ') || from?.username || 'Staff';
+
+  if (!data || !data.includes(':')) {
+    return answerCallback(cbId, '⚠️ Unknown action.');
+  }
+
+  const [action, reservationId] = data.split(':');
+  const db = getSupabase();
+  if (!db) return answerCallback(cbId, '⚠️ Database not configured.', true);
+
+  if (action === 'confirm') {
+    const { error } = await db.from('reservations').update({ status: 'confirmed' }).eq('id', reservationId);
+    if (error) return answerCallback(cbId, '⚠️ Failed to confirm. Try the console.', true);
+    await answerCallback(cbId, '✅ Reservation confirmed!');
+    await removeKeyboard(chatId, messageId);
+    await sendTelegram(`✅ Reservation <b>${reservationId.slice(0, 8)}…</b> confirmed by ${staffName}`);
+
+  } else if (action === 'cancel') {
+    const { error } = await db.from('reservations').update({ status: 'cancelled' }).eq('id', reservationId);
+    if (error) return answerCallback(cbId, '⚠️ Failed to cancel. Try the console.', true);
+    await answerCallback(cbId, '❌ Reservation cancelled.');
+    await removeKeyboard(chatId, messageId);
+    await sendTelegram(`❌ Reservation <b>${reservationId.slice(0, 8)}…</b> cancelled by ${staffName}`);
+
+  } else if (action === 'reschedule') {
+    await answerCallback(cbId, '📅 Open the admin console to reschedule.', true);
+
+  } else if (action === 'email') {
+    const { data: row, error } = await db.from('reservations').select('*').eq('id', reservationId).single();
+    if (error || !row?.email) return answerCallback(cbId, '⚠️ Could not find guest email.', true);
+    try {
+      const { subject, bodyHtml, guestName } = confirmationEmail({
+        name: row.name, date: row.date, time: row.time,
+        party: Number(row.party) || 2, occasion: row.occasion, notes: row.notes,
+        preSelectedMeals: row.pre_selected_meals,
+      });
+      await sendBlackRockEmail({ to: row.email, subject, guestName, bodyHtml, type: 'reservation', ctaText: 'View Reservations', ctaUrl: 'https://blackrockrestaurantng.com/reservations' });
+      await answerCallback(cbId, `✉️ Confirmation sent to ${row.email}`);
+      await sendTelegram(`✉️ Confirmation email sent to <b>${row.name}</b> by ${staffName}`);
+    } catch (err) {
+      await answerCallback(cbId, '⚠️ Email failed to send.', true);
+    }
+
+  } else {
+    await answerCallback(cbId, '⚠️ Unknown action.');
+  }
+}
+
 module.exports = async function handler(req, res) {
   applySecurityHeaders(res);
   // Always return 200 to Telegram to prevent retries
@@ -39,6 +114,13 @@ module.exports = async function handler(req, res) {
 
   try {
     const update = req.body || {};
+
+    // ── Inline keyboard button press ──
+    if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query);
+      return res.status(200).json({ ok: true });
+    }
+
     const message = update.message;
 
     if (!message) return res.status(200).json({ ok: true });

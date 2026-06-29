@@ -351,8 +351,9 @@ function MealSelectionsPanel({ reservation, onClose }) {
                 {items.map((m, i) => (
                   <div key={m.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--ds-border)" }}>
                     <div>
-                      <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--ds-text)" }}>{m.name}</div>
-                      <div style={{ fontSize: 11.5, color: "var(--ds-muted)", marginTop: 1 }}>×{m.qty}</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--ds-text)" }}>
+                        <span style={{ color: "var(--ds-gold)", marginRight: 6 }}>{m.qty}×</span>{m.name}
+                      </div>
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ds-text)", whiteSpace: "nowrap" }}>
                       {fmtMealPrice(Number(m.price) * m.qty)}

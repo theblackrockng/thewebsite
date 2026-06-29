@@ -1,13 +1,15 @@
 const TOKEN  = process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.REACT_APP_TELEGRAM_CHAT_ID;
 
-export async function notifyTelegram(text) {
+export async function notifyTelegram(text, replyMarkup = null) {
   if (!TOKEN || !CHAT_ID) return null;
   try {
+    const payload = { chat_id: CHAT_ID, text, parse_mode: "HTML" };
+    if (replyMarkup) payload.reply_markup = replyMarkup;
     const resp = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: CHAT_ID, text, parse_mode: "HTML" }),
+      body: JSON.stringify(payload),
     });
     const data = await resp.json();
     return data?.result?.message_id ?? null;
@@ -21,7 +23,7 @@ export function reservationMessage(r) {
     ? new Date(r.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : "—";
   const mealsLines = r.preSelectedMeals?.length > 0
-    ? ["\n🍽️ Pre-selected meals:", ...r.preSelectedMeals.map((m) => `  - ${m.name} x${m.qty}`)]
+    ? ["\n🍽️ Pre-selected meals:", ...r.preSelectedMeals.map((m) => `  ${m.qty}  ${m.name}`)]
     : [];
   return [
     "🍽 <b>New Reservation — BLACKROCK</b>",
