@@ -20,6 +20,9 @@ export function reservationMessage(r) {
   const dateStr = r.date
     ? new Date(r.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
     : "—";
+  const mealsLines = r.preSelectedMeals?.length > 0
+    ? ["\n🍽️ Pre-selected meals:", ...r.preSelectedMeals.map((m) => `  - ${m.name} x${m.qty}`)]
+    : [];
   return [
     "🍽 <b>New Reservation — BLACKROCK</b>",
     "",
@@ -31,6 +34,7 @@ export function reservationMessage(r) {
     r.phone ? `📞 ${r.phone}` : null,
     r.email ? `✉️ ${r.email}` : null,
     r.notes ? `\n📝 ${r.notes}` : null,
+    ...mealsLines,
   ].filter((l) => l !== null).join("\n");
 }
 

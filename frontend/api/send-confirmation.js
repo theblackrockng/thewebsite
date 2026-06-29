@@ -65,12 +65,13 @@ module.exports = async function handler(req, res) {
   }
 
   const { name, email, date, time, party, occasion, notes } = sanitized;
+  const preSelectedMeals = Array.isArray(req.body?.preSelectedMeals) ? req.body.preSelectedMeals : [];
 
   if (!email || !name) return res.status(400).json({ error: 'Missing required fields' });
   if (!validateEmail(email)) return res.status(400).json({ error: 'Invalid email address.' });
 
   try {
-    const { subject, bodyHtml, guestName } = confirmationEmail({ name, date, time, party: Number(party) || 2, occasion, notes });
+    const { subject, bodyHtml, guestName } = confirmationEmail({ name, date, time, party: Number(party) || 2, occasion, notes, preSelectedMeals });
     await sendBlackRockEmail({ to: email, subject, guestName, bodyHtml, type: 'reservation', ctaText: 'View Reservations', ctaUrl: 'https://blackrockrestaurantng.com/reservations' });
     return res.status(200).json({ ok: true });
   } catch (err) {

@@ -3,7 +3,7 @@ import { supabase } from "../../lib/supabase";
 import { useStaff } from "../../context/StaffContext";
 import {
   Check, X, RefreshCw, Loader2, Search, Plus,
-  CalendarDays, AlertTriangle, Mail, Send,
+  CalendarDays, AlertTriangle, Mail, Send, UtensilsCrossed,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -312,8 +312,72 @@ function EmailModal({ reservation, onClose }) {
   );
 }
 
+/* ─── Meal Selections Panel ─── */
+function MealSelectionsPanel({ reservation, onClose }) {
+  const meals = reservation.pre_selected_meals || [];
+  const total = meals.reduce((sum, m) => sum + (Number(m.price) * m.qty), 0);
+
+  function fmtMealPrice(p) {
+    return `₦${Number(p).toLocaleString("en-NG")}`;
+  }
+
+  const byCategory = meals.reduce((acc, m) => {
+    const cat = m.category || "Other";
+    if (!acc[cat]) acc[cat] = [];
+    acc[cat].push(m);
+    return acc;
+  }, {});
+
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div style={{ ...MODAL_CARD, maxWidth: 480, margin: "0 auto", maxHeight: "85vh", display: "flex", flexDirection: "column" }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px 16px", borderBottom: "1px solid var(--ds-border)", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, color: "var(--ds-text)", margin: 0 }}>Meal Pre-Selections</h2>
+            <p style={{ fontSize: 12.5, color: "var(--ds-muted)", margin: "3px 0 0" }}>{reservation.name}</p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)", display: "flex" }}><X size={18} /></button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "16px 24px", overflowY: "auto", flex: 1 }}>
+          {meals.length === 0 ? (
+            <p style={{ fontSize: 13, color: "var(--ds-muted)", textAlign: "center", padding: "24px 0" }}>No meals selected.</p>
+          ) : (
+            Object.entries(byCategory).map(([cat, items]) => (
+              <div key={cat} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ds-gold)", marginBottom: 8 }}>{cat}</div>
+                {items.map((m, i) => (
+                  <div key={m.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--ds-border)" }}>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--ds-text)" }}>{m.name}</div>
+                      <div style={{ fontSize: 11.5, color: "var(--ds-muted)", marginTop: 1 }}>×{m.qty}</div>
+                    </div>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ds-text)", whiteSpace: "nowrap" }}>
+                      {fmtMealPrice(Number(m.price) * m.qty)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        {meals.length > 0 && (
+          <div style={{ padding: "14px 24px", borderTop: "1px solid var(--ds-border)", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--ds-muted)" }}>Estimated Total</span>
+            <span style={{ fontSize: 16, fontWeight: 700, color: "var(--ds-gold)" }}>{fmtMealPrice(total)}</span>
+          </div>
+        )}
+      </div>
+    </ModalBackdrop>
+  );
+}
+
 /* ─── Table row ─── */
-function TableRow({ r, idx, working, onConfirm, onReschedule, onCancel, onEmail }) {
+function TableRow({ r, idx, working, onConfirm, onReschedule, onCancel, onEmail, onViewMeals }) {
   const partyDisplay = r.party === "other" ? (r.party_other ?? "—") : (r.party ?? "—");
   const isWorking = working === r.id;
   const evenBg = "transparent";
@@ -414,6 +478,17 @@ function TableRow({ r, idx, working, onConfirm, onReschedule, onCancel, onEmail 
               disabled={isWorking}
             >
               <Mail size={13} />
+            </ActionBtn>
+          )}
+          {r.pre_selected_meals?.length > 0 && (
+            <ActionBtn
+              onClick={() => onViewMeals(r)}
+              title="View meal pre-selections"
+              hoverColor="var(--ds-gold)"
+              hoverBg="rgba(200,169,110,0.12)"
+              disabled={isWorking}
+            >
+              <UtensilsCrossed size={13} />
             </ActionBtn>
           )}
         </div>
@@ -751,6 +826,7 @@ export default function Reservations() {
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [cancelTarget,     setCancelTarget]     = useState(null);
   const [emailTarget,      setEmailTarget]      = useState(null);
+  const [mealTarget,       setMealTarget]       = useState(null);
   const [showNewModal,     setShowNewModal]     = useState(false);
   const [modalSaving,      setModalSaving]      = useState(false);
 
@@ -1024,6 +1100,7 @@ export default function Reservations() {
                     onReschedule={setRescheduleTarget}
                     onCancel={setCancelTarget}
                     onEmail={setEmailTarget}
+                    onViewMeals={setMealTarget}
                   />
                 ))}
               </tbody>
@@ -1064,6 +1141,13 @@ export default function Reservations() {
             key="email"
             reservation={emailTarget}
             onClose={() => setEmailTarget(null)}
+          />
+        )}
+        {mealTarget && (
+          <MealSelectionsPanel
+            key="meals"
+            reservation={mealTarget}
+            onClose={() => setMealTarget(null)}
           />
         )}
       </AnimatePresence>

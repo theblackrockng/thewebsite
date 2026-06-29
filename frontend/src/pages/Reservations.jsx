@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Phone, MessageCircle, X, ArrowRight, ArrowLeft } from "lucide-react";
-import { OCCASIONS, BRAND, IMAGES } from "../lib/data";
+import { Check, Phone, MessageCircle, X, ArrowRight, ArrowLeft, Minus, Plus, UtensilsCrossed, Loader2 } from "lucide-react";
+import { OCCASIONS, BRAND, IMAGES, MENU } from "../lib/data";
 import { supabase } from "../lib/supabase";
 import { notifyTelegram, reservationMessage } from "../lib/telegram";
 
 const today = new Date().toISOString().split("T")[0];
 
 const timeSlots = [
-  "5:00 PM", "5:30 PM", "6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM",
+  "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
+  "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM",
+  "2:00 PM", "2:30 PM", "3:00 PM", "3:30 PM",
+  "4:00 PM", "4:30 PM", "5:00 PM", "5:30 PM",
+  "6:00 PM", "6:30 PM", "7:00 PM", "7:30 PM",
   "8:00 PM", "8:30 PM", "9:00 PM", "9:30 PM", "10:00 PM",
 ];
 
@@ -31,6 +35,23 @@ const pageVariants = {
 };
 
 const pageTransition = { duration: 0.28, ease: "easeInOut" };
+
+function fmtPrice(p) {
+  return `₦${Number(p).toLocaleString("en-NG")}`;
+}
+
+// Convert MENU constant to same shape as menu_items table rows (fallback)
+function menuFallback() {
+  return Object.entries(MENU).flatMap(([category, items]) =>
+    items.map((item, i) => ({
+      id: `${category}-${i}`,
+      name: item.name,
+      description: item.desc,
+      price: parseInt(String(item.price).replace(/[₦,\s]/g, ""), 10),
+      category,
+    }))
+  );
+}
 
 export default function Reservations() {
   const [searchParams] = useSearchParams();
@@ -58,20 +79,74 @@ export default function Reservations() {
   const [submitError, setSubmitError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // Meal pre-selection state
+  const [menuItems, setMenuItems] = useState([]);
+  const [menuLoading, setMenuLoading] = useState(false);
+  const [mealSelections, setMealSelections] = useState({}); // { [itemId]: qty }
+
   useEffect(() => {
     if (initialOcc) setOccasion(initialOcc);
   }, [initialOcc]);
 
+  // Fetch menu items when user reaches step 3
+  useEffect(() => {
+    if (step !== 3 || menuItems.length > 0) return;
+    setMenuLoading(true);
+    supabase
+      .from("menu_items")
+      .select("id, name, description, price, category")
+      .eq("available", true)
+      .order("category")
+      .order("name")
+      .then(({ data, error }) => {
+        if (!error && data && data.length > 0) {
+          setMenuItems(data);
+        } else {
+          setMenuItems(menuFallback());
+        }
+        setMenuLoading(false);
+      });
+  }, [step]);
+
   const selectedOcc = OCCASIONS.find((o) => o.id === occasion);
   const isConcierge = selectedOcc?.concierge;
+
+  const partyMax = form.party === "other"
+    ? (parseInt(form.partyOther, 10) || 20)
+    : (parseInt(String(form.party), 10) || 10);
 
   const handleChange = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   const goForward = () => { setDir(1); setStep(2); };
   const goBack = () => { setDir(-1); setStep(1); };
+  const goBackToDetails = () => { setDir(-1); setStep(step === 2.5 ? 2.5 : 2); };
 
-  const handleSubmit = async (e) => {
+  // Step 2 form → advance to meal selection
+  const handleGoToMeals = (e) => {
     e.preventDefault();
+    setDir(1);
+    setStep(3);
+  };
+
+  const setMealQty = (id, qty) => {
+    setMealSelections((prev) => ({ ...prev, [id]: Math.max(0, Math.min(qty, partyMax)) }));
+  };
+
+  const totalSelected = Object.values(mealSelections).reduce((s, q) => s + q, 0);
+
+  const buildMealsPayload = () =>
+    menuItems
+      .filter((item) => (mealSelections[item.id] ?? 0) > 0)
+      .map((item) => ({
+        id: item.id,
+        name: item.name,
+        qty: mealSelections[item.id],
+        price: item.price,
+        category: item.category,
+      }));
+
+  // Actual reservation submission
+  const handleFinalSubmit = async (skipMeals = false) => {
     setSubmitError("");
     setSubmitting(true);
 
@@ -85,6 +160,9 @@ export default function Reservations() {
       form.celebratingWhat && `Celebrating: ${form.celebratingWhat}`,
     ].filter(Boolean).join(" | ");
 
+    const preSelectedMeals = skipMeals ? null : buildMealsPayload();
+    const hasMeals = preSelectedMeals && preSelectedMeals.length > 0;
+
     const { error } = await supabase.from("reservations").insert({
       name: form.name,
       email: form.email,
@@ -95,6 +173,7 @@ export default function Reservations() {
       occasion: selectedOcc?.label || occasion,
       notes: notes || null,
       status: "pending",
+      pre_selected_meals: hasMeals ? preSelectedMeals : null,
     });
 
     setSubmitting(false);
@@ -112,20 +191,38 @@ export default function Reservations() {
           party: form.party === "other" ? form.partyOther : form.party,
           occasion: selectedOcc?.label || occasion,
           notes: notes || null,
+          preSelectedMeals: hasMeals ? preSelectedMeals : null,
           _hp: form._hp,
         }),
       }).catch(() => {});
     }
 
-    notifyTelegram(reservationMessage({ name: form.name, email: form.email, phone: form.phone, date: form.date, time: form.time, party: form.party === "other" ? form.partyOther : form.party, occasion: selectedOcc?.label || occasion, notes: notes || null }));
+    notifyTelegram(reservationMessage({
+      name: form.name,
+      email: form.email,
+      phone: form.phone,
+      date: form.date,
+      time: form.time,
+      party: form.party === "other" ? form.partyOther : form.party,
+      occasion: selectedOcc?.label || occasion,
+      notes: notes || null,
+      preSelectedMeals: hasMeals ? preSelectedMeals : null,
+    }));
     setSubmitted(true);
   };
 
-  const indicatorStep = submitted ? 3 : step >= 2 ? 2 : 1;
+  const indicatorStep = submitted ? 4 : step >= 3 ? 3 : step >= 2 ? 2 : 1;
+
+  // Group menu items by category
+  const menuByCategory = menuItems.reduce((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = [];
+    acc[item.category].push(item);
+    return acc;
+  }, {});
 
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
-      {/* Hero — full-width background image with dark overlay */}
+      {/* Hero */}
       <section
         className="relative pt-12 pb-10 md:pt-20 md:pb-14 overflow-hidden"
         style={{
@@ -139,10 +236,10 @@ export default function Reservations() {
         <div className="relative z-10 max-w-[1200px] mx-auto px-6 md:px-12 text-center">
           <span className="gold-line">Reserve</span>
           <h1 className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] mt-6 md:mt-8 text-[var(--warm-white)]">
-            Tell us about <span className="font-serif-italic text-[var(--gold)]">your night.</span>
+            Tell us about <span className="font-serif-italic text-[var(--gold)]">your visit.</span>
           </h1>
           <p className="text-[var(--muted)] mt-8 max-w-xl mx-auto font-light text-base md:text-lg leading-relaxed">
-            Every booking begins with an occasion. The night is shaped around it.
+            Every booking begins with an occasion. Your experience is shaped around it.
           </p>
         </div>
       </section>
@@ -155,13 +252,13 @@ export default function Reservations() {
 
           {/* Step progress bar */}
           <div className="flex items-start justify-center pt-10 mb-5 md:mb-6">
-            {["Your Occasion", "Your Details", "Confirm"].map((label, i) => {
+            {["Your Occasion", "Your Details", "Meal Selection", "Confirm"].map((label, i) => {
               const n = i + 1;
               const isCompleted = indicatorStep > n;
               const isActive = indicatorStep === n;
               return (
                 <div key={n} className="flex items-center">
-                  <div className="flex flex-col items-center gap-1.5 min-w-[64px] md:min-w-[80px]">
+                  <div className="flex flex-col items-center gap-1.5 min-w-[60px] md:min-w-[76px]">
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
                       style={{
@@ -183,9 +280,9 @@ export default function Reservations() {
                       {label}
                     </span>
                   </div>
-                  {n < 3 && (
+                  {n < 4 && (
                     <div
-                      className="w-12 md:w-20 h-px mx-1 mb-5"
+                      className="w-8 md:w-16 h-px mx-1 mb-5"
                       style={{
                         background: isCompleted ? "var(--gold)" : "var(--border-soft)",
                         transition: "background 0.5s ease",
@@ -244,7 +341,6 @@ export default function Reservations() {
                   ))}
                 </div>
 
-                {/* Continue to Details button — animates in on card select */}
                 <AnimatePresence>
                   {occasion && (
                     <motion.div
@@ -257,10 +353,7 @@ export default function Reservations() {
                       <button
                         onClick={goForward}
                         className="flex items-center gap-3 px-8 py-4 text-sm uppercase tracking-[0.24em] font-medium transition-colors duration-200"
-                        style={{
-                          background: "var(--gold)",
-                          color: "var(--charcoal)",
-                        }}
+                        style={{ background: "var(--gold)", color: "var(--charcoal)" }}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "var(--gold-light)")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "var(--gold)")}
                       >
@@ -296,11 +389,7 @@ export default function Reservations() {
                       {selectedOcc.note} Speak with our host team. We'll arrange every detail, in private.
                     </p>
                     <div className="mt-10 space-y-3">
-                      <a
-                        href={`tel:${BRAND.phoneTel}`}
-                        className="flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--gold)] transition-colors group"
-                        data-testid="concierge-call"
-                      >
+                      <a href={`tel:${BRAND.phoneTel}`} className="flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--gold)] transition-colors group" data-testid="concierge-call">
                         <div className="flex items-center gap-4">
                           <Phone size={18} className="text-[var(--burgundy)]" />
                           <div>
@@ -310,13 +399,7 @@ export default function Reservations() {
                         </div>
                         <ArrowRight size={16} className="text-[var(--muted)] group-hover:translate-x-1 transition-transform" />
                       </a>
-                      <a
-                        href={BRAND.whatsapp}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--gold)] transition-colors group"
-                        data-testid="concierge-whatsapp"
-                      >
+                      <a href={BRAND.whatsapp} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--gold)] transition-colors group" data-testid="concierge-whatsapp">
                         <div className="flex items-center gap-4">
                           <MessageCircle size={18} className="text-[var(--burgundy)]" />
                           <div>
@@ -326,11 +409,7 @@ export default function Reservations() {
                         </div>
                         <ArrowRight size={16} className="text-[var(--muted)] group-hover:translate-x-1 transition-transform" />
                       </a>
-                      <button
-                        onClick={() => setStep(2.5)}
-                        className="w-full flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--gold)] transition-colors group text-left"
-                        data-testid="concierge-form"
-                      >
+                      <button onClick={() => setStep(2.5)} className="w-full flex items-center justify-between p-5 border border-[var(--border-soft)] hover:border-[var(--gold)] transition-colors group text-left" data-testid="concierge-form">
                         <div>
                           <div className="text-xs uppercase tracking-[0.28em] text-[var(--muted)]">Or</div>
                           <div className="font-serif-display text-xl">Send a brief. We'll call you back</div>
@@ -355,21 +434,14 @@ export default function Reservations() {
                 animate="center"
                 exit="exit"
                 transition={pageTransition}
-                onSubmit={handleSubmit}
+                onSubmit={handleGoToMeals}
                 className="max-w-3xl mx-auto"
                 data-testid="reservation-form"
               >
-                {/* Honeypot — hidden from real users, bots fill it automatically */}
+                {/* Honeypot */}
                 <div style={{ position: "absolute", left: "-9999px", top: "-9999px", width: 1, height: 1, overflow: "hidden" }} aria-hidden="true">
                   <label>Leave this empty</label>
-                  <input
-                    type="text"
-                    name="website"
-                    tabIndex="-1"
-                    autoComplete="off"
-                    value={form._hp}
-                    onChange={(e) => handleChange("_hp", e.target.value)}
-                  />
+                  <input type="text" name="website" tabIndex="-1" autoComplete="off" value={form._hp} onChange={(e) => handleChange("_hp", e.target.value)} />
                 </div>
 
                 <div className="text-center mb-12">
@@ -384,64 +456,27 @@ export default function Reservations() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                   <div>
                     <label className="tbr-label">Full Name</label>
-                    <input
-                      required
-                      type="text"
-                      className="tbr-input"
-                      placeholder="Tomi Adekola"
-                      value={form.name}
-                      onChange={(e) => handleChange("name", e.target.value)}
-                      data-testid="input-name"
-                    />
+                    <input required type="text" className="tbr-input" placeholder="Tomi Adekola" value={form.name} onChange={(e) => handleChange("name", e.target.value)} data-testid="input-name" />
                   </div>
                   <div>
                     <label className="tbr-label">Email</label>
-                    <input
-                      required
-                      type="email"
-                      className="tbr-input"
-                      placeholder="you@example.com"
-                      value={form.email}
-                      onChange={(e) => handleChange("email", e.target.value)}
-                      data-testid="input-email"
-                    />
+                    <input required type="email" className="tbr-input" placeholder="you@example.com" value={form.email} onChange={(e) => handleChange("email", e.target.value)} data-testid="input-email" />
                   </div>
                   <div>
                     <label className="tbr-label">Phone</label>
-                    <input
-                      required
-                      type="tel"
-                      className="tbr-input"
-                      placeholder="+234 803 ..."
-                      value={form.phone}
-                      onChange={(e) => handleChange("phone", e.target.value)}
-                      data-testid="input-phone"
-                    />
+                    <input required type="tel" className="tbr-input" placeholder="+234 803 ..." value={form.phone} onChange={(e) => handleChange("phone", e.target.value)} data-testid="input-phone" />
                   </div>
                   {!isConcierge && (
                     <div>
                       <label className="tbr-label">Party Size</label>
-                      <select
-                        className="tbr-input"
-                        value={form.party}
-                        onChange={(e) => handleChange("party", e.target.value)}
-                        data-testid="input-party"
-                      >
+                      <select className="tbr-input" value={form.party} onChange={(e) => handleChange("party", e.target.value)} data-testid="input-party">
                         {[1,2,3,4,5,6,7,8,9,10,12,15,20].map((n) => (
                           <option key={n} value={n}>{n} {n === 1 ? "guest" : "guests"}</option>
                         ))}
                         <option value="other">More than 20 guests</option>
                       </select>
                       {form.party === "other" && (
-                        <input
-                          type="number"
-                          min="21"
-                          className="tbr-input mt-3"
-                          placeholder="How many guests?"
-                          value={form.partyOther}
-                          onChange={(e) => handleChange("partyOther", e.target.value)}
-                          data-testid="input-party-other"
-                        />
+                        <input type="number" min="21" className="tbr-input mt-3" placeholder="How many guests?" value={form.partyOther} onChange={(e) => handleChange("partyOther", e.target.value)} data-testid="input-party-other" />
                       )}
                     </div>
                   )}
@@ -449,24 +484,11 @@ export default function Reservations() {
                     <>
                       <div>
                         <label className="tbr-label">Date</label>
-                        <input
-                          required
-                          type="date"
-                          min={today}
-                          className="tbr-input"
-                          value={form.date}
-                          onChange={(e) => handleChange("date", e.target.value)}
-                          data-testid="input-date"
-                        />
+                        <input required type="date" min={today} className="tbr-input" value={form.date} onChange={(e) => handleChange("date", e.target.value)} data-testid="input-date" />
                       </div>
                       <div>
                         <label className="tbr-label">Time</label>
-                        <select
-                          className="tbr-input"
-                          value={form.time}
-                          onChange={(e) => handleChange("time", e.target.value)}
-                          data-testid="input-time"
-                        >
+                        <select className="tbr-input" value={form.time} onChange={(e) => handleChange("time", e.target.value)} data-testid="input-time">
                           {timeSlots.map((t) => (<option key={t} value={t}>{t}</option>))}
                         </select>
                       </div>
@@ -474,7 +496,6 @@ export default function Reservations() {
                   )}
                 </div>
 
-                {/* Occasion-specific fields */}
                 {occasion === "birthday" && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
                     <div>
@@ -520,20 +541,161 @@ export default function Reservations() {
                   />
                 </div>
 
-                {submitError && (
-                  <p className="text-sm text-red-400 border border-red-400/20 bg-red-400/5 px-4 py-3 mb-2">{submitError}</p>
-                )}
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <button type="button" onClick={goBack} className="btn-ghost-dark" data-testid="form-back">
                     <ArrowLeft size={14} /> Change occasion
                   </button>
-                  <button type="submit" disabled={submitting} className="btn-burgundy" data-testid="form-submit">
-                    <span>{submitting ? "Sending..." : "Confirm Reservation"}</span>
-                    {!submitting && <ArrowRight size={14} />}
+                  <button type="submit" className="btn-burgundy" data-testid="form-submit">
+                    <span>Continue to Meal Selection</span>
+                    <ArrowRight size={14} />
                   </button>
                 </div>
               </motion.form>
             ) : null}
+
+            {step === 3 && (
+              <motion.div
+                key="step3"
+                custom={dir}
+                variants={pageVariants}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={pageTransition}
+                className="max-w-3xl mx-auto"
+                data-testid="step-meals"
+              >
+                <div className="text-center mb-10">
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <UtensilsCrossed size={20} className="text-[var(--gold)]" />
+                    <h2 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
+                      Plan your meal <span className="font-serif-italic text-[var(--gold)] text-2xl md:text-3xl">(optional)</span>
+                    </h2>
+                  </div>
+                  <p className="text-[var(--muted)] text-sm md:text-base max-w-lg mx-auto leading-relaxed">
+                    Let us know what you're thinking and we'll have everything ready for you.
+                  </p>
+                </div>
+
+                {menuLoading ? (
+                  <div className="flex items-center justify-center py-16 gap-3 text-[var(--muted)]">
+                    <Loader2 size={18} className="animate-spin text-[var(--gold)]" />
+                    <span className="text-sm">Loading menu…</span>
+                  </div>
+                ) : (
+                  <div className="space-y-8">
+                    {Object.entries(menuByCategory).map(([category, items]) => (
+                      <div key={category}>
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="h-px flex-1" style={{ background: "rgba(201,168,76,0.2)" }} />
+                          <span className="text-[10px] uppercase tracking-[0.28em] text-[var(--gold)] font-medium whitespace-nowrap">{category}</span>
+                          <div className="h-px flex-1" style={{ background: "rgba(201,168,76,0.2)" }} />
+                        </div>
+                        <div className="space-y-2">
+                          {items.map((item) => {
+                            const qty = mealSelections[item.id] ?? 0;
+                            return (
+                              <div
+                                key={item.id}
+                                className="flex items-center gap-4 px-4 py-3 border transition-colors"
+                                style={{
+                                  borderColor: qty > 0 ? "rgba(201,168,76,0.4)" : "var(--border-soft)",
+                                  background: qty > 0 ? "rgba(201,168,76,0.05)" : "transparent",
+                                }}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-baseline gap-3 flex-wrap">
+                                    <span className="text-sm font-medium text-[var(--warm-white)]">{item.name}</span>
+                                    <span className="text-xs text-[var(--gold)] font-medium">{fmtPrice(item.price)}</span>
+                                  </div>
+                                  {item.description && (
+                                    <p className="text-xs text-[var(--muted)] mt-0.5 leading-relaxed line-clamp-1">{item.description}</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <button
+                                    type="button"
+                                    onClick={() => setMealQty(item.id, qty - 1)}
+                                    disabled={qty === 0}
+                                    className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                                    style={{
+                                      border: "1px solid var(--border-soft)",
+                                      background: qty > 0 ? "rgba(201,168,76,0.12)" : "transparent",
+                                      color: qty > 0 ? "var(--gold)" : "var(--muted)",
+                                      cursor: qty === 0 ? "not-allowed" : "pointer",
+                                      opacity: qty === 0 ? 0.4 : 1,
+                                    }}
+                                  >
+                                    <Minus size={10} />
+                                  </button>
+                                  <span className="w-5 text-center text-sm font-medium text-[var(--warm-white)]">{qty}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMealQty(item.id, qty + 1)}
+                                    disabled={qty >= partyMax}
+                                    className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                                    style={{
+                                      border: "1px solid var(--border-soft)",
+                                      background: qty < partyMax ? "rgba(201,168,76,0.12)" : "transparent",
+                                      color: qty < partyMax ? "var(--gold)" : "var(--muted)",
+                                      cursor: qty >= partyMax ? "not-allowed" : "pointer",
+                                      opacity: qty >= partyMax ? 0.4 : 1,
+                                    }}
+                                  >
+                                    <Plus size={10} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Running total */}
+                {totalSelected > 0 && (
+                  <div className="mt-6 px-4 py-3 border border-[var(--gold)]/30 bg-[var(--gold)]/5 flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Dishes selected</span>
+                    <span className="font-serif-display text-lg text-[var(--gold)]">{totalSelected} {totalSelected === 1 ? "dish" : "dishes"}</span>
+                  </div>
+                )}
+
+                {submitError && (
+                  <p className="text-sm text-red-400 border border-red-400/20 bg-red-400/5 px-4 py-3 mt-4">{submitError}</p>
+                )}
+
+                <div className="flex items-center justify-between flex-wrap gap-4 mt-8">
+                  <button type="button" onClick={goBackToDetails} className="btn-ghost-dark">
+                    <ArrowLeft size={14} /> Back to details
+                  </button>
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => handleFinalSubmit(true)}
+                      disabled={submitting}
+                      className="text-sm text-[var(--muted)] hover:text-[var(--warm-white)] transition-colors underline underline-offset-2"
+                      data-testid="meal-skip"
+                    >
+                      Skip this step
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleFinalSubmit(false)}
+                      disabled={submitting}
+                      className="btn-burgundy"
+                      data-testid="meal-confirm"
+                    >
+                      {submitting
+                        ? <><Loader2 size={14} className="animate-spin" /> Confirming…</>
+                        : <><span>Confirm Reservation</span><ArrowRight size={14} /></>
+                      }
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </section>
@@ -548,6 +710,7 @@ export default function Reservations() {
               setSubmitted(false);
               setStep(1);
               setOccasion("");
+              setMealSelections({});
             }}
           />
         )}
@@ -559,13 +722,7 @@ export default function Reservations() {
 function SuccessModal({ form, occasion, onClose }) {
   return (
     <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="sheet-overlay"
-        onClick={onClose}
-      />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="sheet-overlay" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -576,12 +733,7 @@ function SuccessModal({ form, occasion, onClose }) {
       >
         <div className="bg-[var(--charcoal)] max-w-xl w-full pointer-events-auto relative overflow-hidden">
           <div className="bg-[var(--charcoal)] p-10 md:p-14 text-center relative grain">
-            <button
-              onClick={onClose}
-              className="absolute top-5 right-5 text-white/60 hover:text-white"
-              data-testid="success-close"
-              aria-label="Close"
-            >
+            <button onClick={onClose} className="absolute top-5 right-5 text-white/60 hover:text-white" data-testid="success-close" aria-label="Close">
               <X size={22} />
             </button>
             <motion.div

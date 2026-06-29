@@ -30,7 +30,7 @@ function detailTable(rows) {
 }
 
 /* ── EMAIL 1: CONFIRMATION ── */
-exports.confirmationEmail = ({ name, date, time, party, occasion, notes }) => {
+exports.confirmationEmail = ({ name, date, time, party, occasion, notes, preSelectedMeals }) => {
   const firstName = (name || 'friend').split(' ')[0];
   const partyLabel = party === 1 ? '1 guest' : `${party} guests`;
 
@@ -43,6 +43,24 @@ exports.confirmationEmail = ({ name, date, time, party, occasion, notes }) => {
     notes ? detailRow('Notes', notes) : '',
   ].join('');
 
+  const meals = Array.isArray(preSelectedMeals) ? preSelectedMeals.filter(m => m.qty > 0) : [];
+  const mealsSection = meals.length > 0 ? `
+    <div style="border-left:3px solid #c8a96e;padding-left:16px;margin:28px 0 4px;">
+      <p style="margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#c8a96e;font-family:Arial,sans-serif;">Pre-Selected Meals</p>
+    </div>
+    <table width="100%" style="border-collapse:collapse;margin:4px 0 20px;">
+      ${meals.map(m => `<tr>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:14px;">${m.name} <span style="color:#888;">×${m.qty}</span></td>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:14px;text-align:right;">₦${(m.price * m.qty).toLocaleString('en-NG')}</td>
+      </tr>`).join('')}
+      <tr>
+        <td style="padding:12px 0 0;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:#888;">Estimated Total</td>
+        <td style="padding:12px 0 0;font-size:15px;font-weight:700;color:#c8a96e;text-align:right;">₦${meals.reduce((s, m) => s + m.price * m.qty, 0).toLocaleString('en-NG')}</td>
+      </tr>
+    </table>
+    <p style="margin:0 0 20px;color:#888;font-size:12px;">Meal selections are subject to availability. Our team will confirm on arrival.</p>
+  ` : '';
+
   const bodyHtml = `
     <p style="margin:0 0 20px;color:#1a1a1a;">We've received your reservation and we're looking forward to welcoming you.</p>
 
@@ -50,6 +68,7 @@ exports.confirmationEmail = ({ name, date, time, party, occasion, notes }) => {
       <p style="margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#c8a96e;font-family:Arial,sans-serif;">Booking Details</p>
     </div>
     ${detailTable(rows)}
+    ${mealsSection}
 
     <p style="margin:20px 0;color:#555;font-size:14px;">
       For changes, call <a href="tel:+2349030482774" style="color:#c8a96e;text-decoration:none;font-weight:bold;">+234 903 048 2774</a>
@@ -115,10 +134,10 @@ exports.dayOfEmail = ({ name, date, time, party, occasion }) => {
   ].join('');
 
   const bodyHtml = `
-    <p style="margin:0 0 20px;color:#1a1a1a;">Tonight is your night. We've been looking forward to welcoming you all week.</p>
+    <p style="margin:0 0 20px;color:#1a1a1a;">Your table is set and we're ready to welcome you. We've been looking forward to this.</p>
 
     <div style="border-left:3px solid #c8a96e;padding-left:16px;margin:20px 0 4px;">
-      <p style="margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#c8a96e;font-family:Arial,sans-serif;">Tonight's Details</p>
+      <p style="margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#c8a96e;font-family:Arial,sans-serif;">Your Reservation Details</p>
     </div>
     ${detailTable(rows)}
 
@@ -127,11 +146,11 @@ exports.dayOfEmail = ({ name, date, time, party, occasion }) => {
       <p style="margin:0;color:#555;font-size:14px;line-height:1.7;">We're on Ajao Road, off Adeniyi Jones Road, Ikeja. There is parking available on-site. If you need directions, call us and we'll guide you in.</p>
     </div>
 
-    <p style="margin:20px 0 0;font-style:italic;color:#888;font-size:15px;line-height:1.7;">"The best evenings begin with the right table. Yours is waiting."</p>
+    <p style="margin:20px 0 0;font-style:italic;color:#888;font-size:15px;line-height:1.7;">"Every great meal begins with the right table. Yours is waiting."</p>
   `;
 
   return {
-    subject: `Tonight at BLACKROCK — your table is ready`,
+    subject: `Your table at BLACKROCK is ready`,
     bodyHtml,
     guestName: name,
   };
