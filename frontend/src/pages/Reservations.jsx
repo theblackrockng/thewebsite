@@ -8,6 +8,19 @@ import { notifyTelegram, reservationMessage } from "../lib/telegram";
 
 const today = new Date().toISOString().split("T")[0];
 
+const CATEGORY_ORDER = [
+  "Starters",
+  "Salads",
+  "Rice",
+  "Noodles",
+  "Pepper Soup & Specials",
+  "Continental",
+  "Sauces",
+  "Charcoal Grills",
+  "National Dishes",
+  "Traditional Specials",
+];
+
 const timeSlots = [
   "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
   "12:00 PM", "12:30 PM", "1:00 PM", "1:30 PM",
@@ -96,7 +109,6 @@ export default function Reservations() {
       .from("menu_items")
       .select("id, name, description, price, category")
       .eq("available", true)
-      .order("category")
       .order("name")
       .then(({ data, error }) => {
         if (!error && data && data.length > 0) {
@@ -584,7 +596,11 @@ export default function Reservations() {
                   </div>
                 ) : (
                   <div className="space-y-8">
-                    {Object.entries(menuByCategory).map(([category, items]) => (
+                    {Object.entries(menuByCategory).sort(([a], [b]) => {
+                        const ai = CATEGORY_ORDER.indexOf(a);
+                        const bi = CATEGORY_ORDER.indexOf(b);
+                        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+                      }).map(([category, items]) => (
                       <div key={category}>
                         <div className="flex items-center gap-3 mb-4">
                           <div className="h-px flex-1" style={{ background: "rgba(201,168,76,0.2)" }} />
