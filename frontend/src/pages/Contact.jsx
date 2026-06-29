@@ -48,7 +48,7 @@ export default function Contact() {
             Say <span className="font-serif-italic text-[var(--gold)]">hello.</span>
           </h1>
           <p className="text-white/70 mt-8 max-w-xl mx-auto font-light text-base md:text-lg" style={{ textShadow: "0 2px 12px rgba(0,0,0,0.8)" }}>
-            We'll respond quickly. For tonight's bookings, the phone is always faster.
+            We'll respond quickly. For everyday bookings, the phone is always faster.
           </p>
         </div>
       </section>
