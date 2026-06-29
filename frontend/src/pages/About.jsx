@@ -93,7 +93,7 @@ export default function About() {
         {/* Panels */}
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, padding: "0 24px" }}>
           {[
-            { img: "/restaurant-interior.jpg", name: "The Restaurant",     floor: "Ground Floor", desc: "White linen, warm light, an open kitchen. Continental, traditional, and everything in between. From grilled T-bone to ofada and ayamase. The night begins here.", imgLeft: true,  num: "01" },
+            { img: "/restaurant-interior.jpg", name: "The Restaurant",     floor: "Ground Floor", desc: "White linen, warm light, an open kitchen. Continental, traditional, and everything in between. From grilled T-bone to ofada and ayamase. Every meal begins here.", imgLeft: true,  num: "01" },
             { img: "/rooftop.jpg",             name: "The Rooftop Lounge", floor: "Rooftop",      desc: "Open to the sky. The Ikeja skyline curling around you. Smaller plates, longer pours, conversations that stretch into morning.",                              imgLeft: false, num: "02" },
           ].map((s) => (
             <div key={s.name} className="flex flex-col md:flex-row" style={{ height: 420 }}>

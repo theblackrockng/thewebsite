@@ -227,8 +227,8 @@ export default function Home() {
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <SectionHeader
             kicker="Made for moments"
-            title="Every night, a different kind of evening."
-            subtitle="From quiet date nights to private dining for twenty. Tell us why you're coming, and we'll build the night around it."
+            title="Every visit, a different kind of experience."
+            subtitle="From quiet lunches to private dining for twenty. Tell us why you're coming, and we'll shape the experience around it."
           />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5 mt-10 md:mt-16">
             {occasionPreview.map((o, i) => (
