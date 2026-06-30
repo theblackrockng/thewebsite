@@ -201,6 +201,103 @@ exports.thankYouEmail = ({ name, occasion }) => {
   };
 };
 
+/* ── EMAIL 6: ORDER CONFIRMATION ── */
+exports.orderConfirmationEmail = ({ guestName, orderNumber, orderType, deliveryAddress, items, subtotal, deliveryFee, total, paymentMethod, scheduledTime }) => {
+  function fmtPrice(n) {
+    return `₦${Number(n).toLocaleString('en-NG')}`;
+  }
+
+  function fmtScheduledTime(iso) {
+    if (!iso) return 'As soon as possible';
+    try {
+      return new Date(iso).toLocaleString('en-NG', {
+        weekday: 'long', day: 'numeric', month: 'long',
+        hour: '2-digit', minute: '2-digit', hour12: true,
+        timeZone: 'Africa/Lagos',
+      });
+    } catch { return iso; }
+  }
+
+  const itemsHtml = (items || []).map(item => `
+    <tr>
+      <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:14px;">${item.name} <span style="color:#888;">×${item.qty}</span></td>
+      <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:14px;text-align:right;">${fmtPrice((item.unit_price || item.price) * item.qty)}</td>
+    </tr>
+  `).join('');
+
+  const deliveryRow = (deliveryFee > 0) ? `
+    <tr>
+      <td style="padding:8px 0;color:#888;font-size:13px;">Delivery Fee</td>
+      <td style="padding:8px 0;color:#1a1a1a;font-size:13px;text-align:right;">${fmtPrice(deliveryFee)}</td>
+    </tr>
+  ` : '';
+
+  const paymentLabel = paymentMethod === 'paid' ? 'Paid Online' : `Pay on ${orderType === 'delivery' ? 'Delivery' : 'Pickup'}`;
+
+  const bodyHtml = `
+    <p style="margin:0 0 20px;color:#1a1a1a;">We've received your order and our team will start preparing it shortly. Here's a summary of what you ordered.</p>
+
+    <div style="border-left:3px solid #c8a96e;padding-left:16px;margin:20px 0 4px;">
+      <p style="margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#c8a96e;font-family:Arial,sans-serif;">Order Details</p>
+    </div>
+
+    <table width="100%" style="border-collapse:collapse;margin:4px 0 20px;">
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;width:120px;vertical-align:top;">Order #</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:15px;text-align:right;font-weight:bold;">${orderNumber}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;vertical-align:top;">Type</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:14px;text-align:right;text-transform:capitalize;">${orderType}</td>
+      </tr>
+      ${orderType === 'delivery' && deliveryAddress ? `
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;vertical-align:top;">Address</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:14px;text-align:right;">${deliveryAddress}</td>
+      </tr>
+      ` : ''}
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;vertical-align:top;">Time</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:14px;text-align:right;">${fmtScheduledTime(scheduledTime)}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px 0;color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;vertical-align:top;">Payment</td>
+        <td style="padding:10px 0;color:#1a1a1a;font-size:14px;text-align:right;">${paymentLabel}</td>
+      </tr>
+    </table>
+
+    <div style="border-left:3px solid #c8a96e;padding-left:16px;margin:20px 0 4px;">
+      <p style="margin:0;font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#c8a96e;font-family:Arial,sans-serif;">Items Ordered</p>
+    </div>
+    <table width="100%" style="border-collapse:collapse;margin:4px 0 20px;">
+      ${itemsHtml}
+      <tr>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#888;font-size:13px;">Subtotal</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:13px;text-align:right;">${fmtPrice(subtotal)}</td>
+      </tr>
+      ${deliveryRow}
+      <tr>
+        <td style="padding:12px 0 0;font-size:13px;font-weight:700;color:#1a1a1a;">Total</td>
+        <td style="padding:12px 0 0;font-size:15px;font-weight:700;color:#c8a96e;text-align:right;">${fmtPrice(total)}</td>
+      </tr>
+    </table>
+
+    <p style="margin:20px 0;color:#555;font-size:14px;line-height:1.7;">
+      Questions? Call us: <a href="tel:+2349030482774" style="color:#c8a96e;text-decoration:none;font-weight:bold;">+234 903 048 2774</a>
+    </p>
+
+    <p style="margin:24px 0 0;font-style:italic;color:#888;font-size:14px;border-top:1px solid rgba(200,169,110,0.2);padding-top:20px;">
+      "Clean food. Natural ingredients. Exceptional experience. — That's the BLACKROCK promise."
+    </p>
+  `;
+
+  return {
+    subject: `Your order is confirmed — ${orderNumber}`,
+    bodyHtml,
+    guestName,
+  };
+};
+
 /* ── EMAIL 5: ENQUIRY AUTO-REPLY ── */
 exports.enquiryReplyEmail = ({ name, message }) => {
   const firstName = (name || 'friend').split(' ')[0];

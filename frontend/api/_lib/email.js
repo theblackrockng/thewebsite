@@ -27,6 +27,12 @@ function getSenderConfig(type) {
         fromEmail: 'enquiries@blackrockrestaurantng.com',
         password: process.env.ZOHO_ENQUIRIES_PASSWORD || process.env.ZOHO_APP_PASSWORD,
       };
+    case 'order':
+      return {
+        fromName: 'BLACKROCK Orders',
+        fromEmail: 'orders@blackrockrestaurantng.com',
+        password: process.env.ZOHO_ORDERS_PASSWORD || process.env.ZOHO_APP_PASSWORD,
+      };
     case 'general':
     default:
       return {

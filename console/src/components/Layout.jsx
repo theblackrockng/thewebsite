@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useMatch } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
   Image, FileEdit, Users, UserCircle, Settings, Home, Search,
-  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen,
+  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -31,7 +31,7 @@ function useCurrentPage() {
   const { pathname } = useLocation();
   const map = {
     "/": "Dashboard", "/reservations": "Reservations",
-    "/menu": "Menu Management", "/enquiries": "Enquiries",
+    "/menu": "Menu Management", "/enquiries": "Enquiries", "/orders": "Orders",
     "/media": "Media Library", "/content": "Site Content",
     "/users": "Staff Management", "/content-hub": "Content Hub",
     "/settings": "Settings", "/blog": "Blog", "/security": "Security Log",
@@ -49,6 +49,7 @@ const NAV_GROUPS = [
       { to: "/",             label: "Dashboard",    icon: LayoutGrid },
       { to: "/reservations", label: "Reservations", icon: CalendarDays,   badge: "pending" },
       { to: "/enquiries",    label: "Enquiries",    icon: MessageSquare,  badge: "enquiries" },
+      { to: "/orders",       label: "Orders",       icon: ShoppingBag,    badge: "new_orders" },
     ],
   },
   {
@@ -78,7 +79,7 @@ const NAV_GROUPS = [
 ];
 
 /* ─── NavItem ─── */
-function NavItem({ item, pathname, pendingCount, newEnqCount, onClick }) {
+function NavItem({ item, pathname, pendingCount, newEnqCount, newOrdersCount, onClick }) {
   const Icon = item.icon;
   const active = item.to !== null && pathname === item.to;
   const isLink = item.to !== null;
@@ -89,6 +90,8 @@ function NavItem({ item, pathname, pendingCount, newEnqCount, onClick }) {
       return <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 600, background: "rgba(245,158,11,0.15)", color: "#d97706", padding: "1px 6px", borderRadius: 99 }}>{pendingCount > 99 ? "99+" : pendingCount}</span>;
     if (item.badge === "enquiries" && newEnqCount > 0)
       return <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 600, background: "rgba(239,68,68,0.15)", color: "#ef4444", padding: "1px 6px", borderRadius: 99 }}>{newEnqCount > 99 ? "99+" : newEnqCount}</span>;
+    if (item.badge === "new_orders" && newOrdersCount > 0)
+      return <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 600, background: "rgba(201,168,76,0.15)", color: "#C9A84C", padding: "1px 6px", borderRadius: 99 }}>{newOrdersCount > 99 ? "99+" : newOrdersCount}</span>;
     return null;
   })();
 
@@ -138,7 +141,7 @@ function NavItem({ item, pathname, pendingCount, newEnqCount, onClick }) {
 }
 
 /* ─── SidebarContent ─── */
-function SidebarContent({ pathname, pendingCount, newEnqCount, staffProfile, session, onNav }) {
+function SidebarContent({ pathname, pendingCount, newEnqCount, newOrdersCount, staffProfile, session, onNav }) {
   const name     = staffProfile?.full_name ?? session?.user?.email?.split("@")[0] ?? "Admin";
   const initials = name.slice(0, 2).toUpperCase() || "BK";
   const role     = staffProfile?.role ?? "staff";
@@ -172,7 +175,7 @@ function SidebarContent({ pathname, pendingCount, newEnqCount, staffProfile, ses
               {group.items
                 .filter(item => !item.superAdminOnly || staffProfile?.role === 'super_admin')
                 .map(item => (
-                <NavItem key={item.label} item={item} pathname={pathname} pendingCount={pendingCount} newEnqCount={newEnqCount} onClick={onNav} />
+                <NavItem key={item.label} item={item} pathname={pathname} pendingCount={pendingCount} newEnqCount={newEnqCount} newOrdersCount={newOrdersCount} onClick={onNav} />
               ))}
             </div>
           </div>
@@ -229,6 +232,7 @@ export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [newEnqCount, setNewEnqCount] = useState(0);
+  const [newOrdersCount, setNewOrdersCount] = useState(0);
   const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [clock, setClock] = useState("");
@@ -238,17 +242,20 @@ export default function Layout({ children }) {
 
   useEffect(() => {
     async function fetchCounts() {
-      const [r1, r2, r3, r4] = await Promise.all([
+      const [r1, r2, r3, r4, r5] = await Promise.all([
         supabase.from("reservations").select("id", { count: "exact", head: true }).eq("status", "pending"),
         supabase.from("enquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
         supabase.from("reservations").select("id, name, occasion, created_at").eq("status", "pending").order("created_at", { ascending: false }).limit(5),
         supabase.from("enquiries").select("id, name, message, created_at").eq("status", "new").order("created_at", { ascending: false }).limit(5),
+        supabase.from("orders").select("id", { count: "exact", head: true }).eq("order_status", "new"),
       ]);
       setPendingCount(r1.count ?? 0);
       setNewEnqCount(r2.count ?? 0);
+      setNewOrdersCount(r5.count ?? 0);
       const items = [
         ...(r3.data || []).map(r => ({ type: "reservation", id: r.id, label: r.name || "Guest", sub: r.occasion || "Reservation request", time: r.created_at })),
         ...(r4.data || []).map(e => ({ type: "enquiry", id: e.id, label: e.name || "Guest", sub: (e.message || "").slice(0, 55) || "New enquiry", time: e.created_at })),
+
       ].sort((a, b) => new Date(b.time) - new Date(a.time)).slice(0, 8);
       setNotifications(items);
     }
@@ -295,6 +302,7 @@ export default function Layout({ children }) {
       pathname={pathname}
       pendingCount={pendingCount}
       newEnqCount={newEnqCount}
+      newOrdersCount={newOrdersCount}
       staffProfile={staffProfile}
       session={session}
       onNav={() => setMobileOpen(false)}

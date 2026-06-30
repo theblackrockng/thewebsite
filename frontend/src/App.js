@@ -4,9 +4,11 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import "@/App.css";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
+import { CartProvider } from "./context/CartContext";
 import { useTheme } from "./hooks/useTheme";
 
 import Navbar from "./components/Navbar";
+import CartDrawer from "./components/CartDrawer";
 import Footer from "./components/Footer";
 import FloatingWhatsApp from "./components/FloatingWhatsApp";
 import { ContentSidebar } from "./components/content/ContentSidebar";
@@ -23,6 +25,9 @@ import ContentHub from "./pages/ContentHub";
 import ContentHubAsset from "./pages/ContentHubAsset";
 import ContentHubGuide from "./pages/ContentHubGuide";
 import ContentHubLogin from "./pages/ContentHubLogin";
+import Order from "./pages/Order";
+import Checkout from "./pages/Checkout";
+import OrderConfirmation from "./pages/OrderConfirmation";
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -61,10 +66,11 @@ function ThemeLoader() {
 
 function MainLayout() {
   const { pathname } = useLocation();
-  const isReservations = pathname === "/reservations";
+  const noFooter = pathname === "/reservations" || pathname === "/checkout" || pathname.startsWith("/order-confirmation");
   return (
     <>
       <Navbar />
+      <CartDrawer />
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -75,9 +81,12 @@ function MainLayout() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
+          <Route path="/order" element={<Order />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
         </Routes>
       </main>
-      {!isReservations && <Footer />}
+      {!noFooter && <Footer />}
       <FloatingWhatsApp />
     </>
   );
@@ -87,12 +96,14 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <ThemeLoader />
-        <ScrollToTop />
-        <Routes>
-          <Route path="/content-hub/*" element={<ContentHubLayout />} />
-          <Route path="*" element={<MainLayout />} />
-        </Routes>
+        <CartProvider>
+          <ThemeLoader />
+          <ScrollToTop />
+          <Routes>
+            <Route path="/content-hub/*" element={<ContentHubLayout />} />
+            <Route path="*" element={<MainLayout />} />
+          </Routes>
+        </CartProvider>
       </AuthProvider>
     </BrowserRouter>
   );

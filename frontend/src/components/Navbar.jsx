@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X } from "lucide-react";
+import { Menu, X, ShoppingBag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NAV_LINKS } from "../lib/data";
+import { useCart } from "../context/CartContext";
 
 export default function Navbar({ onReserveClick }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  const { totalItems, setDrawerOpen } = useCart();
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 24);
@@ -61,6 +63,36 @@ export default function Navbar({ onReserveClick }) {
           </nav>
 
           <div className="hidden lg:flex items-center gap-6">
+            <button
+              onClick={() => setDrawerOpen(true)}
+              aria-label="View cart"
+              data-testid="cart-btn-desktop"
+              style={{ position: "relative", background: "none", border: "none", cursor: "pointer", padding: 6, color: "var(--warm-white)", display: "flex", alignItems: "center" }}
+            >
+              <ShoppingBag size={20} />
+              {totalItems > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -2,
+                    right: -4,
+                    width: 17,
+                    height: 17,
+                    borderRadius: "50%",
+                    background: "var(--gold, #C9A84C)",
+                    color: "#0f0d0a",
+                    fontSize: 10,
+                    fontWeight: 700,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    lineHeight: 1,
+                  }}
+                >
+                  {totalItems > 99 ? "99+" : totalItems}
+                </span>
+              )}
+            </button>
             <button
               onClick={() => navigate("/reservations")}
               className="btn-burgundy"
@@ -119,9 +151,20 @@ export default function Navbar({ onReserveClick }) {
               <motion.button
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.38, duration: 0.4 }}
+                onClick={() => { setOpen(false); setDrawerOpen(true); }}
+                className="btn-outline-gold mt-12"
+                data-testid="mobile-cart-cta"
+              >
+                <ShoppingBag size={16} style={{ display: "inline", marginRight: 6 }} />
+                View Cart{totalItems > 0 ? ` (${totalItems})` : ""}
+              </motion.button>
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.4, duration: 0.4 }}
                 onClick={() => { setOpen(false); navigate("/reservations"); }}
-                className="btn-outline-gold mt-12"
+                className="btn-outline-gold mt-4"
                 data-testid="mobile-reserve-cta"
               >
                 Reserve a Table

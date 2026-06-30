@@ -100,6 +100,13 @@ async function handleCallbackQuery(callbackQuery) {
       await answerCallback(cbId, '⚠️ Email failed to send.', true);
     }
 
+  } else if (action === 'order_confirm') {
+    const { error } = await db.from('orders').update({ order_status: 'confirmed' }).eq('id', reservationId);
+    if (error) return answerCallback(cbId, '⚠️ Failed to confirm. Try the console.', true);
+    await answerCallback(cbId, '✅ Order confirmed!');
+    await removeKeyboard(chatId, messageId);
+    await sendTelegram(`✅ Order <b>${reservationId.slice(0, 8)}…</b> confirmed by ${staffName}`);
+
   } else {
     await answerCallback(cbId, '⚠️ Unknown action.');
   }
