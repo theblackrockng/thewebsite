@@ -133,8 +133,8 @@ export default function Home() {
               <span>Reserve a Table</span>
               <ArrowRight size={14} />
             </Link>
-            <Link to="/menu" className="btn-outline-gold" data-testid="hero-menu">
-              <span>View Menu</span>
+            <Link to="/order" className="btn-outline-gold" data-testid="hero-order">
+              <span>Order Online</span>
             </Link>
           </motion.div>
         </div>
