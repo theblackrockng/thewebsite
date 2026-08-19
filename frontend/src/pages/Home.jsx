@@ -179,10 +179,10 @@ export default function Home() {
         </div>
 
         {/* Auto-scrolling image strip */}
-        <div style={{ overflow: "hidden", marginLeft: "-24px", marginRight: "-24px" }}>
-          <div className="flex marquee gap-3 w-max px-6" style={{ willChange: "transform" }}>
-            {[...foodReel, ...foodReel, ...foodReel].map((src, i) => (
-              <div key={i} className="img-hover flex-shrink-0" style={{ width: 200, height: 200 }}>
+        <div style={{ overflow: "hidden" }}>
+          <div className="flex marquee" style={{ willChange: "transform" }}>
+            {[...foodReel, ...foodReel].map((src, i) => (
+              <div key={i} className="img-hover flex-shrink-0" style={{ width: 200, height: 200, marginRight: 12 }}>
                 <img src={src} alt="BlackRock dish" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
             ))}
