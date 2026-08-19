@@ -332,6 +332,9 @@ h1, h2, h3, h4, h5, h6 {
     100% { transform: translateX(-50%); }
 }
 .marquee { animation: marquee 12s linear infinite; }
+@media (max-width: 768px) {
+    .marquee { animation-duration: 6s; }
+}
 
 .nav-link {
     position: relative;
