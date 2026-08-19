@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useEditor, EditorContent, NodeViewWrapper, ReactNodeViewRenderer } from "@tiptap/react";
+import { Node, mergeAttributes } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
-import Image from "@tiptap/extension-image";
 import Link from "@tiptap/extension-link";
 import Underline from "@tiptap/extension-underline";
 import TextAlign from "@tiptap/extension-text-align";
@@ -22,6 +22,148 @@ import {
   Highlighter, Palette, Type, PlayCircle,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+
+/* ─── Resizable Image NodeView ─── */
+function ResizableImageView({ node, updateAttributes, selected }) {
+  const imgRef = useRef(null);
+  const containerRef = useRef(null);
+  const [showSizeInput, setShowSizeInput] = useState(false);
+  const [sizeInput, setSizeInput] = useState("");
+
+  const { src, alt, width } = node.attrs;
+
+  const startResize = useCallback((e, direction) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startWidth = imgRef.current?.offsetWidth || parseInt(width) || 400;
+
+    const onMove = (ev) => {
+      const dx = direction === "w" ? startX - ev.clientX : ev.clientX - startX;
+      const newW = Math.max(80, startWidth + dx);
+      updateAttributes({ width: newW + "px" });
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [updateAttributes, width]);
+
+  const applySize = () => {
+    const val = sizeInput.trim();
+    if (!val) return;
+    const w = val.includes("%") || val.includes("px") ? val : val + "px";
+    updateAttributes({ width: w });
+    setShowSizeInput(false);
+    setSizeInput("");
+  };
+
+  const handleStyle = {
+    position: "absolute", width: 12, height: 12,
+    background: "var(--ds-gold)", border: "2px solid #fff",
+    borderRadius: 3, zIndex: 10,
+  };
+
+  return (
+    <NodeViewWrapper
+      ref={containerRef}
+      style={{ display: "block", position: "relative", lineHeight: 0, userSelect: "none", margin: "12px 0" }}
+    >
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt || ""}
+        draggable={false}
+        style={{
+          width: width || "auto",
+          maxWidth: "100%",
+          height: "auto",
+          display: "block",
+          borderRadius: 6,
+          outline: selected ? "2px solid var(--ds-gold)" : "none",
+          outlineOffset: 2,
+        }}
+      />
+
+      {selected && (
+        <>
+          {/* Resize handles */}
+          <div onMouseDown={e => startResize(e, "e")} style={{ ...handleStyle, right: -6, top: "50%", transform: "translateY(-50%)", cursor: "e-resize" }} />
+          <div onMouseDown={e => startResize(e, "w")} style={{ ...handleStyle, left: -6, top: "50%", transform: "translateY(-50%)", cursor: "w-resize" }} />
+          <div onMouseDown={e => startResize(e, "e")} style={{ ...handleStyle, right: -6, bottom: -6, cursor: "se-resize" }} />
+          <div onMouseDown={e => startResize(e, "w")} style={{ ...handleStyle, left: -6, bottom: -6, cursor: "sw-resize" }} />
+          <div onMouseDown={e => startResize(e, "e")} style={{ ...handleStyle, right: -6, top: -6, cursor: "ne-resize" }} />
+          <div onMouseDown={e => startResize(e, "w")} style={{ ...handleStyle, left: -6, top: -6, cursor: "nw-resize" }} />
+
+          {/* Size toolbar */}
+          <div style={{
+            position: "absolute", top: -38, left: "50%", transform: "translateX(-50%)",
+            background: "var(--ds-surface)", border: "1px solid var(--ds-border)",
+            borderRadius: 7, padding: "4px 8px", display: "flex", alignItems: "center",
+            gap: 6, boxShadow: "0 4px 12px rgba(0,0,0,0.3)", whiteSpace: "nowrap", zIndex: 20,
+          }}>
+            {showSizeInput ? (
+              <>
+                <input
+                  autoFocus
+                  value={sizeInput}
+                  onChange={e => setSizeInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") applySize(); if (e.key === "Escape") setShowSizeInput(false); }}
+                  placeholder="e.g. 400px or 80%"
+                  style={{
+                    width: 130, fontSize: 11.5, padding: "3px 7px",
+                    background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)",
+                    borderRadius: 5, color: "var(--ds-text)", fontFamily: "'DM Sans', sans-serif", outline: "none",
+                  }}
+                />
+                <button type="button" onClick={applySize} style={{ fontSize: 11, background: "var(--ds-gold)", border: "none", borderRadius: 4, padding: "3px 8px", cursor: "pointer", color: "#1a1a1a", fontWeight: 600 }}>Set</button>
+                <button type="button" onClick={() => setShowSizeInput(false)} style={{ fontSize: 11, background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)" }}>✕</button>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: 11, color: "var(--ds-muted)", fontFamily: "'DM Sans', sans-serif" }}>
+                  {width ? width : `${imgRef.current?.naturalWidth || "?"}px`}
+                </span>
+                <button type="button" onClick={() => { setSizeInput(width || ""); setShowSizeInput(true); }} style={{ fontSize: 11, background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 4, padding: "2px 8px", cursor: "pointer", color: "var(--ds-text)", fontFamily: "'DM Sans', sans-serif" }}>Resize</button>
+                <button type="button" onClick={() => updateAttributes({ width: null })} style={{ fontSize: 11, background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)", fontFamily: "'DM Sans', sans-serif" }}>Full width</button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </NodeViewWrapper>
+  );
+}
+
+const ResizableImage = Node.create({
+  name: "image",
+  group: "block",
+  atom: true,
+  draggable: true,
+
+  addAttributes() {
+    return {
+      src: { default: null },
+      alt: { default: null },
+      title: { default: null },
+      width: { default: null },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: "img[src]" }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return ["img", mergeAttributes(HTMLAttributes)];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageView);
+  },
+});
 
 function toSlug(str) {
   return str.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-").replace(/-+/g, "-");
@@ -570,7 +712,7 @@ export default function BlogEditor() {
       FontSize,
       Color,
       Highlight.configure({ multicolor: true }),
-      Image.configure({ inline: false }),
+      ResizableImage,
       Link.configure({ openOnClick: false }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
       Placeholder.configure({ placeholder: "Start writing your story…" }),
