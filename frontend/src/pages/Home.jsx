@@ -178,21 +178,10 @@ export default function Home() {
           </motion.p>
         </div>
 
-        {/* Scrollable image strip with edge bleed */}
-        <div
-          style={{
-            overflowX: "auto",
-            scrollBehavior: "smooth",
-            WebkitOverflowScrolling: "touch",
-            scrollbarWidth: "none",
-            msOverflowStyle: "none",
-            marginLeft: "-24px",
-            marginRight: "-24px",
-          }}
-          className="[&::-webkit-scrollbar]:hidden"
-        >
-          <div className="flex marquee gap-3 w-max px-6">
-            {[...foodReel, ...foodReel].map((src, i) => (
+        {/* Auto-scrolling image strip */}
+        <div style={{ overflow: "hidden", marginLeft: "-24px", marginRight: "-24px" }}>
+          <div className="flex marquee gap-3 w-max px-6" style={{ willChange: "transform" }}>
+            {[...foodReel, ...foodReel, ...foodReel].map((src, i) => (
               <div key={i} className="img-hover flex-shrink-0" style={{ width: 200, height: 200 }}>
                 <img src={src} alt="BlackRock dish" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
