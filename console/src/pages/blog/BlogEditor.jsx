@@ -160,6 +160,14 @@ const ResizableImage = Node.create({
     return ["img", mergeAttributes(HTMLAttributes)];
   },
 
+  addCommands() {
+    return {
+      setImage: (options) => ({ commands }) => {
+        return commands.insertContent({ type: this.name, attrs: options });
+      },
+    };
+  },
+
   addNodeView() {
     return ReactNodeViewRenderer(ResizableImageView);
   },
