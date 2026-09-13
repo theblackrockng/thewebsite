@@ -325,15 +325,16 @@ export default function Home() {
       <section className="bg-[var(--charcoal)] text-[var(--warm-white)] pt-10 pb-24 md:pt-10 md:pb-36 grain relative" data-testid="three-spaces">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12">
           <SectionHeader
-            kicker="Two Spaces, One Address"
-            title="Choose your evening."
-            subtitle="A restaurant downstairs, a rooftop lounge above. Two moods, one destination."
+            kicker="Two Spaces"
+            title="One destination, two moods."
+            subtitle="A restaurant built for every hour of the day. The same space, two completely different feelings."
             dark
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-16">
             {[
-              { img: "/restaurant-interior.jpg", name: "The Restaurant", desc: "Continental and traditional. White linen, warm light, full flavours.", floor: "Ground Floor" },
-              { img: "/rooftop.jpg", name: "The Rooftop Lounge", desc: "Open sky, the Ikeja skyline around you. Good company, longer pours, the night stretches.", floor: "Rooftop" },
+              { img: "/black-rock-5.jpg", name: "The Restaurant — Day", desc: "Natural light, open kitchen, the smell of something good already cooking. The perfect setting for a long lunch, a business meal, or a quiet afternoon that turns into dinner.", floor: "Ground Floor", detail: "01 — OPEN DAILY FROM 10:00 AM" },
+              /* TODO: Replace with night-edited version of Interior Restaurant.png once ready */
+              { img: "/black-rock-5.jpg", name: "The Restaurant — Evening", desc: "The lights dim, the music lifts, and the room becomes something else entirely. Same kitchen, same care, different energy.", floor: "Ground Floor", detail: "02 — OPEN DAILY UNTIL 11:59 PM" },
             ].map((s, i) => (
               <motion.div
                 key={s.name}
@@ -343,19 +344,21 @@ export default function Home() {
                 transition={{ duration: 0.8, delay: i * 0.15 }}
                 whileHover={{ y: -6, transition: { duration: 0.3 } }}
                 className="group relative overflow-hidden h-[380px] md:h-[520px]"
-                data-testid={`space-${s.floor.toLowerCase().replace(" ", "-")}`}
+                data-testid={`space-${i + 1}`}
               >
                 <img
                   src={s.img}
                   alt={s.name}
                   loading="lazy"
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  style={{ objectFit: "cover", objectPosition: "center" }}
+                  className="absolute inset-0 w-full h-full transition-transform duration-700 group-hover:scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-8" style={{ paddingBottom: 28 }}>
                   <div className="text-xs uppercase tracking-[0.3em] text-[var(--gold)] mb-3">{s.floor}</div>
                   <h3 className="font-serif-display text-3xl md:text-4xl mb-3">{s.name}</h3>
                   <p className="text-sm text-white/70 leading-relaxed font-light">{s.desc}</p>
+                  <p className="text-xs uppercase tracking-[0.25em] text-white/40 mt-4">{s.detail}</p>
                 </div>
               </motion.div>
             ))}

@@ -87,6 +87,7 @@ export default function About() {
           <SectionHeader
             kicker="Two Spaces"
             title="One destination, two moods."
+            subtitle="A restaurant built for every hour of the day. The same space, two completely different feelings."
             align="left"
           />
         </div>
@@ -94,8 +95,9 @@ export default function About() {
         {/* Panels */}
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, padding: "0 24px" }}>
           {[
-            { img: "/restaurant-interior.jpg", name: "The Restaurant",     floor: "Ground Floor", desc: "White linen, warm light, an open kitchen. Continental, traditional, and everything in between. From grilled T-bone to ofada and ayamase. Every meal begins here.", imgLeft: true,  num: "01" },
-            { img: "/rooftop.jpg",             name: "The Rooftop Lounge", floor: "Rooftop",      desc: "Open to the sky. The Ikeja skyline curling around you. Smaller plates, longer pours, conversations that stretch into morning.",                              imgLeft: false, num: "02" },
+            { img: "/black-rock-5.jpg", name: "The Restaurant — Day",     floor: "Ground Floor", desc: "Natural light, open kitchen, the smell of something good already cooking. The perfect setting for a long lunch, a business meal, or a quiet afternoon that turns into dinner.", imgLeft: true,  num: "01", detail: "OPEN DAILY FROM 10:00 AM" },
+            /* TODO: Replace with night-edited version of Interior Restaurant.png once ready */
+            { img: "/black-rock-5.jpg", name: "The Restaurant — Evening", floor: "Ground Floor", desc: "The lights dim, the music lifts, and the room becomes something else entirely. Same kitchen, same care, different energy.",                                                       imgLeft: false, num: "02", detail: "OPEN DAILY UNTIL 11:59 PM" },
           ].map((s) => (
             <div key={s.name} className="flex flex-col md:flex-row" style={{ height: 420 }}>
 
@@ -139,7 +141,7 @@ export default function About() {
                 <div className="mt-8 flex items-center gap-3">
                   <div className="font-serif-display text-4xl text-[var(--burgundy)] leading-none">{s.num}</div>
                   <div className="w-8 h-px bg-[var(--gold)]" />
-                  <div className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">Open Daily from 10:00 AM</div>
+                  <div className="text-xs uppercase tracking-[0.3em] text-[var(--muted)]">{s.detail}</div>
                 </div>
               </motion.div>
             </div>
