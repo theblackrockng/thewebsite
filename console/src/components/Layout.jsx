@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useMatch } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
   Image, FileEdit, Users, UserCircle, Settings, Home, Search,
-  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal,
+  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -33,7 +33,7 @@ function useCurrentPage() {
   const map = {
     "/": "Dashboard", "/reservations": "Reservations",
     "/menu": "Menu Management", "/enquiries": "Enquiries", "/orders": "Orders",
-    "/media": "Media Library", "/gallery": "Gallery", "/content": "Site Content",
+    "/media": "Media Library", "/gallery": "Gallery", "/content": "Site Content", "/images": "Website Images",
     "/users": "Staff Management", "/content-hub": "Content Hub",
     "/settings": "Settings", "/blog": "Blog", "/security": "Security Log",
     "/profile": "My Profile",
@@ -58,6 +58,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/menu",         label: "Menu Management", icon: UtensilsCrossed },
       { to: "/media",        label: "Media Library",   icon: Image },
+      { to: "/images",       label: "Website Images",  icon: LayoutPanelTop },
       { to: "/gallery",      label: "Gallery",         icon: GalleryHorizontal },
       { to: "/content",      label: "Site Content",    icon: FileEdit },
       { to: "/content-hub",  label: "Content Hub",     icon: Layers },

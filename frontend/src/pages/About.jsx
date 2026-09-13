@@ -1,7 +1,9 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { IMAGES } from "../lib/data";
+import { supabase } from "../lib/supabase";
 import SectionHeader from "../components/SectionHeader";
 import OrderNowLink from "../components/OrderNowLink";
 
@@ -19,11 +21,33 @@ const reveal = (y = 24, delay = 0, duration = 0.7) => ({
 });
 
 export default function About() {
+  const [heroImage, setHeroImage] = useState("/heroimage.png");
+  const [spaceDayImg, setSpaceDayImg] = useState("/black-rock-5.jpg");
+  const [spaceEveImg, setSpaceEveImg] = useState("/black-rock-5.jpg");
+
+  useEffect(() => {
+    async function loadImages() {
+      try {
+        const [heroRow, dayRow, eveRow, aboutRow] = await Promise.all([
+          supabase.from("site_content").select("data").eq("section", "hero").maybeSingle(),
+          supabase.from("site_content").select("data").eq("section", "two-spaces-day").maybeSingle(),
+          supabase.from("site_content").select("data").eq("section", "two-spaces-evening").maybeSingle(),
+          supabase.from("site_content").select("data").eq("section", "about-hero").maybeSingle(),
+        ]);
+        const aboutImg = aboutRow.data?.data?.image || heroRow.data?.data?.image;
+        if (aboutImg) setHeroImage(aboutImg);
+        if (dayRow.data?.data?.image) setSpaceDayImg(dayRow.data.data.image);
+        if (eveRow.data?.data?.image) setSpaceEveImg(eveRow.data.data.image);
+      } catch {}
+    }
+    loadImages();
+  }, []);
+
   return (
     <div className="page-enter">
       {/* Hero */}
       <section className="relative h-[50vh] md:h-[65vh] min-h-[320px] overflow-hidden" data-testid="about-hero">
-        <img src="/heroimage.png" alt="" className="w-full h-full object-cover object-center" />
+        <img src={heroImage} alt="" className="w-full h-full object-cover object-center" />
         <div className="absolute inset-0 bg-black/55" />
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6">
           <motion.h1
@@ -95,9 +119,8 @@ export default function About() {
         {/* Panels */}
         <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", flexDirection: "column", gap: 12, padding: "0 24px" }}>
           {[
-            { img: "/black-rock-5.jpg", name: "The Restaurant — Day",     floor: "Ground Floor", desc: "Natural light, open kitchen, the smell of something good already cooking. The perfect setting for a long lunch, a business meal, or a quiet afternoon that turns into dinner.", imgLeft: true,  num: "01", detail: "OPEN DAILY FROM 10:00 AM" },
-            /* TODO: Replace with night-edited version of Interior Restaurant.png once ready */
-            { img: "/black-rock-5.jpg", name: "The Restaurant — Evening", floor: "Ground Floor", desc: "The lights dim, the music lifts, and the room becomes something else entirely. Same kitchen, same care, different energy.",                                                       imgLeft: false, num: "02", detail: "OPEN DAILY UNTIL 11:59 PM" },
+            { img: spaceDayImg, name: "The Restaurant — Day",     floor: "Ground Floor", desc: "Natural light, open kitchen, the smell of something good already cooking. The perfect setting for a long lunch, a business meal, or a quiet afternoon that turns into dinner.", imgLeft: true,  num: "01", detail: "OPEN DAILY FROM 10:00 AM" },
+            { img: spaceEveImg, name: "The Restaurant — Evening", floor: "Ground Floor", desc: "The lights dim, the music lifts, and the room becomes something else entirely. Same kitchen, same care, different energy.",                                                       imgLeft: false, num: "02", detail: "OPEN DAILY UNTIL 11:59 PM" },
           ].map((s) => (
             <div key={s.name} className="flex flex-col md:flex-row" style={{ height: 420 }}>
 

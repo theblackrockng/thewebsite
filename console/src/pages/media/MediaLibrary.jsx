@@ -49,12 +49,15 @@ const LABEL_STYLE = {
 const SECTION_OPTIONS = [
   { value: "", label: "— None —" },
   { value: "hero", label: "Homepage Hero" },
+  { value: "two-spaces-day", label: "Two Spaces — Day" },
+  { value: "two-spaces-evening", label: "Two Spaces — Evening" },
+  { value: "about-hero", label: "About Page Header" },
   { value: "home-food-reel", label: "Homepage Food Reel" },
   { value: "home-instagram", label: "Homepage Instagram Strip" },
   { value: "gallery-food", label: "Gallery — Food" },
   { value: "gallery-drinks", label: "Gallery — Drinks" },
   { value: "gallery", label: "Gallery — Ambience" },
-  { value: "about", label: "About Page" },
+  { value: "gallery-behind", label: "Gallery — Behind the Scenes" },
   { value: "other", label: "Other" },
 ];
 

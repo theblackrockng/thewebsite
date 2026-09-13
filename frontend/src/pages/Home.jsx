@@ -38,6 +38,8 @@ const FALLBACK_FOOD_REEL = [
 
 export default function Home() {
   const [heroImage, setHeroImage] = useState("/heroimage.png");
+  const [spaceDayImg, setSpaceDayImg] = useState("/black-rock-5.jpg");
+  const [spaceEveImg, setSpaceEveImg] = useState("/black-rock-5.jpg");
   const [foodReel, setFoodReel] = useState(FALLBACK_FOOD_REEL);
   const [kitchenSlide, setKitchenSlide] = useState(0);
 
@@ -51,13 +53,14 @@ export default function Home() {
   useEffect(() => {
     async function loadDynamic() {
       try {
-        // Hero image from site_content
-        const { data: heroRow } = await supabase
-          .from("site_content")
-          .select("data")
-          .eq("section", "hero")
-          .maybeSingle();
-        if (heroRow?.data?.image) setHeroImage(heroRow.data.image);
+        const [heroRow, dayRow, eveRow] = await Promise.all([
+          supabase.from("site_content").select("data").eq("section", "hero").maybeSingle(),
+          supabase.from("site_content").select("data").eq("section", "two-spaces-day").maybeSingle(),
+          supabase.from("site_content").select("data").eq("section", "two-spaces-evening").maybeSingle(),
+        ]);
+        if (heroRow.data?.data?.image) setHeroImage(heroRow.data.data.image);
+        if (dayRow.data?.data?.image) setSpaceDayImg(dayRow.data.data.image);
+        if (eveRow.data?.data?.image) setSpaceEveImg(eveRow.data.data.image);
 
         // Food reel from media_assets — merge with FALLBACK so menu category images always appear
         const { data: reelAssets } = await supabase
@@ -332,9 +335,8 @@ export default function Home() {
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-16">
             {[
-              { img: "/black-rock-5.jpg", name: "The Restaurant — Day", desc: "Natural light, open kitchen, the smell of something good already cooking. The perfect setting for a long lunch, a business meal, or a quiet afternoon that turns into dinner.", floor: "Ground Floor", detail: "01 — OPEN DAILY FROM 10:00 AM" },
-              /* TODO: Replace with night-edited version of Interior Restaurant.png once ready */
-              { img: "/black-rock-5.jpg", name: "The Restaurant — Evening", desc: "The lights dim, the music lifts, and the room becomes something else entirely. Same kitchen, same care, different energy.", floor: "Ground Floor", detail: "02 — OPEN DAILY UNTIL 11:59 PM" },
+              { img: spaceDayImg, name: "The Restaurant — Day", desc: "Natural light, open kitchen, the smell of something good already cooking. The perfect setting for a long lunch, a business meal, or a quiet afternoon that turns into dinner.", floor: "Ground Floor", detail: "01 — OPEN DAILY FROM 10:00 AM" },
+              { img: spaceEveImg, name: "The Restaurant — Evening", desc: "The lights dim, the music lifts, and the room becomes something else entirely. Same kitchen, same care, different energy.", floor: "Ground Floor", detail: "02 — OPEN DAILY UNTIL 11:59 PM" },
             ].map((s, i) => (
               <motion.div
                 key={s.name}
