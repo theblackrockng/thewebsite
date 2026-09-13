@@ -19,32 +19,39 @@ const GHOST_BTN = {
   cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
 };
 
-/* Sections we manage — each maps to a site_content section key */
+const SITE = "https://www.blackrockrestaurantng.com";
+
+/* Sections we manage — each maps to a site_content section key.
+   fallback = the image currently hardcoded/live on the website. */
 const SECTIONS = [
   {
     key: "hero",
     label: "Homepage Hero",
     where: "Homepage — full-screen banner",
     aspect: "16/7",
+    fallback: `${SITE}/heroimage.png`,
   },
   {
     key: "two-spaces-day",
     label: "Restaurant — Day",
     where: "Homepage & About — Two Spaces card 1",
     aspect: "4/3",
+    fallback: `${SITE}/black-rock-5.jpg`,
   },
   {
     key: "two-spaces-evening",
     label: "Restaurant — Evening",
     where: "Homepage & About — Two Spaces card 2",
     aspect: "4/3",
-    note: "TODO: Replace with night-edited version of Interior Restaurant.png once ready",
+    fallback: `${SITE}/black-rock-5.jpg`,
+    note: "Pending night-edited version — currently showing same image as Day card",
   },
   {
     key: "about-hero",
     label: "About Page Header",
     where: "About — top hero banner",
     aspect: "16/7",
+    fallback: `${SITE}/heroimage.png`,
   },
 ];
 
@@ -123,6 +130,8 @@ function MediaPickerModal({ onSelect, onClose }) {
 function SectionCard({ section, initialUrl, onSaved }) {
   const [url, setUrl] = useState(initialUrl || "");
   const [dirty, setDirty] = useState(false);
+  const isDefault = !url && !!section.fallback;
+  const previewSrc = url || section.fallback || "";
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(null); // "saved" | error string
   const [uploading, setUploading] = useState(false);
@@ -171,12 +180,12 @@ function SectionCard({ section, initialUrl, onSaved }) {
   };
 
   const save = async () => {
-    if (!url) return;
+    if (!previewSrc) return;
     setSaving(true); setStatus(null);
     try {
       const { error } = await supabase
         .from("site_content")
-        .upsert({ section: section.key, data: { image: url } }, { onConflict: "section" });
+        .upsert({ section: section.key, data: { image: previewSrc } }, { onConflict: "section" });
       if (error) throw error;
       setStatus("saved");
       setDirty(false);
@@ -215,8 +224,17 @@ function SectionCard({ section, initialUrl, onSaved }) {
           transition: "border-color 0.15s",
         }}
       >
-        {url ? (
-          <img src={url} alt={section.label} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }} />
+        {previewSrc ? (
+          <>
+            <img src={previewSrc} alt={section.label} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }} />
+            {isDefault && (
+              <div style={{ position: "absolute", top: 8, left: 8 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", background: "rgba(0,0,0,0.65)", color: "#9ca3af", borderRadius: 99, padding: "3px 8px", border: "1px solid rgba(255,255,255,0.15)" }}>
+                  Live default
+                </span>
+              </div>
+            )}
+          </>
         ) : (
           <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8, color: "var(--ds-muted)" }}>
             <ImagePlus size={28} strokeWidth={1.3} style={{ opacity: 0.4 }} />
@@ -239,7 +257,7 @@ function SectionCard({ section, initialUrl, onSaved }) {
         )}
 
         {/* Hover hint when image exists */}
-        {url && !uploading && !dragOver && (
+        {previewSrc && !uploading && !dragOver && (
           <div style={{
             position: "absolute", inset: 0,
             background: "rgba(0,0,0,0)",
@@ -283,12 +301,12 @@ function SectionCard({ section, initialUrl, onSaved }) {
           </button>
           <button
             onClick={save}
-            disabled={saving || !dirty || !url}
+            disabled={saving || !dirty || !previewSrc}
             style={{
               ...GOLD_BTN,
               marginLeft: "auto",
-              opacity: (saving || !dirty || !url) ? 0.45 : 1,
-              pointerEvents: (saving || !dirty || !url) ? "none" : "auto",
+              opacity: (saving || !dirty || !previewSrc) ? 0.45 : 1,
+              pointerEvents: (saving || !dirty || !previewSrc) ? "none" : "auto",
             }}
           >
             {saving ? "Saving…" : "Save"}
