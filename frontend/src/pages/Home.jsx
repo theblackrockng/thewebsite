@@ -355,12 +355,12 @@ export default function Home() {
                   style={{ objectFit: "cover", objectPosition: "center" }}
                   className="absolute inset-0 w-full h-full transition-transform duration-700 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+                <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(10,9,8,0.93) 0%, rgba(10,9,8,0.72) 38%, rgba(10,9,8,0.18) 68%, transparent 100%)" }} />
                 <div className="absolute bottom-0 left-0 right-0 p-8" style={{ paddingBottom: 28 }}>
                   <div className="text-xs uppercase tracking-[0.3em] text-[var(--gold)] mb-3">{s.floor}</div>
                   <h3 className="font-serif-display text-3xl md:text-4xl mb-3">{s.name}</h3>
                   <p className="text-sm text-white/70 leading-relaxed font-light">{s.desc}</p>
-                  <p className="text-xs uppercase tracking-[0.25em] text-white/40 mt-4">{s.detail}</p>
+                  <p className="text-xs uppercase tracking-[0.25em] text-white/50 mt-4">{s.detail}</p>
                 </div>
               </motion.div>
             ))}
