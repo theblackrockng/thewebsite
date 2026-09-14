@@ -107,7 +107,7 @@ export default function Home() {
               loop
               playsInline
               poster={heroImage}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover block"
               preload="auto"
               onCanPlay={() => { if (videoRef.current) videoRef.current.playbackRate = 0.5; }}
             >
@@ -141,7 +141,8 @@ export default function Home() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.9 }}
-            className="font-serif-display text-[var(--warm-white)] text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-[1.05] max-w-4xl drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
+            className="font-serif-display text-[var(--warm-white)] text-4xl sm:text-5xl md:text-7xl lg:text-8xl leading-[1.0] max-w-5xl drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
+            style={{ fontWeight: 500 }}
           >
             Where exceptional food<br />
             meets beautiful ambience,<br />
