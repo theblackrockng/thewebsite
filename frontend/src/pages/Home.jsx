@@ -87,10 +87,10 @@ export default function Home() {
             alt="BlackRock Restaurant"
             className="w-full h-full object-cover ken-burns"
           />
-          {/* Overlay — lets the video breathe while keeping copy legible */}
-          <div className="absolute inset-0 bg-black/45" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/75" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/15 to-transparent" />
+          {/* Overlay */}
+          <div className="absolute inset-0 bg-black/60" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/30 via-black/50 to-black/85" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/20 to-transparent" />
         </div>
         <div className="relative z-10 h-full flex flex-col justify-center px-4 md:px-16 max-w-[1440px] mx-auto">
           <motion.div

@@ -48,7 +48,7 @@ export default function Navbar({ onReserveClick }) {
           </Link>
 
           {/* Desktop nav */}
-          <nav className="hidden lg:flex items-center gap-10">
+          <nav className="hidden lg:flex items-center gap-14">
             {NAV_LINKS.map((link) => {
               const active = location.pathname === link.to;
               return (
