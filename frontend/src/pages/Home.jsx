@@ -37,7 +37,7 @@ const FALLBACK_FOOD_REEL = [
 ];
 
 export default function Home() {
-  const [heroImage, setHeroImage] = useState("/heroimage.png");
+  const [heroImage, setHeroImage] = useState("/hero-poster.jpg");
   const [spaceDayImg, setSpaceDayImg] = useState("/black-rock-5.jpg");
   const [spaceEveImg, setSpaceEveImg] = useState("/black-rock-5.jpg");
   const [foodReel, setFoodReel] = useState(FALLBACK_FOOD_REEL);
