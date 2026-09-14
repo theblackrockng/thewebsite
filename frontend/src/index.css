@@ -49,6 +49,7 @@
 }
 
 html {
+    font-size: 17.5px; /* +9.4% from browser default 16px — scales all rem-based text sitewide */
     scroll-behavior: smooth;
 }
 
@@ -56,6 +57,7 @@ body {
     margin: 0;
     font-family: var(--font-body);
     font-weight: 400;
+    line-height: 1.65; /* up from Tailwind base 1.5 — improves paragraph readability at larger size */
     background: var(--charcoal);
     color: var(--warm-white);
     -webkit-font-smoothing: antialiased;
