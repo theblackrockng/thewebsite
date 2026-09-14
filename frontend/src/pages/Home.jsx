@@ -109,7 +109,7 @@ export default function Home() {
               poster={heroImage}
               className="w-full h-full object-cover block"
               preload="auto"
-              onCanPlay={() => { if (videoRef.current) videoRef.current.playbackRate = 0.5; }}
+              onCanPlay={() => { if (videoRef.current) videoRef.current.playbackRate = 0.25; }}
             >
               <source src="/hero-desktop.mp4" type="video/mp4" />
               <img src={heroImage} alt="BlackRock Restaurant" className="w-full h-full object-cover" />
