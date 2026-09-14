@@ -58,6 +58,8 @@ const SECTION_OPTIONS = [
   { value: "gallery-drinks", label: "Gallery — Drinks" },
   { value: "gallery", label: "Gallery — Ambience" },
   { value: "gallery-behind", label: "Gallery — Behind the Scenes" },
+  { value: "gallery-faces-day", label: "Gallery — Two Faces Day" },
+  { value: "gallery-faces-evening", label: "Gallery — Two Faces Evening" },
   { value: "other", label: "Other" },
 ];
 

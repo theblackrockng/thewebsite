@@ -32,6 +32,23 @@ export default function Gallery() {
   const [drinkImages, setDrinkImages] = useState([]);
   const [behindImages, setBehindImages] = useState([]);
   const [menuDishImages, setMenuDishImages] = useState([]);
+  const [facesDayImg, setFacesDayImg] = useState("/black-rock-5.jpg");
+  const [facesEveImg, setFacesEveImg] = useState("/black-rock-5.jpg");
+
+  // Load Two Faces section images from site_content
+  useEffect(() => {
+    async function loadFaces() {
+      try {
+        const [dayRow, eveRow] = await Promise.all([
+          supabase.from("site_content").select("data").eq("section", "gallery-faces-day").maybeSingle(),
+          supabase.from("site_content").select("data").eq("section", "gallery-faces-evening").maybeSingle(),
+        ]);
+        if (dayRow.data?.data?.image) setFacesDayImg(dayRow.data.data.image);
+        if (eveRow.data?.data?.image) setFacesEveImg(eveRow.data.data.image);
+      } catch {}
+    }
+    loadFaces();
+  }, []);
 
   // Load curated gallery images from media_assets by section tag
   useEffect(() => {
@@ -201,13 +218,12 @@ export default function Gallery() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-16">
             {[
               {
-                /* TODO: Replace with real BlackRock daytime interior photo after shoot */
-                img: IMAGES.rooftopDay,
+                img: facesDayImg,
                 title: "Daylight & Fresh",
                 desc: "Sunday brunches, soft afternoon light, slow lunches that turn into dinner.",
               },
               {
-                img: IMAGES.rooftopNight,
+                img: facesEveImg,
                 title: "After Dark",
                 desc: "The city below, the night above. The rooftop at its best. Candlelit, open sky, you in the middle of it.",
               },

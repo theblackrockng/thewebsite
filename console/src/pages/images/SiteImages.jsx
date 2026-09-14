@@ -53,6 +53,20 @@ const SECTIONS = [
     aspect: "16/7",
     fallback: `${SITE}/heroimage.png`,
   },
+  {
+    key: "gallery-faces-day",
+    label: "Gallery — Two Faces Day",
+    where: "Gallery page — \"Daylight & Fresh\" card",
+    aspect: "4/3",
+    fallback: `${SITE}/black-rock-5.jpg`,
+  },
+  {
+    key: "gallery-faces-evening",
+    label: "Gallery — Two Faces Evening",
+    where: "Gallery page — \"After Dark\" card",
+    aspect: "4/3",
+    fallback: `${SITE}/black-rock-5.jpg`,
+  },
 ];
 
 /* ─── MediaPickerModal ─── */
