@@ -42,12 +42,20 @@ export default function Home() {
   const [spaceEveImg, setSpaceEveImg] = useState("/black-rock-5.jpg");
   const [foodReel, setFoodReel] = useState(FALLBACK_FOOD_REEL);
   const [kitchenSlide, setKitchenSlide] = useState(0);
+  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
 
   useEffect(() => {
     const id = setInterval(() => {
       setKitchenSlide(prev => (prev + 1) % KITCHEN_IMAGES.length);
     }, 4000);
     return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 767px)");
+    const handler = (e) => setIsMobile(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
   }, []);
 
   useEffect(() => {
@@ -82,11 +90,28 @@ export default function Home() {
       {/* HERO */}
       <section className="relative h-screen min-h-[580px] md:min-h-[720px] w-full overflow-hidden" data-testid="hero-section">
         <div className="absolute inset-0">
-          <img
-            src={heroImage}
-            alt="BlackRock Restaurant dining room"
-            className="w-full h-full object-cover ken-burns"
-          />
+          {isMobile ? (
+            /* Mobile: static image only — no video download on slow connections */
+            <img
+              src={heroImage}
+              alt="BlackRock Restaurant"
+              className="w-full h-full object-cover ken-burns"
+            />
+          ) : (
+            /* Desktop: autoplay video, poster shows instantly while video loads */
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              poster={heroImage}
+              className="w-full h-full object-cover"
+              preload="auto"
+            >
+              <source src="/hero-desktop.mp4" type="video/mp4" />
+              <img src={heroImage} alt="BlackRock Restaurant" className="w-full h-full object-cover" />
+            </video>
+          )}
           {/* Strong layered overlays for legibility */}
           <div className="absolute inset-0 bg-[var(--charcoal)]/75" />
           <div className="absolute inset-0 bg-gradient-to-b from-[var(--charcoal)]/50 via-[var(--charcoal)]/60 to-[var(--charcoal)]" />
