@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, MapPin, Phone } from "lucide-react";
@@ -42,21 +42,12 @@ export default function Home() {
   const [spaceEveImg, setSpaceEveImg] = useState("/black-rock-5.jpg");
   const [foodReel, setFoodReel] = useState(FALLBACK_FOOD_REEL);
   const [kitchenSlide, setKitchenSlide] = useState(0);
-  const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
-  const videoRef = useRef(null);
 
   useEffect(() => {
     const id = setInterval(() => {
       setKitchenSlide(prev => (prev + 1) % KITCHEN_IMAGES.length);
     }, 4000);
     return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    const handler = (e) => setIsMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
   }, []);
 
   useEffect(() => {
@@ -91,30 +82,11 @@ export default function Home() {
       {/* HERO */}
       <section className="relative h-screen min-h-[580px] md:min-h-[720px] w-full overflow-hidden" data-testid="hero-section">
         <div className="absolute inset-0">
-          {isMobile ? (
-            /* Mobile: static image only — no video download on slow connections */
-            <img
-              src={heroImage}
-              alt="BlackRock Restaurant"
-              className="w-full h-full object-cover ken-burns"
-            />
-          ) : (
-            /* Desktop: autoplay video, poster shows instantly while video loads */
-            <video
-              ref={videoRef}
-              autoPlay
-              muted
-              loop
-              playsInline
-              poster={heroImage}
-              className="w-full h-full object-cover block"
-              preload="auto"
-              onCanPlay={() => { if (videoRef.current) videoRef.current.playbackRate = 0.25; }}
-            >
-              <source src="/hero-desktop.mp4" type="video/mp4" />
-              <img src={heroImage} alt="BlackRock Restaurant" className="w-full h-full object-cover" />
-            </video>
-          )}
+          <img
+            src={heroImage}
+            alt="BlackRock Restaurant"
+            className="w-full h-full object-cover ken-burns"
+          />
           {/* Overlay — lets the video breathe while keeping copy legible */}
           <div className="absolute inset-0 bg-black/45" />
           <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/75" />

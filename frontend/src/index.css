@@ -314,9 +314,9 @@ h1, h2, h3, h4, h5, h6 {
     from { opacity: 0; }
     to { opacity: 1; }
 }
-@keyframes slowPan {
-    from { transform: scale(1.05); }
-    to { transform: scale(1.15); }
+@keyframes heroZoom {
+    from { transform: scale(1.0); }
+    to   { transform: scale(1.10); }
 }
 
 .reveal { animation: fadeUp 1s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
@@ -326,7 +326,7 @@ h1, h2, h3, h4, h5, h6 {
 .reveal-delay-4 { animation-delay: 0.6s; }
 
 .ken-burns {
-    animation: slowPan 16s ease-in-out infinite alternate;
+    animation: heroZoom 25s ease-in forwards;
 }
 
 @keyframes marquee {
