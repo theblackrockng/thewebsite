@@ -115,10 +115,10 @@ export default function Home() {
               <img src={heroImage} alt="BlackRock Restaurant" className="w-full h-full object-cover" />
             </video>
           )}
-          {/* Dark overlay — deep enough for copy legibility over any frame */}
-          <div className="absolute inset-0 bg-black/70" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/55 to-black/90" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
+          {/* Overlay — lets the video breathe while keeping copy legible */}
+          <div className="absolute inset-0 bg-black/45" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/35 to-black/75" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-black/15 to-transparent" />
         </div>
         <div className="relative z-10 h-full flex flex-col justify-center px-4 md:px-16 max-w-[1440px] mx-auto">
           <motion.div
