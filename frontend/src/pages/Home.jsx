@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, MapPin, Phone } from "lucide-react";
@@ -43,6 +43,7 @@ export default function Home() {
   const [foodReel, setFoodReel] = useState(FALLBACK_FOOD_REEL);
   const [kitchenSlide, setKitchenSlide] = useState(0);
   const [isMobile, setIsMobile] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
+  const videoRef = useRef(null);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -100,6 +101,7 @@ export default function Home() {
           ) : (
             /* Desktop: autoplay video, poster shows instantly while video loads */
             <video
+              ref={videoRef}
               autoPlay
               muted
               loop
@@ -107,15 +109,16 @@ export default function Home() {
               poster={heroImage}
               className="w-full h-full object-cover"
               preload="auto"
+              onCanPlay={() => { if (videoRef.current) videoRef.current.playbackRate = 0.5; }}
             >
               <source src="/hero-desktop.mp4" type="video/mp4" />
               <img src={heroImage} alt="BlackRock Restaurant" className="w-full h-full object-cover" />
             </video>
           )}
-          {/* Strong layered overlays for legibility */}
-          <div className="absolute inset-0 bg-[var(--charcoal)]/75" />
-          <div className="absolute inset-0 bg-gradient-to-b from-[var(--charcoal)]/50 via-[var(--charcoal)]/60 to-[var(--charcoal)]" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[var(--charcoal)] via-[var(--charcoal)]/80 to-[var(--charcoal)]/40" />
+          {/* Dark overlay — deep enough for copy legibility over any frame */}
+          <div className="absolute inset-0 bg-black/70" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/55 to-black/90" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent" />
         </div>
         <div className="relative z-10 h-full flex flex-col justify-center px-4 md:px-16 max-w-[1440px] mx-auto">
           <motion.div
