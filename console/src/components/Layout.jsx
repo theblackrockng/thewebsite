@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useMatch } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
   Image, FileEdit, Users, UserCircle, Settings, Home, Search,
-  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop,
+  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop, QrCode,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -33,7 +33,7 @@ function useCurrentPage() {
   const map = {
     "/": "Dashboard", "/reservations": "Reservations",
     "/menu": "Menu Management", "/enquiries": "Enquiries", "/orders": "Orders",
-    "/media": "Media Library", "/gallery": "Gallery", "/content": "Site Content", "/images": "Website Images",
+    "/media": "Media Library", "/gallery": "Gallery", "/content": "Site Content", "/images": "Website Images", "/tables": "Tables & QR Codes",
     "/users": "Staff Management", "/content-hub": "Content Hub",
     "/settings": "Settings", "/blog": "Blog", "/security": "Security Log",
     "/profile": "My Profile",
@@ -51,6 +51,7 @@ const NAV_GROUPS = [
       { to: "/reservations", label: "Reservations", icon: CalendarDays,   badge: "pending" },
       { to: "/enquiries",    label: "Enquiries",    icon: MessageSquare,  badge: "enquiries" },
       { to: "/orders",       label: "Orders",       icon: ShoppingBag,    badge: "new_orders" },
+      { to: "/tables",       label: "Tables & QR",  icon: QrCode },
     ],
   },
   {

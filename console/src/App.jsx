@@ -24,6 +24,7 @@ import StaffProfile from "./pages/profile/StaffProfile";
 import Orders from "./pages/orders/Orders";
 import GalleryManager from "./pages/gallery/GalleryManager";
 import SiteImages from "./pages/images/SiteImages";
+import Tables from "./pages/tables/Tables";
 
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth();
@@ -90,6 +91,7 @@ function AppRoutes() {
       <Route path="/orders"             element={<ProtectedRoute><Orders /></ProtectedRoute>} />
       <Route path="/gallery"            element={<ProtectedRoute><GalleryManager /></ProtectedRoute>} />
       <Route path="/images"             element={<ProtectedRoute><SiteImages /></ProtectedRoute>} />
+      <Route path="/tables"             element={<ProtectedRoute><Tables /></ProtectedRoute>} />
       <Route path="/console-internal-br2026" element={<SuperAdminRoute><FeatureControl /></SuperAdminRoute>} />
       <Route path="*"                   element={<Navigate to="/" replace />} />
     </Routes>
