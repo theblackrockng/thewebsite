@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Check, MapPin, Truck, Package, Clock, Calendar, ChevronRight, AlertCircle, Copy } from "lucide-react";
+import { Check, MapPin, Truck, Package, Clock, Calendar, ChevronRight, AlertCircle, Copy, UtensilsCrossed } from "lucide-react";
 import { useCart } from "../context/CartContext";
+import { useTable } from "../context/TableContext";
 import { supabase } from "../lib/supabase";
 
 function fmtPrice(n) {
@@ -121,6 +122,8 @@ const inputStyle = {
 export default function Checkout() {
   const navigate = useNavigate();
   const { items, subtotal, clearCart } = useCart();
+  const { tableNumber, tableValid, clearTable } = useTable();
+  const isDineIn = tableValid && tableNumber !== null;
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -180,9 +183,14 @@ export default function Checkout() {
   function handleNext() {
     setError(null);
     let err = null;
-    if (step === 1) err = validateStep1();
-    else if (step === 2) err = validateStep2();
-    else if (step === 3) err = validateStep3();
+    if (isDineIn) {
+      // Dine-in: step 1 = details, step 2 = review
+      if (step === 1) err = validateStep2(); // reuse name/phone validation
+    } else {
+      if (step === 1) err = validateStep1();
+      else if (step === 2) err = validateStep2();
+      else if (step === 3) err = validateStep3();
+    }
     if (err) { setError(err); return; }
     setStep((s) => s + 1);
   }
@@ -193,7 +201,7 @@ export default function Checkout() {
     setLoading(true);
     try {
       let scheduledTime = null;
-      if (scheduleType === "later" && scheduleDate && scheduleTime) {
+      if (!isDineIn && scheduleType === "later" && scheduleDate && scheduleTime) {
         scheduledTime = new Date(`${scheduleDate}T${scheduleTime}:00`).toISOString();
       }
 
@@ -201,16 +209,21 @@ export default function Checkout() {
         ? `${deliveryAddress}, ${deliveryLandmark}`
         : deliveryAddress;
 
+      const effectiveOrderType = isDineIn ? "dine-in" : orderType;
+
       const payload = {
-        orderType,
-        deliveryAddress: orderType === "delivery" ? fullAddress : null,
+        orderType: effectiveOrderType,
+        deliveryAddress: effectiveOrderType === "delivery" ? fullAddress : null,
+        tableNumber: isDineIn ? tableNumber : undefined,
+        orderSource: isDineIn ? "qr" : "website",
+        placedBy: isDineIn ? "guest" : undefined,
         guestName: guestName.trim(),
         guestPhone: guestPhone.trim(),
         guestEmail: guestEmail.trim() || null,
         specialInstructions: specialInstructions.trim() || null,
         scheduledTime,
         paymentMethod: "pay_on_arrival",
-        items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+        items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, menuType: i.menuType || "food" })),
       };
 
       const res = await fetch("/api/orders", {
@@ -222,17 +235,20 @@ export default function Checkout() {
       const data = await res.json();
       if (!res.ok || !data.ok) throw new Error((data.error || "Failed to place order.") + (data.detail ? ` — ${data.detail}` : ""));
 
-      // Open WhatsApp with proof of payment request
-      const itemsList = items.map(i => `• ${i.name} x${i.qty} — ${fmtPrice(i.price * i.qty)}`).join("\n");
-      const msg = encodeURIComponent(
-        `Hello BLACKROCK! 🍽️\n\nI just made a bank transfer for my order and would like to send proof of payment.\n\n*Order Details*\nName: ${guestName.trim()}\nPhone: ${guestPhone.trim()}\nType: ${orderType === "delivery" ? "Delivery" : "Pickup"}\nTotal: ${fmtPrice(total)}\n\n*Items:*\n${itemsList}\n\nPlease find attached my proof of payment. Thank you!`
-      );
-      window.open(`https://wa.me/${bankAccount.whatsappNumber}?text=${msg}`, "_blank");
+      if (!isDineIn) {
+        // Open WhatsApp with proof of payment request (regular orders only)
+        const itemsList = items.map(i => `• ${i.name} x${i.qty} — ${fmtPrice(i.price * i.qty)}`).join("\n");
+        const msg = encodeURIComponent(
+          `Hello BLACKROCK! 🍽️\n\nI just made a bank transfer for my order and would like to send proof of payment.\n\n*Order Details*\nName: ${guestName.trim()}\nPhone: ${guestPhone.trim()}\nType: ${orderType === "delivery" ? "Delivery" : "Pickup"}\nTotal: ${fmtPrice(total)}\n\n*Items:*\n${itemsList}\n\nPlease find attached my proof of payment. Thank you!`
+        );
+        window.open(`https://wa.me/${bankAccount.whatsappNumber}?text=${msg}`, "_blank");
+      }
 
       const confirmationState = {
         orderNumber: data.orderNumber,
-        orderType,
-        deliveryAddress: orderType === "delivery" ? fullAddress : null,
+        orderType: effectiveOrderType,
+        tableNumber: isDineIn ? tableNumber : undefined,
+        deliveryAddress: effectiveOrderType === "delivery" ? fullAddress : null,
         guestName: guestName.trim(),
         scheduledTime,
         items: items.map((i) => ({ name: i.name, qty: i.qty, unit_price: i.price, line_total: i.price * i.qty })),
@@ -241,10 +257,10 @@ export default function Checkout() {
         total,
       };
 
-      // Save to sessionStorage so a page refresh still shows the confirmation
       try { sessionStorage.setItem(`order_${data.orderId}`, JSON.stringify(confirmationState)); } catch {}
 
       clearCart();
+      if (isDineIn) clearTable();
       navigate(`/order-confirmation/${data.orderId}`, { state: confirmationState });
     } catch (err) {
       setError(err.message || "Something went wrong. Please try again.");
@@ -287,32 +303,19 @@ export default function Checkout() {
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 24px" }}>
         {/* Header */}
         <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <p
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              letterSpacing: "0.25em",
-              textTransform: "uppercase",
-              color: "var(--gold, #C9A84C)",
-              marginBottom: 12,
-            }}
-          >
-            Checkout
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.25em", textTransform: "uppercase", color: "var(--gold, #C9A84C)", marginBottom: 12 }}>
+            {isDineIn ? `Table ${tableNumber} — Dine-In` : "Checkout"}
           </p>
-          <h1
-            style={{
-              fontFamily: "'Cormorant Garamond', Georgia, serif",
-              fontSize: "clamp(32px, 5vw, 48px)",
-              fontWeight: 700,
-              color: "var(--warm-white, #F5F0E8)",
-              margin: 0,
-            }}
-          >
-            Complete Your Order
+          <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(32px, 5vw, 48px)", fontWeight: 700, color: "var(--warm-white, #F5F0E8)", margin: 0 }}>
+            {isDineIn ? "Place Your Order" : "Complete Your Order"}
           </h1>
         </div>
 
-        <StepIndicator current={step} />
+        {isDineIn ? (
+          <DineInStepIndicator current={step} />
+        ) : (
+          <StepIndicator current={step} />
+        )}
 
         {/* Error */}
         {error && (
@@ -333,8 +336,96 @@ export default function Checkout() {
           </div>
         )}
 
+        {/* ── DINE-IN FLOW ── */}
+        {isDineIn && step === 1 && (
+          <div>
+            <h2 style={sectionTitle}>Your details</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 24 }}>
+              <div>
+                <FieldLabel required>Full Name</FieldLabel>
+                <input type="text" value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Your full name" style={inputStyle} />
+              </div>
+              <div>
+                <FieldLabel required>Phone Number</FieldLabel>
+                <input type="tel" value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} placeholder="+234 or 0XXXXXXXXXX" style={inputStyle} />
+              </div>
+              <div>
+                <FieldLabel>Email Address</FieldLabel>
+                <input type="email" value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} placeholder="For order confirmation (optional)" style={inputStyle} />
+              </div>
+              <div>
+                <FieldLabel>Special Instructions</FieldLabel>
+                <textarea value={specialInstructions} onChange={(e) => setSpecialInstructions(e.target.value)} placeholder="Allergies, preferences, or anything we should know." rows={3} style={{ ...inputStyle, resize: "vertical", minHeight: 80 }} />
+              </div>
+            </div>
+            <button onClick={handleNext} className="btn-burgundy" style={{ width: "100%" }}>
+              Continue <ChevronRight size={16} style={{ display: "inline" }} />
+            </button>
+          </div>
+        )}
+
+        {isDineIn && step === 2 && (
+          <div>
+            <h2 style={sectionTitle}>Review your order</h2>
+
+            {/* Items */}
+            <div style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 10, marginBottom: 16, overflow: "hidden" }}>
+              <div style={{ padding: "14px 20px", borderBottom: "1px solid #2e2820" }}>
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--muted, #9C8E7A)" }}>Items ({items.length})</span>
+              </div>
+              {items.map((item, idx) => (
+                <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "12px 20px", borderBottom: idx < items.length - 1 ? "1px solid #1e1a16" : "none", gap: 16 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--warm-white, #F5F0E8)", lineHeight: 1.3 }}>{item.name}</div>
+                    <div style={{ fontSize: 12, color: "var(--muted, #9C8E7A)", marginTop: 2 }}>{fmtPrice(item.price)} × {item.qty}</div>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--warm-white, #F5F0E8)", flexShrink: 0 }}>{fmtPrice(item.price * item.qty)}</div>
+                </div>
+              ))}
+              <div style={{ borderTop: "1px solid #2e2820", padding: "12px 20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 4 }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "var(--warm-white, #F5F0E8)" }}>Total</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: "var(--gold, #C9A84C)" }}>{fmtPrice(total)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Order summary */}
+            <div style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 10, padding: "16px 20px", marginBottom: 16, display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted, #9C8E7A)", minWidth: 80 }}>Table</span>
+                <span style={{ fontSize: 13, color: "var(--warm-white, #F5F0E8)" }}>Table {tableNumber} — Dine-In</span>
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted, #9C8E7A)", minWidth: 80 }}>Name</span>
+                <span style={{ fontSize: 13, color: "var(--warm-white, #F5F0E8)" }}>{guestName}</span>
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--muted, #9C8E7A)", minWidth: 80 }}>Phone</span>
+                <span style={{ fontSize: 13, color: "var(--warm-white, #F5F0E8)" }}>{guestPhone}</span>
+              </div>
+            </div>
+
+            {/* Pay at table notice */}
+            <div style={{ background: "rgba(200,169,110,0.08)", border: "1px solid rgba(200,169,110,0.25)", borderRadius: 10, padding: "14px 18px", marginBottom: 24, display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <UtensilsCrossed size={16} style={{ color: "#c8a96e", flexShrink: 0, marginTop: 2 }} />
+              <p style={{ margin: 0, fontSize: 13, color: "var(--gold, #C9A84C)", lineHeight: 1.6 }}>
+                <strong>Pay at Table.</strong> Your bill will be brought to you when you're ready to pay. No payment is needed right now.
+              </p>
+            </div>
+
+            <div style={{ display: "flex", gap: 12 }}>
+              <button onClick={() => setStep(1)} style={{ ...ghostBtn, flex: 1 }}>Back</button>
+              <button onClick={handlePlaceOrder} disabled={loading} className="btn-burgundy" style={{ flex: 2, opacity: loading ? 0.7 : 1, cursor: loading ? "not-allowed" : "pointer" }}>
+                {loading ? "Placing Order…" : "Place Order →"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── REGULAR FLOW ── */}
         {/* Step 1: Order Type */}
-        {step === 1 && (
+        {!isDineIn && step === 1 && (
           <div>
             <h2 style={sectionTitle}>How would you like to receive your order?</h2>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
@@ -402,7 +493,7 @@ export default function Checkout() {
         )}
 
         {/* Step 2: Your Details */}
-        {step === 2 && (
+        {!isDineIn && step === 2 && (
           <div>
             <h2 style={sectionTitle}>Tell us who you are</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 16, marginBottom: 24 }}>
@@ -457,7 +548,7 @@ export default function Checkout() {
         )}
 
         {/* Step 3: Order Time */}
-        {step === 3 && (
+        {!isDineIn && step === 3 && (
           <div>
             <h2 style={sectionTitle}>When do you want your order?</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 24 }}>
@@ -516,7 +607,7 @@ export default function Checkout() {
         )}
 
         {/* Step 4: Review & Pay */}
-        {step === 4 && (
+        {!isDineIn && step === 4 && (
           <div>
             <h2 style={sectionTitle}>Review your order</h2>
 
@@ -777,6 +868,32 @@ function TimeOption({ active, onClick, icon, title, subtitle }) {
         </div>
       </div>
     </button>
+  );
+}
+
+function DineInStepIndicator({ current }) {
+  const steps = ["Your Details", "Review & Pay"];
+  return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 0, marginBottom: 40 }}>
+      {steps.map((label, idx) => {
+        const step = idx + 1;
+        const done = current > step;
+        const active = current === step;
+        return (
+          <div key={step} style={{ display: "flex", alignItems: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 36, height: 36, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", background: done || active ? "var(--gold, #C9A84C)" : "transparent", border: `2px solid ${done || active ? "var(--gold, #C9A84C)" : "#2e2820"}`, fontSize: 13, fontWeight: 700, color: done || active ? "#0f0d0a" : "#5a4e46", transition: "all 0.2s" }}>
+                {done ? <Check size={16} /> : step}
+              </div>
+              <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.05em", color: done || active ? "var(--warm-white, #F5F0E8)" : "#5a4e46", textTransform: "uppercase", whiteSpace: "nowrap" }}>{label}</span>
+            </div>
+            {idx < steps.length - 1 && (
+              <div style={{ width: "clamp(24px, 5vw, 60px)", height: 2, background: current > step ? "var(--gold, #C9A84C)" : "#2e2820", margin: "0 8px", marginBottom: 22, flexShrink: 0 }} />
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

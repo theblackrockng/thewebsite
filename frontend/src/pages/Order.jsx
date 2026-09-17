@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Plus, Minus, ShoppingBag, X, Check } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
+import { Plus, Minus, ShoppingBag, X, Check, UtensilsCrossed } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { MENU } from "../lib/data";
 import { useCart } from "../context/CartContext";
+import { useTable } from "../context/TableContext";
 
 const FOOD_CATEGORY_ORDER = [
   "Starters", "Salads", "Rice", "Pasta",
@@ -33,6 +35,8 @@ function slugify(str) {
 
 export default function Order() {
   const { items: cartItems, addItem, setQty, totalItems, subtotal, setDrawerOpen } = useCart();
+  const { tableNumber, tableValid, setTable } = useTable();
+  const [searchParams] = useSearchParams();
 
   const [foodData, setFoodData] = useState(null);
   const [drinkData, setDrinkData] = useState(null);
@@ -46,6 +50,22 @@ export default function Order() {
   const drinkSectionRefs = useRef({});
   const scrollingProgrammatically = useRef(false);
   const tabsRef = useRef(null);
+
+  // Validate table query param once on mount
+  useEffect(() => {
+    const tableParam = searchParams.get("table");
+    if (!tableParam) return;
+    const n = parseInt(tableParam, 10);
+    if (isNaN(n)) return;
+    if (tableValid && tableNumber === n) return; // already validated this session
+    supabase
+      .from("tables")
+      .select("id, table_number, active")
+      .eq("table_number", n)
+      .eq("active", true)
+      .maybeSingle()
+      .then(({ data }) => { if (data) setTable(data.table_number); });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     async function fetchMenu() {
@@ -177,14 +197,23 @@ export default function Order() {
       >
         <div style={{ maxWidth: 640, margin: "0 auto", padding: "0 24px" }}>
           <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.25em", textTransform: "uppercase", color: "var(--gold, #C9A84C)", marginBottom: 16 }}>
-            Online Ordering
+            {tableValid ? "Dine-In" : "Online Ordering"}
           </p>
           <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(40px, 6vw, 68px)", fontWeight: 700, color: "var(--warm-white, #F5F0E8)", lineHeight: 1.1, margin: "0 0 20px" }}>
-            Order Now
+            {tableValid ? `Table ${tableNumber}` : "Order Now"}
           </h1>
-          <p style={{ fontSize: 16, color: "var(--muted, #9C8E7A)", lineHeight: 1.7, margin: 0 }}>
-            Pickup or delivery — fresh from our kitchen to you.
-          </p>
+          {tableValid ? (
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(200,169,110,0.12)", border: "1px solid rgba(200,169,110,0.3)", borderRadius: 99, padding: "8px 18px" }}>
+              <UtensilsCrossed size={15} style={{ color: "#c8a96e" }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#c8a96e", letterSpacing: "0.06em" }}>
+                Dine-In Order — Pay at Table
+              </span>
+            </div>
+          ) : (
+            <p style={{ fontSize: 16, color: "var(--muted, #9C8E7A)", lineHeight: 1.7, margin: 0 }}>
+              Pickup or delivery — fresh from our kitchen to you.
+            </p>
+          )}
         </div>
       </section>
 
@@ -290,7 +319,7 @@ export default function Order() {
                       onAdd={() => {
                         if (isNational) setSoupModal(dish);
                         else if (isTraditional) setTraditionalModal(dish);
-                        else addItem({ id: dish.id, name: dish.name, price: dish.price, category: dish.category, description: dish.description });
+                        else addItem({ id: dish.id, name: dish.name, price: dish.price, category: dish.category, menuType: "food", description: dish.description });
                       }}
                       onSetQty={(q) => setQty(dish.id, q)}
                     />
@@ -322,7 +351,7 @@ export default function Order() {
                     key={drink.id}
                     dish={drink}
                     cartItem={getCartItem(drink.id)}
-                    onAdd={() => addItem({ id: drink.id, name: drink.name, price: drink.price, category: drink.category, description: drink.description })}
+                    onAdd={() => addItem({ id: drink.id, name: drink.name, price: drink.price, category: drink.category, menuType: "drink", description: drink.description })}
                     onSetQty={(q) => setQty(drink.id, q)}
                   />
                 ))}
@@ -345,6 +374,7 @@ export default function Order() {
               name: soupModal.name,
               price: soupModal.price,
               category: soupModal.category,
+              menuType: "food",
               soup,
               swallow,
             });
@@ -367,6 +397,7 @@ export default function Order() {
               name: traditionalModal.name,
               price: traditionalModal.price,
               category: traditionalModal.category,
+              menuType: "food",
               swallow,
             });
             setTraditionalModal(null);

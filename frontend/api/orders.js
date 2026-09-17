@@ -128,7 +128,7 @@ module.exports = async function handler(req, res) {
   }
 
   const { guestName, guestPhone, guestEmail, specialInstructions, deliveryAddress } = sanitized;
-  const { orderType, scheduledTime, paymentMethod, items } = body;
+  const { orderType, scheduledTime, paymentMethod, items, tableNumber, orderSource, placedBy } = body;
 
   // Validate required fields
   if (!guestName || !guestName.trim()) {
@@ -137,11 +137,17 @@ module.exports = async function handler(req, res) {
   if (!guestPhone || !guestPhone.trim()) {
     return res.status(400).json({ error: 'Phone number is required.' });
   }
-  if (!['pickup', 'delivery'].includes(orderType)) {
+  if (!['pickup', 'delivery', 'dine-in'].includes(orderType)) {
     return res.status(400).json({ error: 'Invalid order type.' });
   }
   if (orderType === 'delivery' && (!deliveryAddress || !deliveryAddress.trim())) {
     return res.status(400).json({ error: 'Delivery address is required.' });
+  }
+  if (orderType === 'dine-in') {
+    const tableNum = parseInt(tableNumber, 10);
+    if (!tableNumber || isNaN(tableNum) || tableNum < 1) {
+      return res.status(400).json({ error: 'Valid table number is required for dine-in.' });
+    }
   }
   if (guestEmail && !validateEmail(guestEmail)) {
     return res.status(400).json({ error: 'Invalid email address.' });
@@ -193,10 +199,13 @@ module.exports = async function handler(req, res) {
         guest_email: guestEmail ? guestEmail.trim() : null,
         order_type: orderType,
         delivery_address: orderType === 'delivery' ? deliveryAddress.trim() : null,
+        table_number: orderType === 'dine-in' ? parseInt(tableNumber, 10) : null,
+        order_source: ['website', 'qr', 'waiter'].includes(orderSource) ? orderSource : 'website',
+        placed_by: placedBy ? String(placedBy).slice(0, 100) : null,
         special_instructions: specialInstructions ? specialInstructions.trim() : null,
         scheduled_time: scheduledTimeISO,
         payment_method: 'pay_on_arrival',
-        payment_status: 'awaiting_proof',
+        payment_status: orderType === 'dine-in' ? 'pay_on_arrival' : 'awaiting_proof',
         order_status: 'new',
         subtotal,
         delivery_fee: deliveryFee,
@@ -224,6 +233,7 @@ module.exports = async function handler(req, res) {
       unit_price: item.price,
       qty: item.qty,
       line_total: item.price * item.qty,
+      category: item.menuType === 'drink' ? 'drink' : 'food',
     }));
 
     const { error: itemsErr } = await db.from('order_items').insert(orderItemsRows);
@@ -236,22 +246,36 @@ module.exports = async function handler(req, res) {
       .map((i) => `  ${i.qty}× ${i.name} — ₦${(i.price * i.qty).toLocaleString('en-NG')}`)
       .join('\n');
 
+    const locationLine =
+      orderType === 'delivery'
+        ? `🚚 Delivery to ${deliveryAddress ? deliveryAddress.trim() : 'Address not provided'}`
+        : orderType === 'dine-in'
+        ? `🍽️ Dine-In — Table ${parseInt(tableNumber, 10)}`
+        : `📦 Pickup — 11 Ajao Road, Ikeja`;
+
+    const paymentLine =
+      orderType === 'dine-in'
+        ? `💵 Pay at Table`
+        : `💳 Bank Transfer — awaiting WhatsApp proof`;
+
+    const sourceLine =
+      orderSource === 'waiter' ? `👨‍🍳 Waiter: ${placedBy || 'Staff'}` : null;
+
     const telegramText = [
       `🛒 <b>New Order — ${orderNumber}</b>`,
       ``,
       `👤 <b>${guestName.trim()}</b> — ${guestPhone.trim()}`,
-      orderType === 'delivery'
-        ? `🚚 Delivery to ${deliveryAddress ? deliveryAddress.trim() : 'Address not provided'}`
-        : `📦 Pickup — 11 Ajao Road, Ikeja`,
-      `💳 Bank Transfer — awaiting WhatsApp proof`,
+      locationLine,
+      paymentLine,
+      sourceLine,
       ``,
       `Items:`,
       itemsText,
       ``,
       `Total: ₦${total.toLocaleString('en-NG')}`,
-      scheduledTimeISO ? `Scheduled: ${fmtScheduledTime(scheduledTimeISO)}` : `Scheduled: ASAP`,
+      orderType !== 'dine-in' && scheduledTimeISO ? `Scheduled: ${fmtScheduledTime(scheduledTimeISO)}` : (orderType !== 'dine-in' ? `Scheduled: ASAP` : null),
       specialInstructions ? `\nNote: ${specialInstructions.trim()}` : '',
-    ].filter((l) => l !== null).join('\n');
+    ].filter((l) => l !== null && l !== undefined).join('\n');
 
     const replyMarkup = {
       inline_keyboard: [[
@@ -271,6 +295,7 @@ module.exports = async function handler(req, res) {
           guestName: guestName.trim(),
           orderNumber,
           orderType,
+          tableNumber: orderType === 'dine-in' ? parseInt(tableNumber, 10) : null,
           deliveryAddress: orderType === 'delivery' ? deliveryAddress.trim() : null,
           items: items.map((i) => ({ name: i.name, qty: i.qty, unit_price: i.price, price: i.price })),
           subtotal,

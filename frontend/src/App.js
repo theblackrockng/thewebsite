@@ -5,6 +5,7 @@ import "@/App.css";
 
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CartProvider } from "./context/CartContext";
+import { TableProvider } from "./context/TableContext";
 import { FeatureFlagProvider, useFeatureFlags } from "./context/FeatureFlagContext";
 import { useTheme } from "./hooks/useTheme";
 
@@ -29,6 +30,9 @@ import ContentHubLogin from "./pages/ContentHubLogin";
 import Order from "./pages/Order";
 import Checkout from "./pages/Checkout";
 import OrderConfirmation from "./pages/OrderConfirmation";
+import Waiter from "./pages/Waiter";
+import KitchenDisplay from "./pages/KitchenDisplay";
+import BarDisplay from "./pages/BarDisplay";
 
 function OrderRoute({ children }) {
   const { orderingEnabled, loading } = useFeatureFlags();
@@ -105,14 +109,19 @@ function App() {
     <BrowserRouter>
       <AuthProvider>
         <CartProvider>
-          <FeatureFlagProvider>
-          <ThemeLoader />
-          <ScrollToTop />
-          <Routes>
-            <Route path="/content-hub/*" element={<ContentHubLayout />} />
-            <Route path="*" element={<MainLayout />} />
-          </Routes>
-          </FeatureFlagProvider>
+          <TableProvider>
+            <FeatureFlagProvider>
+              <ThemeLoader />
+              <ScrollToTop />
+              <Routes>
+                <Route path="/content-hub/*" element={<ContentHubLayout />} />
+                <Route path="/kitchen-display" element={<KitchenDisplay />} />
+                <Route path="/bar-display" element={<BarDisplay />} />
+                <Route path="/waiter" element={<OrderRoute><Waiter /></OrderRoute>} />
+                <Route path="*" element={<MainLayout />} />
+              </Routes>
+            </FeatureFlagProvider>
+          </TableProvider>
         </CartProvider>
       </AuthProvider>
     </BrowserRouter>

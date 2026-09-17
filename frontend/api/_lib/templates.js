@@ -202,7 +202,7 @@ exports.thankYouEmail = ({ name, occasion }) => {
 };
 
 /* ── EMAIL 6: ORDER CONFIRMATION ── */
-exports.orderConfirmationEmail = ({ guestName, orderNumber, orderType, deliveryAddress, items, subtotal, deliveryFee, total, paymentMethod, scheduledTime }) => {
+exports.orderConfirmationEmail = ({ guestName, orderNumber, orderType, tableNumber, deliveryAddress, items, subtotal, deliveryFee, total, paymentMethod, scheduledTime }) => {
   function fmtPrice(n) {
     return `₦${Number(n).toLocaleString('en-NG')}`;
   }
@@ -232,7 +232,10 @@ exports.orderConfirmationEmail = ({ guestName, orderNumber, orderType, deliveryA
     </tr>
   ` : '';
 
-  const paymentLabel = paymentMethod === 'paid' ? 'Paid Online' : `Pay on ${orderType === 'delivery' ? 'Delivery' : 'Pickup'}`;
+  const paymentLabel =
+    orderType === 'dine-in' ? 'Pay at Table'
+    : paymentMethod === 'paid' ? 'Paid Online'
+    : `Pay on ${orderType === 'delivery' ? 'Delivery' : 'Pickup'}`;
 
   const bodyHtml = `
     <p style="margin:0 0 20px;color:#1a1a1a;">We've received your order and our team will start preparing it shortly. Here's a summary of what you ordered.</p>
@@ -248,7 +251,9 @@ exports.orderConfirmationEmail = ({ guestName, orderNumber, orderType, deliveryA
       </tr>
       <tr>
         <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#888;font-size:11px;letter-spacing:2px;text-transform:uppercase;vertical-align:top;">Type</td>
-        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:14px;text-align:right;text-transform:capitalize;">${orderType}</td>
+        <td style="padding:10px 0;border-bottom:1px solid #e5e0d8;color:#1a1a1a;font-size:14px;text-align:right;text-transform:capitalize;">
+          ${orderType === 'dine-in' ? `Dine-In — Table ${tableNumber}` : orderType}
+        </td>
       </tr>
       ${orderType === 'delivery' && deliveryAddress ? `
       <tr>

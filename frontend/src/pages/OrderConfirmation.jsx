@@ -1,5 +1,5 @@
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { CheckCircle, Package, Truck, Clock, RotateCcw, Home, MessageCircle } from "lucide-react";
+import { CheckCircle, Package, Truck, Clock, RotateCcw, Home, MessageCircle, UtensilsCrossed } from "lucide-react";
 
 function fmtPrice(n) {
   return `₦${Number(n).toLocaleString("en-NG")}`;
@@ -55,7 +55,8 @@ export default function OrderConfirmation() {
     );
   }
 
-  const { orderNumber, orderType, deliveryAddress, guestName, scheduledTime, items = [], subtotal, deliveryFee = 0, total } = orderData;
+  const { orderNumber, orderType, tableNumber, deliveryAddress, guestName, scheduledTime, items = [], subtotal, deliveryFee = 0, total } = orderData;
+  const isDineIn = orderType === "dine-in";
 
   return (
     <div
@@ -100,28 +101,28 @@ export default function OrderConfirmation() {
             We've received your order <strong style={{ color: "var(--warm-white, #F5F0E8)" }}>{orderNumber}</strong>.
           </p>
           <p style={{ fontSize: 14, color: "var(--muted, #9C8E7A)", margin: 0, lineHeight: 1.6 }}>
-            Once we confirm your bank transfer via WhatsApp, we'll process your order immediately.
+            {isDineIn
+              ? "Your order has been sent to the kitchen. Sit tight — we'll bring it to your table!"
+              : "Once we confirm your bank transfer via WhatsApp, we'll process your order immediately."}
           </p>
         </div>
 
-        {/* Payment reminder banner */}
-        <div
-          style={{
-            background: "rgba(201,168,76,0.08)",
-            border: "1px solid rgba(201,168,76,0.25)",
-            borderRadius: 10,
-            padding: "14px 18px",
-            marginBottom: 20,
-            display: "flex",
-            alignItems: "flex-start",
-            gap: 12,
-          }}
-        >
-          <MessageCircle size={18} style={{ color: "var(--gold, #C9A84C)", flexShrink: 0, marginTop: 2 }} />
-          <p style={{ fontSize: 13, color: "var(--gold, #C9A84C)", margin: 0, lineHeight: 1.6 }}>
-            Please send your payment proof on WhatsApp if you haven't already. Payment confirms and activates your order.
-          </p>
-        </div>
+        {/* Banner */}
+        {isDineIn ? (
+          <div style={{ background: "rgba(200,169,110,0.08)", border: "1px solid rgba(200,169,110,0.25)", borderRadius: 10, padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <UtensilsCrossed size={18} style={{ color: "var(--gold, #C9A84C)", flexShrink: 0, marginTop: 2 }} />
+            <p style={{ fontSize: 13, color: "var(--gold, #C9A84C)", margin: 0, lineHeight: 1.6 }}>
+              <strong>Pay at Table.</strong> Your bill will be brought to you — no payment needed right now.
+            </p>
+          </div>
+        ) : (
+          <div style={{ background: "rgba(201,168,76,0.08)", border: "1px solid rgba(201,168,76,0.25)", borderRadius: 10, padding: "14px 18px", marginBottom: 20, display: "flex", alignItems: "flex-start", gap: 12 }}>
+            <MessageCircle size={18} style={{ color: "var(--gold, #C9A84C)", flexShrink: 0, marginTop: 2 }} />
+            <p style={{ fontSize: 13, color: "var(--gold, #C9A84C)", margin: 0, lineHeight: 1.6 }}>
+              Please send your payment proof on WhatsApp if you haven't already. Payment confirms and activates your order.
+            </p>
+          </div>
+        )}
 
         {/* Order summary card */}
         <div
@@ -139,24 +140,30 @@ export default function OrderConfirmation() {
               Order Details
             </p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <DetailRow
-                icon={orderType === "delivery" ? <Truck size={14} /> : <Package size={14} />}
-                label={orderType === "delivery" ? "Delivery" : "Pickup"}
-                value={
-                  orderType === "delivery"
-                    ? deliveryAddress
-                    : "11 Ajao Road, off Adeniyi Jones Road, Ikeja"
-                }
-              />
-              <DetailRow
-                icon={<Clock size={14} />}
-                label="Time"
-                value={fmtScheduledTime(scheduledTime)}
-              />
+              {isDineIn ? (
+                <DetailRow
+                  icon={<UtensilsCrossed size={14} />}
+                  label="Table"
+                  value={`Table ${tableNumber} — Dine-In`}
+                />
+              ) : (
+                <DetailRow
+                  icon={orderType === "delivery" ? <Truck size={14} /> : <Package size={14} />}
+                  label={orderType === "delivery" ? "Delivery" : "Pickup"}
+                  value={orderType === "delivery" ? deliveryAddress : "11 Ajao Road, off Adeniyi Jones Road, Ikeja"}
+                />
+              )}
+              {!isDineIn && (
+                <DetailRow
+                  icon={<Clock size={14} />}
+                  label="Time"
+                  value={fmtScheduledTime(scheduledTime)}
+                />
+              )}
               <DetailRow
                 icon={null}
                 label="Payment"
-                value="Bank Transfer (awaiting confirmation)"
+                value={isDineIn ? "Pay at Table" : "Bank Transfer (awaiting confirmation)"}
               />
             </div>
           </div>

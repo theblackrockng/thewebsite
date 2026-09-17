@@ -3,7 +3,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import {
   Package, Truck, Search, RefreshCw, Loader2, X,
-  Phone, Mail, MapPin, Clock, UtensilsCrossed, ChevronRight, UserCheck,
+  Phone, Mail, MapPin, Clock, UtensilsCrossed, ChevronRight, UserCheck, QrCode, User,
 } from "lucide-react";
 
 /* ─── Constants ─── */
@@ -113,6 +113,27 @@ function PaymentBadge({ status }) {
       border: `1px solid ${cfg.border}`,
       borderRadius: 99, padding: "3px 10px",
       fontSize: 11, fontWeight: 600, whiteSpace: "nowrap",
+    }}>
+      {cfg.label}
+    </span>
+  );
+}
+
+const SOURCE_CFG = {
+  qr:      { label: "QR",      bg: "rgba(34,197,94,0.10)",  color: "#22c55e",  border: "rgba(34,197,94,0.2)" },
+  waiter:  { label: "Waiter",  bg: "rgba(139,92,246,0.10)", color: "#8b5cf6",  border: "rgba(139,92,246,0.2)" },
+  website: { label: "Website", bg: "rgba(107,114,128,0.10)", color: "#6b7280", border: "rgba(107,114,128,0.2)" },
+};
+
+function SourceBadge({ source }) {
+  const cfg = SOURCE_CFG[source] ?? SOURCE_CFG.website;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center",
+      background: cfg.bg, color: cfg.color,
+      border: `1px solid ${cfg.border}`,
+      borderRadius: 99, padding: "2px 8px",
+      fontSize: 10, fontWeight: 600, whiteSpace: "nowrap",
     }}>
       {cfg.label}
     </span>
@@ -439,7 +460,7 @@ export default function Orders() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--ds-border)" }}>
-                  {["Order #", "Guest", "Type", "Items", "Total", "Payment", "Status", "Time"].map((h) => (
+                  {["Order #", "Guest", "Type", "Source", "Items", "Total", "Payment", "Status", "Time"].map((h) => (
                     <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: 10, fontWeight: 600, letterSpacing: "1.5px", textTransform: "uppercase", color: "var(--ds-muted)", whiteSpace: "nowrap" }}>
                       {h}
                     </th>
@@ -474,9 +495,19 @@ export default function Orders() {
                       </div>
                     </td>
                     <td style={{ padding: "12px 16px" }}>
-                      {order.order_type === "delivery"
-                        ? <Truck size={16} style={{ color: "#3b82f6" }} />
-                        : <Package size={16} style={{ color: "var(--ds-gold)" }} />}
+                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        {order.order_type === "delivery"
+                          ? <Truck size={16} style={{ color: "#3b82f6" }} />
+                          : order.order_type === "dine-in"
+                          ? <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                              <UtensilsCrossed size={15} style={{ color: "var(--ds-gold)" }} />
+                              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-gold)" }}>T{order.table_number}</span>
+                            </div>
+                          : <Package size={16} style={{ color: "var(--ds-gold)" }} />}
+                      </div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <SourceBadge source={order.order_source || "website"} />
                     </td>
                     <td style={{ padding: "12px 16px", fontSize: 12.5, color: "var(--ds-muted)" }}>
                       {order.item_count ?? "—"}
@@ -603,17 +634,31 @@ function OrderDetailPanel({ order, items, itemsLoading, onClose, onStatusUpdate,
 
           {/* Order info */}
           <Section title="Order Info">
-            <InfoRow
-              icon={order.order_type === "delivery" ? <Truck size={13} /> : <Package size={13} />}
-              label={order.order_type === "delivery" ? `Delivery` : "Pickup — 11 Ajao Road, Ikeja"}
-            />
-            {order.order_type === "delivery" && order.delivery_address && (
-              <InfoRow icon={<MapPin size={13} />} label={order.delivery_address} />
+            {order.order_type === "dine-in" ? (
+              <>
+                <InfoRow icon={<UtensilsCrossed size={13} />} label={`Table ${order.table_number} — Dine-In`} />
+                <InfoRow icon={<QrCode size={13} />} label={`Source: ${order.order_source === "waiter" ? `Waiter (${order.placed_by || "Staff"})` : order.order_source === "qr" ? "QR Code" : "Website"}`} />
+              </>
+            ) : (
+              <>
+                <InfoRow
+                  icon={order.order_type === "delivery" ? <Truck size={13} /> : <Package size={13} />}
+                  label={order.order_type === "delivery" ? "Delivery" : "Pickup — 11 Ajao Road, Ikeja"}
+                />
+                {order.order_type === "delivery" && order.delivery_address && (
+                  <InfoRow icon={<MapPin size={13} />} label={order.delivery_address} />
+                )}
+                {order.order_source && order.order_source !== "website" && (
+                  <InfoRow icon={<User size={13} />} label={`Source: ${order.order_source === "waiter" ? `Waiter (${order.placed_by || "Staff"})` : "QR Code"}`} />
+                )}
+              </>
             )}
-            <InfoRow
-              icon={<Clock size={13} />}
-              label={order.scheduled_time ? fmtTime(order.scheduled_time) : "As soon as possible"}
-            />
+            {order.order_type !== "dine-in" && (
+              <InfoRow
+                icon={<Clock size={13} />}
+                label={order.scheduled_time ? fmtTime(order.scheduled_time) : "As soon as possible"}
+              />
+            )}
           </Section>
 
           {/* Payment */}
