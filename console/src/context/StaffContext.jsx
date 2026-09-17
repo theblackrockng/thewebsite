@@ -6,7 +6,7 @@ const StaffContext = createContext(null);
 
 const SUPER_ADMIN_PERMISSIONS = {
   dashboard: true, reservations: true, enquiries: true,
-  menu: true, media: true, content: true, users: true, settings: true,
+  menu: true, media: true, content: true, users: true, settings: true, analytics: true,
 };
 
 export function StaffProvider({ children }) {

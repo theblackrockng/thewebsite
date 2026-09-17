@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useMatch } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
   Image, FileEdit, Users, UserCircle, Settings, Home, Search,
-  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop, QrCode,
+  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop, QrCode, TrendingUp,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -33,7 +33,7 @@ function useCurrentPage() {
   const map = {
     "/": "Dashboard", "/reservations": "Reservations",
     "/menu": "Menu Management", "/enquiries": "Enquiries", "/orders": "Orders",
-    "/media": "Media Library", "/gallery": "Gallery", "/content": "Site Content", "/images": "Website Images", "/tables": "Tables & QR Codes",
+    "/media": "Media Library", "/gallery": "Gallery", "/content": "Site Content", "/images": "Website Images", "/tables": "Tables & QR Codes", "/analytics": "Analytics",
     "/users": "Staff Management", "/content-hub": "Content Hub",
     "/settings": "Settings", "/blog": "Blog", "/security": "Security Log",
     "/profile": "My Profile",
@@ -52,6 +52,7 @@ const NAV_GROUPS = [
       { to: "/enquiries",    label: "Enquiries",    icon: MessageSquare,  badge: "enquiries" },
       { to: "/orders",       label: "Orders",       icon: ShoppingBag,    badge: "new_orders" },
       { to: "/tables",       label: "Tables & QR",  icon: QrCode },
+      { to: "/analytics",    label: "Analytics",    icon: TrendingUp, permKey: "analytics" },
     ],
   },
   {
@@ -185,6 +186,11 @@ function SidebarContent({ pathname, pendingCount, newEnqCount, newOrdersCount, s
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {group.items
                 .filter(item => !item.superAdminOnly || staffProfile?.role === 'super_admin')
+                .filter(item => {
+                  if (!item.permKey) return true;
+                  if (staffProfile?.role === 'super_admin') return true;
+                  return staffProfile?.permissions?.[item.permKey] === true;
+                })
                 .map(item => (
                 <NavItem key={item.label} item={item} pathname={pathname} pendingCount={pendingCount} newEnqCount={newEnqCount} newOrdersCount={newOrdersCount} onClick={onNav} />
               ))}

@@ -25,6 +25,7 @@ import Orders from "./pages/orders/Orders";
 import GalleryManager from "./pages/gallery/GalleryManager";
 import SiteImages from "./pages/images/SiteImages";
 import Tables from "./pages/tables/Tables";
+import Analytics from "./pages/analytics/Analytics";
 
 function ProtectedRoute({ children }) {
   const { session, loading } = useAuth();
@@ -48,6 +49,16 @@ function SuperAdminRoute({ children }) {
   if (!session) return <Navigate to="/login" replace />;
   if (profile?.role !== "super_admin") return <Navigate to="/" replace />;
   return children;
+}
+
+function AnalyticsRoute({ children }) {
+  const { session, loading: authLoading } = useAuth();
+  const { profile, loading: staffLoading } = useStaff();
+  if (authLoading || staffLoading) return null;
+  if (!session) return <Navigate to="/login" replace />;
+  const allowed = profile?.role === "super_admin" || profile?.permissions?.analytics === true;
+  if (!allowed) return <Navigate to="/" replace />;
+  return <Layout>{children}</Layout>;
 }
 
 function AppRoutes() {
@@ -92,6 +103,7 @@ function AppRoutes() {
       <Route path="/gallery"            element={<ProtectedRoute><GalleryManager /></ProtectedRoute>} />
       <Route path="/images"             element={<ProtectedRoute><SiteImages /></ProtectedRoute>} />
       <Route path="/tables"             element={<ProtectedRoute><Tables /></ProtectedRoute>} />
+      <Route path="/analytics"          element={<AnalyticsRoute><Analytics /></AnalyticsRoute>} />
       <Route path="/console-internal-br2026" element={<SuperAdminRoute><FeatureControl /></SuperAdminRoute>} />
       <Route path="*"                   element={<Navigate to="/" replace />} />
     </Routes>

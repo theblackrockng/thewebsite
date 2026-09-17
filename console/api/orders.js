@@ -18,15 +18,16 @@ export default async function handler(req, res) {
   const db = getDb();
   if (!db) return res.status(500).json({ error: "Server misconfiguration" });
 
-  // GET /api/orders — fetch all orders
+  // GET /api/orders — fetch orders, optional ?from=ISO&to=ISO date filters
   if (req.method === "GET") {
     try {
-      const { data, error } = await db
-        .from("orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(500);
+      const { from, to } = req.query || {};
+      let query = db.from("orders").select("*").order("created_at", { ascending: false });
+      if (from) query = query.gte("created_at", from);
+      if (to)   query = query.lte("created_at", to);
+      if (!from && !to) query = query.limit(500);
 
+      const { data, error } = await query;
       if (error) throw error;
       return res.status(200).json({ ok: true, data });
     } catch (err) {

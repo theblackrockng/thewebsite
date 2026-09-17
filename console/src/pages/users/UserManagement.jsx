@@ -13,6 +13,7 @@ const PERMISSIONS = [
   { key: "content",      label: "Content" },
   { key: "users",        label: "Users" },
   { key: "settings",     label: "Settings" },
+  { key: "analytics",    label: "Analytics" },
 ];
 
 const DEFAULT_PERMS = {
