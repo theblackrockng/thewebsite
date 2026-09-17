@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from "react-router-dom";
 
 import "@/App.css";
 
@@ -36,7 +36,10 @@ import BarDisplay from "./pages/BarDisplay";
 
 function OrderRoute({ children }) {
   const { orderingEnabled, loading } = useFeatureFlags();
+  const [searchParams] = useSearchParams();
   if (loading) return null;
+  // QR dine-in scans always get through regardless of the ordering flag
+  if (searchParams.get("table")) return children;
   if (!orderingEnabled) return <Navigate to="/" replace />;
   return children;
 }

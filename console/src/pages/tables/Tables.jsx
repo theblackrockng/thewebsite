@@ -35,9 +35,10 @@ function makeQR(url, size = 240) {
   });
 }
 
-function getTableUrl(slug) {
-  const base = typeof window !== "undefined" ? `${window.location.protocol}//${window.location.host.replace("console.", "").replace(":5173", ":3000")}` : "";
-  return `${base}/order?table=${slug}`;
+function getTableUrl(table) {
+  const host = typeof window !== "undefined" ? window.location.host.replace("console.", "").replace(":5173", ":3000") : "";
+  const base = typeof window !== "undefined" ? `${window.location.protocol}//${host}` : "";
+  return `${base}/order?table=${table.table_number}`;
 }
 
 /* ── tiny helpers ── */
@@ -77,7 +78,7 @@ const btn = (variant = "primary") => ({
 function QRModal({ table, onClose }) {
   const containerRef = useRef(null);
   const qrRef = useRef(null);
-  const url = getTableUrl(table.qr_slug);
+  const url = getTableUrl(table);
 
   useEffect(() => {
     qrRef.current = makeQR(url, 260);
@@ -309,7 +310,7 @@ function TableRow({ table, onEdit, onDelete, onQR }) {
   const qrInstance = useRef(null);
 
   useEffect(() => {
-    const url = getTableUrl(table.qr_slug);
+    const url = getTableUrl(table);
     qrInstance.current = makeQR(url, 56);
     if (miniRef.current) {
       miniRef.current.innerHTML = "";
@@ -347,7 +348,7 @@ function TableRow({ table, onEdit, onDelete, onQR }) {
 
       {/* URL */}
       <div style={{ fontSize: 11.5, color: "var(--ds-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-        {getTableUrl(table.qr_slug)}
+        {getTableUrl(table)}
       </div>
 
       {/* Active */}
