@@ -20,11 +20,12 @@ const DEFAULT_PERMS = {
   menu: false, media: false, content: false, users: false, settings: false,
 };
 
-const ROLE_OPTIONS = ["staff", "manager", "content_creator", "social_media_manager", "super_admin"];
+const ROLE_OPTIONS = ["waiter", "staff", "manager", "content_creator", "social_media_manager", "super_admin"];
 
 const ROLE_COLORS = {
   super_admin:          { bg: "rgba(200,169,110,0.15)", text: "var(--ds-gold)",  label: "Super Admin" },
   manager:              { bg: "rgba(99,179,237,0.15)",  text: "#63b3ed",         label: "Manager" },
+  waiter:               { bg: "rgba(251,146,60,0.15)",  text: "#fb923c",         label: "Waiter" },
   content_creator:      { bg: "rgba(139,92,246,0.15)",  text: "#a78bfa",         label: "Content Creator" },
   social_media_manager: { bg: "rgba(236,72,153,0.13)",  text: "#f472b6",         label: "Social Media Manager" },
   staff:                { bg: "rgba(160,174,192,0.12)", text: "var(--ds-muted)", label: "Staff" },
@@ -32,7 +33,10 @@ const ROLE_COLORS = {
 
 const CONTENT_ONLY_PERMS = { ...Object.fromEntries(Object.keys(DEFAULT_PERMS).map(k => [k, false])), dashboard: true, content: true, media: true };
 
+const WAITER_PERMS = Object.fromEntries(Object.keys(DEFAULT_PERMS).map(k => [k, false]));
+
 const ROLE_PRESETS = {
+  waiter:               WAITER_PERMS,
   content_creator:      CONTENT_ONLY_PERMS,
   social_media_manager: CONTENT_ONLY_PERMS,
 };

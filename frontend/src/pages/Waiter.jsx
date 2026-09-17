@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { MENU } from "../lib/data";
-import PinGate from "../components/PinGate";
-import { Plus, Minus, X, Check, ChevronLeft, UtensilsCrossed, AlertCircle } from "lucide-react";
+import { Plus, Minus, X, Check, ChevronLeft, UtensilsCrossed, AlertCircle, LogOut } from "lucide-react";
 
 /* ── Constants (same as Order.jsx) ────────────────────────────────── */
 const FOOD_CATEGORY_ORDER = [
@@ -55,53 +54,129 @@ function useMenu() {
   return { foodData, drinkData };
 }
 
+/* ── Allowed roles for the waiter app ───────────────────────────────── */
+const WAITER_ROLES = ["waiter", "staff", "manager", "super_admin"];
+
 /* ── Main export ────────────────────────────────────────────────────── */
 export default function Waiter() {
-  return (
-    <PinGate storageKey="waiter">
-      <WaiterSession />
-    </PinGate>
-  );
+  return <WaiterAuth />;
 }
 
-function WaiterSession() {
-  const [waiterName, setWaiterName] = useState(() => {
-    try { return sessionStorage.getItem("br_waiter_name") || ""; } catch { return ""; }
-  });
-  const [nameInput, setNameInput] = useState("");
+function WaiterAuth() {
+  const [profile, setProfile] = useState(null); // { id, name, role }
+  const [bootLoading, setBootLoading] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [signingIn, setSigningIn] = useState(false);
 
-  if (!waiterName) {
+  async function loadProfile(userId) {
+    const { data } = await supabase
+      .from("staff_profiles")
+      .select("id, full_name, role")
+      .eq("id", userId)
+      .maybeSingle();
+    if (data && WAITER_ROLES.includes(data.role)) {
+      setProfile({ id: data.id, name: data.full_name || "Waiter", role: data.role });
+      return true;
+    }
+    return false;
+  }
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) await loadProfile(session.user.id);
+      setBootLoading(false);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, session) => {
+      if (session?.user) { await loadProfile(session.user.id); }
+      else { setProfile(null); }
+    });
+    return () => subscription.unsubscribe();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleSignIn(e) {
+    e.preventDefault();
+    setError("");
+    setSigningIn(true);
+    try {
+      const { data, error: authErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+      if (authErr) { setError("Incorrect email or password."); return; }
+      const valid = await loadProfile(data.user.id);
+      if (!valid) {
+        await supabase.auth.signOut();
+        setError("Your account doesn't have waiter access. Contact your manager.");
+      }
+    } finally {
+      setSigningIn(false);
+    }
+  }
+
+  async function handleSignOut() {
+    await supabase.auth.signOut();
+    setProfile(null);
+    setEmail("");
+    setPassword("");
+  }
+
+  if (bootLoading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#0f0d0a", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <div style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 12, padding: 40, width: "100%", maxWidth: 380, display: "flex", flexDirection: "column", gap: 0 }}>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 700, letterSpacing: "4px", color: "#c8a96e", textTransform: "uppercase", marginBottom: 8 }}>BLACKROCK</div>
-          <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 700, color: "#F5F0E8", margin: "0 0 6px" }}>Waiter Mode</h2>
-          <p style={{ fontSize: 13, color: "#9C8E7A", margin: "0 0 24px", lineHeight: 1.5 }}>Enter your name to start taking orders.</p>
-          <input
-            type="text"
-            value={nameInput}
-            onChange={(e) => setNameInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && nameInput.trim()) { sessionStorage.setItem("br_waiter_name", nameInput.trim()); setWaiterName(nameInput.trim()); } }}
-            placeholder="Your name"
-            style={{ background: "#2e2820", border: "1px solid #3e3426", borderRadius: 7, padding: "12px 14px", fontSize: 14, color: "#F5F0E8", outline: "none", marginBottom: 16, fontFamily: "inherit" }}
-            autoFocus
-          />
-          <button
-            onClick={() => { if (nameInput.trim()) { sessionStorage.setItem("br_waiter_name", nameInput.trim()); setWaiterName(nameInput.trim()); } }}
-            disabled={!nameInput.trim()}
-            style={{ padding: "13px 20px", borderRadius: 7, border: "none", background: nameInput.trim() ? "#c8a96e" : "#2e2820", color: nameInput.trim() ? "#0f0d0a" : "#5a4e46", fontSize: 13, fontWeight: 700, cursor: nameInput.trim() ? "pointer" : "not-allowed", fontFamily: "inherit" }}
-          >
-            Continue
-          </button>
-        </div>
+      <div style={{ minHeight: "100vh", background: "#0f0d0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <div style={{ fontSize: 11, color: "#9C8E7A", letterSpacing: "0.2em", textTransform: "uppercase" }}>Loading…</div>
       </div>
     );
   }
 
-  return <WaiterApp waiterName={waiterName} onChangeName={() => { sessionStorage.removeItem("br_waiter_name"); setWaiterName(""); }} />;
+  if (!profile) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#0f0d0a", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <form onSubmit={handleSignIn} style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 14, padding: "40px 36px", width: "100%", maxWidth: 400, display: "flex", flexDirection: "column" }}>
+          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 17, fontWeight: 700, letterSpacing: "4px", color: "#c8a96e", textTransform: "uppercase", marginBottom: 6 }}>BLACKROCK</div>
+          <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 700, color: "#F5F0E8", margin: "0 0 6px" }}>Waiter Sign In</h2>
+          <p style={{ fontSize: 13, color: "#9C8E7A", margin: "0 0 28px", lineHeight: 1.5 }}>Sign in with your staff account to start taking orders.</p>
+
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#9C8E7A", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>Email</label>
+          <input
+            type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@blackrock.com" required autoFocus
+            style={{ background: "#251f19", border: "1px solid #3e3426", borderRadius: 7, padding: "12px 14px", fontSize: 14, color: "#F5F0E8", outline: "none", marginBottom: 16, fontFamily: "inherit" }}
+          />
+
+          <label style={{ fontSize: 11, fontWeight: 600, color: "#9C8E7A", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>Password</label>
+          <input
+            type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••" required
+            style={{ background: "#251f19", border: "1px solid #3e3426", borderRadius: 7, padding: "12px 14px", fontSize: 14, color: "#F5F0E8", outline: "none", marginBottom: error ? 14 : 24, fontFamily: "inherit" }}
+          />
+
+          {error && (
+            <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 7, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#ef4444", lineHeight: 1.5 }}>
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={signingIn || !email.trim() || !password}
+            style={{
+              padding: "14px 20px", borderRadius: 7, border: "none",
+              background: (signingIn || !email.trim() || !password) ? "#2e2820" : "#c8a96e",
+              color: (signingIn || !email.trim() || !password) ? "#5a4e46" : "#0f0d0a",
+              fontSize: 13, fontWeight: 700, cursor: (signingIn || !email.trim() || !password) ? "not-allowed" : "pointer",
+              fontFamily: "inherit", letterSpacing: "0.04em",
+            }}
+          >
+            {signingIn ? "Signing in…" : "Sign In"}
+          </button>
+        </form>
+      </div>
+    );
+  }
+
+  return <WaiterApp waiterName={profile.name} waiterRole={profile.role} onSignOut={handleSignOut} />;
 }
 
-function WaiterApp({ waiterName, onChangeName }) {
+function WaiterApp({ waiterName, waiterRole, onSignOut }) {
   const [stage, setStage] = useState("table"); // table | menu | confirm | done
   const [tables, setTables] = useState([]);
   const [selectedTable, setSelectedTable] = useState(null);
@@ -174,8 +249,8 @@ function WaiterApp({ waiterName, onChangeName }) {
               <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 700, letterSpacing: "3px", color: "#c8a96e", textTransform: "uppercase" }}>BLACKROCK</div>
               <div style={{ fontSize: 12, color: "#9C8E7A", marginTop: 2 }}>Waiter: <strong style={{ color: "#F5F0E8" }}>{waiterName}</strong></div>
             </div>
-            <button onClick={onChangeName} style={{ background: "transparent", border: "1px solid #2e2820", borderRadius: 6, padding: "6px 12px", color: "#9C8E7A", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
-              Change Name
+            <button onClick={onSignOut} style={{ display: "flex", alignItems: "center", gap: 6, background: "transparent", border: "1px solid #2e2820", borderRadius: 6, padding: "6px 12px", color: "#9C8E7A", fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              <LogOut size={12} /> Sign Out
             </button>
           </div>
 

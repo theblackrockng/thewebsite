@@ -150,8 +150,15 @@ function SidebarContent({ pathname, pendingCount, newEnqCount, newOrdersCount, s
   const initials = name.slice(0, 2).toUpperCase() || "BK";
   const role     = staffProfile?.role ?? "staff";
 
-  const roleLabel  = role === "super_admin" ? "Super Admin" : role === "manager" ? "Manager" : "Staff";
-  const roleColor  = role === "super_admin" ? "var(--ds-gold)" : role === "manager" ? "#63b3ed" : "var(--ds-muted)";
+  const ROLE_META = {
+    super_admin: { label: "Super Admin", color: "var(--ds-gold)" },
+    manager:     { label: "Manager",     color: "#63b3ed" },
+    waiter:      { label: "Waiter",      color: "#fb923c" },
+    content_creator:      { label: "Content Creator",      color: "#a78bfa" },
+    social_media_manager: { label: "Social Media Manager", color: "#f472b6" },
+  };
+  const roleLabel  = ROLE_META[role]?.label ?? "Staff";
+  const roleColor  = ROLE_META[role]?.color ?? "var(--ds-muted)";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
