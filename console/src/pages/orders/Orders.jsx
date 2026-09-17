@@ -357,6 +357,7 @@ export default function Orders() {
 
   // Filter + search
   const filtered = orders.filter((o) => {
+    if (viewMode === "online" && o.order_type === "dine-in") return false;
     if (activeFilter !== "all" && o.order_status !== activeFilter) return false;
     if (search.trim()) {
       const q = search.toLowerCase();
@@ -403,35 +404,39 @@ export default function Orders() {
       {/* View mode toggle */}
       <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "var(--ds-surface)", border: "1px solid var(--ds-border)", borderRadius: 8, padding: 4, width: "fit-content" }}>
         {[
-          { key: "all",    label: "All Orders",    icon: <Package size={13} /> },
-          { key: "tables", label: "Table Orders",  icon: <UtensilsCrossed size={13} /> },
-        ].map(({ key, label, icon }) => (
-          <button
-            key={key}
-            onClick={() => setViewMode(key)}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              padding: "7px 16px", borderRadius: 6,
-              fontSize: 12.5, fontWeight: viewMode === key ? 600 : 500,
-              background: viewMode === key ? "var(--ds-gold)" : "transparent",
-              color: viewMode === key ? "#1a1a1a" : "var(--ds-muted)",
-              border: "none", cursor: "pointer",
-              fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
-            }}
-          >
-            {icon} {label}
-            {key === "tables" && orders.filter(o => o.order_type === "dine-in").length > 0 && (
-              <span style={{
-                fontSize: 10, fontWeight: 700,
-                background: viewMode === "tables" ? "rgba(0,0,0,0.2)" : "var(--ds-input-bg)",
-                color: viewMode === "tables" ? "#1a1a1a" : "var(--ds-text)",
-                padding: "1px 5px", borderRadius: 99,
-              }}>
-                {orders.filter(o => o.order_type === "dine-in").length}
-              </span>
-            )}
-          </button>
-        ))}
+          { key: "all",     label: "All Orders",     icon: <Package size={13} />,         countFn: () => orders.length },
+          { key: "tables",  label: "Table Orders",   icon: <UtensilsCrossed size={13} />, countFn: () => orders.filter(o => o.order_type === "dine-in").length },
+          { key: "online",  label: "Online Orders",  icon: <Truck size={13} />,           countFn: () => orders.filter(o => o.order_type !== "dine-in").length },
+        ].map(({ key, label, icon, countFn }) => {
+          const count = countFn();
+          return (
+            <button
+              key={key}
+              onClick={() => setViewMode(key)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "7px 16px", borderRadius: 6,
+                fontSize: 12.5, fontWeight: viewMode === key ? 600 : 500,
+                background: viewMode === key ? "var(--ds-gold)" : "transparent",
+                color: viewMode === key ? "#1a1a1a" : "var(--ds-muted)",
+                border: "none", cursor: "pointer",
+                fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
+              }}
+            >
+              {icon} {label}
+              {count > 0 && (
+                <span style={{
+                  fontSize: 10, fontWeight: 700,
+                  background: viewMode === key ? "rgba(0,0,0,0.2)" : "var(--ds-input-bg)",
+                  color: viewMode === key ? "#1a1a1a" : "var(--ds-text)",
+                  padding: "1px 5px", borderRadius: 99,
+                }}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       {viewMode === "tables" && (
@@ -445,7 +450,7 @@ export default function Orders() {
         />
       )}
 
-      {viewMode === "all" && <>
+      {(viewMode === "all" || viewMode === "online") && <>
 
       {/* Summary cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
