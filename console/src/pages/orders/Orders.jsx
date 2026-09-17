@@ -3,7 +3,7 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../context/AuthContext";
 import {
   Package, Truck, Search, RefreshCw, Loader2, X,
-  Phone, Mail, MapPin, Clock, UtensilsCrossed, ChevronRight, UserCheck, QrCode, User,
+  Phone, Mail, MapPin, Clock, UtensilsCrossed, ChevronRight, UserCheck, QrCode, User, CreditCard, CheckCircle2,
 } from "lucide-react";
 
 /* ─── Constants ─── */
@@ -228,6 +228,7 @@ export default function Orders() {
   const [actionLoading, setActionLoading] = useState(false);
   const [counts, setCounts] = useState({ new: 0, confirmed: 0, preparing: 0, ready: 0, completed_today: 0 });
   const [fetchError, setFetchError] = useState(null);
+  const [viewMode, setViewMode] = useState("all"); // "all" | "tables"
 
   useEffect(() => {
     if (!session?.user?.id) return;
@@ -376,7 +377,7 @@ export default function Orders() {
   return (
     <div style={{ padding: "28px 24px", maxWidth: 1400, margin: "0 auto" }}>
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 20, flexWrap: "wrap", gap: 12 }}>
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "var(--ds-text)", margin: "0 0 4px", fontFamily: "'Cormorant Garamond', serif", letterSpacing: "0.5px" }}>
             Orders
@@ -398,6 +399,53 @@ export default function Orders() {
           Refresh
         </button>
       </div>
+
+      {/* View mode toggle */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 20, background: "var(--ds-surface)", border: "1px solid var(--ds-border)", borderRadius: 8, padding: 4, width: "fit-content" }}>
+        {[
+          { key: "all",    label: "All Orders",    icon: <Package size={13} /> },
+          { key: "tables", label: "Table Orders",  icon: <UtensilsCrossed size={13} /> },
+        ].map(({ key, label, icon }) => (
+          <button
+            key={key}
+            onClick={() => setViewMode(key)}
+            style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "7px 16px", borderRadius: 6,
+              fontSize: 12.5, fontWeight: viewMode === key ? 600 : 500,
+              background: viewMode === key ? "var(--ds-gold)" : "transparent",
+              color: viewMode === key ? "#1a1a1a" : "var(--ds-muted)",
+              border: "none", cursor: "pointer",
+              fontFamily: "'DM Sans', sans-serif", whiteSpace: "nowrap",
+            }}
+          >
+            {icon} {label}
+            {key === "tables" && orders.filter(o => o.order_type === "dine-in").length > 0 && (
+              <span style={{
+                fontSize: 10, fontWeight: 700,
+                background: viewMode === "tables" ? "rgba(0,0,0,0.2)" : "var(--ds-input-bg)",
+                color: viewMode === "tables" ? "#1a1a1a" : "var(--ds-text)",
+                padding: "1px 5px", borderRadius: 99,
+              }}>
+                {orders.filter(o => o.order_type === "dine-in").length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {viewMode === "tables" && (
+        <TableOrdersView
+          orders={orders}
+          loading={loading}
+          onOpenOrder={openOrder}
+          onMarkPaid={(id) => updatePaymentStatus(id, "paid")}
+          onMarkComplete={(id) => updateStatus(id, "completed")}
+          actionLoading={actionLoading}
+        />
+      )}
+
+      {viewMode === "all" && <>
 
       {/* Summary cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12, marginBottom: 24 }}>
@@ -535,6 +583,8 @@ export default function Orders() {
         )}
       </div>
 
+      </>}
+
       {/* Detail panel */}
       {selectedOrder && (
         <OrderDetailPanel
@@ -556,11 +606,227 @@ export default function Orders() {
   );
 }
 
+/* ─── Table Orders View ─── */
+function TableOrdersView({ orders, loading, onOpenOrder, onMarkPaid, onMarkComplete, actionLoading }) {
+  const tableOrders = orders
+    .filter((o) => o.order_type === "dine-in")
+    .sort((a, b) => a.table_number - b.table_number || new Date(b.created_at) - new Date(a.created_at));
+
+  const byTable = tableOrders.reduce((acc, o) => {
+    const t = o.table_number || 0;
+    if (!acc[t]) acc[t] = [];
+    acc[t].push(o);
+    return acc;
+  }, {});
+
+  const tableNums = Object.keys(byTable).map(Number).sort((a, b) => a - b);
+
+  if (loading && tableOrders.length === 0) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: 10, color: "var(--ds-muted)" }}>
+        <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+        <span style={{ fontSize: 13 }}>Loading table orders…</span>
+      </div>
+    );
+  }
+
+  if (tableOrders.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "80px 0" }}>
+        <UtensilsCrossed size={40} style={{ color: "var(--ds-border)", marginBottom: 14 }} />
+        <p style={{ fontSize: 13, color: "var(--ds-muted)", margin: 0 }}>No dine-in table orders yet.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+      {tableNums.map((tableNum) => {
+        const tableOrderList = byTable[tableNum];
+        const activeOrders = tableOrderList.filter((o) => !["completed", "cancelled"].includes(o.order_status));
+        const allPaid = tableOrderList.every((o) => o.payment_status === "paid");
+        const anyUnpaid = tableOrderList.some((o) => o.payment_status !== "paid" && o.payment_status !== "failed");
+
+        return (
+          <div key={tableNum} style={{ background: "var(--ds-surface)", border: "1px solid var(--ds-border)", borderRadius: 12, overflow: "hidden" }}>
+            {/* Table header */}
+            <div style={{
+              background: "var(--ds-input-bg)",
+              padding: "14px 20px",
+              borderBottom: "1px solid var(--ds-border)",
+              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: 8,
+                  background: "rgba(200,169,110,0.12)", border: "1px solid rgba(200,169,110,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <UtensilsCrossed size={16} style={{ color: "var(--ds-gold)" }} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: "var(--ds-text)" }}>Table {tableNum}</div>
+                  <div style={{ fontSize: 12, color: "var(--ds-muted)" }}>
+                    {tableOrderList.length} order{tableOrderList.length !== 1 ? "s" : ""} · {activeOrders.length} active
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: "3px 10px", borderRadius: 99,
+                  background: allPaid ? "rgba(34,197,94,0.1)" : "rgba(245,158,11,0.1)",
+                  color: allPaid ? "#22c55e" : "#d97706",
+                  border: `1px solid ${allPaid ? "rgba(34,197,94,0.25)" : "rgba(245,158,11,0.25)"}`,
+                }}>
+                  {allPaid ? "Paid" : "Unpaid"}
+                </span>
+                {anyUnpaid && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); tableOrderList.forEach((o) => { if (o.payment_status !== "paid") onMarkPaid(o.id); }); }}
+                    disabled={actionLoading}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      padding: "7px 14px", borderRadius: 7,
+                      background: "#22c55e", border: "none",
+                      color: "#fff", fontSize: 12, fontWeight: 700,
+                      cursor: actionLoading ? "not-allowed" : "pointer",
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    <CreditCard size={13} /> Mark Table Paid
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Orders list */}
+            <div style={{ display: "flex", flexDirection: "column", divide: "border" }}>
+              {tableOrderList.map((order, idx) => (
+                <TableOrderRow
+                  key={order.id}
+                  order={order}
+                  isLast={idx === tableOrderList.length - 1}
+                  onOpen={() => onOpenOrder(order)}
+                  onMarkPaid={() => onMarkPaid(order.id)}
+                  onMarkComplete={() => onMarkComplete(order.id)}
+                  actionLoading={actionLoading}
+                />
+              ))}
+            </div>
+
+            {/* Table total */}
+            <div style={{ padding: "12px 20px", borderTop: "1px solid var(--ds-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontSize: 12, color: "var(--ds-muted)" }}>Table Total</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "var(--ds-gold)" }}>
+                {fmtPrice(tableOrderList.reduce((s, o) => s + Number(o.total || 0), 0))}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TableOrderRow({ order, isLast, onOpen, onMarkPaid, onMarkComplete, actionLoading }) {
+  const statusCfg = STATUS_CFG[order.order_status] ?? STATUS_CFG.new;
+  const isPaid = order.payment_status === "paid";
+  const isCompleted = order.order_status === "completed" || order.order_status === "cancelled";
+  const canComplete = order.order_status === "ready";
+
+  return (
+    <div style={{
+      padding: "14px 20px",
+      borderBottom: isLast ? "none" : "1px solid var(--ds-border)",
+      display: "flex", alignItems: "flex-start", gap: 14, flexWrap: "wrap",
+    }}>
+      {/* Order info */}
+      <div style={{ flex: 1, minWidth: 200, cursor: "pointer" }} onClick={onOpen}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <span style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ds-text)" }}>
+            {order.order_number || order.id.slice(0, 8)}
+          </span>
+          <span style={{ fontSize: 11, color: "var(--ds-muted)" }}>{timeAgo(order.created_at)}</span>
+          <span style={{
+            display: "inline-flex", alignItems: "center",
+            background: statusCfg.bg, color: statusCfg.color, border: `1px solid ${statusCfg.border}`,
+            borderRadius: 99, padding: "2px 8px", fontSize: 10, fontWeight: 600,
+          }}>
+            {statusCfg.label}
+          </span>
+          <SourceBadge source={order.order_source || "qr"} />
+        </div>
+        <div style={{ fontSize: 12, color: "var(--ds-muted)" }}>
+          {order.item_count ?? "—"} item{(order.item_count ?? 0) !== 1 ? "s" : ""} · {fmtPrice(order.total)}
+          {order.special_instructions && (
+            <span style={{ color: "#d97706", marginLeft: 8, fontStyle: "italic" }}>
+              · "{order.special_instructions}"
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
+        {!isPaid && !isCompleted && (
+          <button
+            onClick={onMarkPaid}
+            disabled={actionLoading}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "6px 12px", borderRadius: 6,
+              background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.25)",
+              color: "#22c55e", fontSize: 11.5, fontWeight: 600,
+              cursor: actionLoading ? "not-allowed" : "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            <CreditCard size={12} /> Mark Paid
+          </button>
+        )}
+        {isPaid && (
+          <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11.5, color: "#22c55e", fontWeight: 600 }}>
+            <CheckCircle2 size={13} /> Paid
+          </span>
+        )}
+        {canComplete && (
+          <button
+            onClick={onMarkComplete}
+            disabled={actionLoading}
+            style={{
+              display: "flex", alignItems: "center", gap: 5,
+              padding: "6px 12px", borderRadius: 6,
+              background: "var(--ds-gold)", border: "none",
+              color: "#1a1a1a", fontSize: 11.5, fontWeight: 600,
+              cursor: actionLoading ? "not-allowed" : "pointer",
+              fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            Complete
+          </button>
+        )}
+        <button
+          onClick={onOpen}
+          style={{
+            display: "flex", alignItems: "center",
+            padding: "6px 8px", borderRadius: 6,
+            background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)",
+            color: "var(--ds-muted)", cursor: "pointer",
+          }}
+        >
+          <ChevronRight size={14} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Order detail panel ─── */
 function OrderDetailPanel({ order, items, itemsLoading, onClose, onStatusUpdate, onPaymentUpdate, onCancel, actionLoading }) {
   const flow = STATUS_FLOW[order.order_status] || {};
   const canCancel = order.order_status !== "completed" && order.order_status !== "cancelled";
   const payStatus = order.payment_status;
+  const isDineIn = order.order_type === "dine-in";
   const isProofReceived = payStatus === "proof_received" || payStatus === "paid";
   const isPaymentConfirmed = payStatus === "paid";
 
@@ -668,78 +934,123 @@ function OrderDetailPanel({ order, items, itemsLoading, onClose, onStatusUpdate,
               <span style={{ fontSize: 13, color: "var(--ds-text)", fontWeight: 600 }}>{fmtPrice(order.total)}</span>
             </div>
 
-            {/* Step 1 — WhatsApp proof */}
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-              padding: "10px 12px", borderRadius: 8, marginBottom: 8,
-              background: isProofReceived ? "rgba(34,197,94,0.06)" : "var(--ds-input-bg)",
-              border: `1px solid ${isProofReceived ? "rgba(34,197,94,0.2)" : "var(--ds-border)"}`,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <div style={{
-                  width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-                  background: isProofReceived ? "#22c55e" : "var(--ds-border)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  {isProofReceived && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}
+            {isDineIn ? (
+              /* Dine-in: single "Mark Paid" button */
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                padding: "12px 14px", borderRadius: 8,
+                background: isPaymentConfirmed ? "rgba(34,197,94,0.06)" : "var(--ds-input-bg)",
+                border: `1px solid ${isPaymentConfirmed ? "rgba(34,197,94,0.2)" : "var(--ds-border)"}`,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{
+                    width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                    background: isPaymentConfirmed ? "#22c55e" : "var(--ds-border)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {isPaymentConfirmed && <span style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>✓</span>}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ds-text)" }}>
+                      {isPaymentConfirmed ? "Payment Settled" : "Pay at Table"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "var(--ds-muted)" }}>
+                      {isPaymentConfirmed ? "Customer has paid" : "Customer pays in person"}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ds-text)" }}>WhatsApp Proof</div>
-                  <div style={{ fontSize: 11, color: "var(--ds-muted)" }}>Customer sent payment screenshot</div>
-                </div>
+                {!isPaymentConfirmed && (
+                  <button
+                    onClick={() => onPaymentUpdate(order.id, "paid")}
+                    disabled={actionLoading}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 5,
+                      padding: "7px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                      background: "#22c55e", border: "none", color: "#fff",
+                      cursor: actionLoading ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                      fontFamily: "'DM Sans', sans-serif",
+                    }}
+                  >
+                    <CreditCard size={12} /> Mark Paid
+                  </button>
+                )}
               </div>
-              {!isProofReceived && (
-                <button
-                  onClick={() => onPaymentUpdate(order.id, "proof_received")}
-                  disabled={actionLoading}
-                  style={{
-                    padding: "5px 10px", borderRadius: 6, fontSize: 11.5, fontWeight: 600,
-                    background: "var(--ds-gold)", border: "none", color: "#1a1a1a",
-                    cursor: actionLoading ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-                    fontFamily: "'DM Sans', sans-serif",
-                  }}
-                >
-                  Mark Received
-                </button>
-              )}
-            </div>
+            ) : (
+              <>
+                {/* Step 1 — WhatsApp proof */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                  padding: "10px 12px", borderRadius: 8, marginBottom: 8,
+                  background: isProofReceived ? "rgba(34,197,94,0.06)" : "var(--ds-input-bg)",
+                  border: `1px solid ${isProofReceived ? "rgba(34,197,94,0.2)" : "var(--ds-border)"}`,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                      background: isProofReceived ? "#22c55e" : "var(--ds-border)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {isProofReceived && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ds-text)" }}>WhatsApp Proof</div>
+                      <div style={{ fontSize: 11, color: "var(--ds-muted)" }}>Customer sent payment screenshot</div>
+                    </div>
+                  </div>
+                  {!isProofReceived && (
+                    <button
+                      onClick={() => onPaymentUpdate(order.id, "proof_received")}
+                      disabled={actionLoading}
+                      style={{
+                        padding: "5px 10px", borderRadius: 6, fontSize: 11.5, fontWeight: 600,
+                        background: "var(--ds-gold)", border: "none", color: "#1a1a1a",
+                        cursor: actionLoading ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}
+                    >
+                      Mark Received
+                    </button>
+                  )}
+                </div>
 
-            {/* Step 2 — Bank confirmation */}
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-              padding: "10px 12px", borderRadius: 8,
-              background: isPaymentConfirmed ? "rgba(34,197,94,0.06)" : isProofReceived ? "var(--ds-input-bg)" : "rgba(0,0,0,0.1)",
-              border: `1px solid ${isPaymentConfirmed ? "rgba(34,197,94,0.2)" : "var(--ds-border)"}`,
-              opacity: isProofReceived ? 1 : 0.5,
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {/* Step 2 — Bank confirmation */}
                 <div style={{
-                  width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
-                  background: isPaymentConfirmed ? "#22c55e" : "var(--ds-border)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
+                  display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                  padding: "10px 12px", borderRadius: 8,
+                  background: isPaymentConfirmed ? "rgba(34,197,94,0.06)" : isProofReceived ? "var(--ds-input-bg)" : "rgba(0,0,0,0.1)",
+                  border: `1px solid ${isPaymentConfirmed ? "rgba(34,197,94,0.2)" : "var(--ds-border)"}`,
+                  opacity: isProofReceived ? 1 : 0.5,
                 }}>
-                  {isPaymentConfirmed && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                      background: isPaymentConfirmed ? "#22c55e" : "var(--ds-border)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {isPaymentConfirmed && <span style={{ color: "#fff", fontSize: 11, fontWeight: 700 }}>✓</span>}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ds-text)" }}>Bank Confirmation</div>
+                      <div style={{ fontSize: 11, color: "var(--ds-muted)" }}>Payment verified in bank account</div>
+                    </div>
+                  </div>
+                  {isProofReceived && !isPaymentConfirmed && (
+                    <button
+                      onClick={() => onPaymentUpdate(order.id, "paid")}
+                      disabled={actionLoading}
+                      style={{
+                        padding: "5px 10px", borderRadius: 6, fontSize: 11.5, fontWeight: 600,
+                        background: "#22c55e", border: "none", color: "#fff",
+                        cursor: actionLoading ? "not-allowed" : "pointer", whiteSpace: "nowrap",
+                        fontFamily: "'DM Sans', sans-serif",
+                      }}
+                    >
+                      Confirm Payment
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ds-text)" }}>Bank Confirmation</div>
-                  <div style={{ fontSize: 11, color: "var(--ds-muted)" }}>Payment verified in bank account</div>
-                </div>
-              </div>
-              {isProofReceived && !isPaymentConfirmed && (
-                <button
-                  onClick={() => onPaymentUpdate(order.id, "paid")}
-                  disabled={actionLoading}
-                  style={{
-                    padding: "5px 10px", borderRadius: 6, fontSize: 11.5, fontWeight: 600,
-                    background: "#22c55e", border: "none", color: "#fff",
-                    cursor: actionLoading ? "not-allowed" : "pointer", whiteSpace: "nowrap",
-                    fontFamily: "'DM Sans', sans-serif",
-                  }}
-                >
-                  Confirm Payment
-                </button>
-              )}
-            </div>
+              </>
+            )}
           </Section>
 
           {/* Items */}

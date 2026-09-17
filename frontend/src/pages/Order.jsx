@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Plus, Minus, ShoppingBag, X, Check, UtensilsCrossed } from "lucide-react";
+import { Plus, Minus, ShoppingBag, X, Check, UtensilsCrossed, ChefHat } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { MENU } from "../lib/data";
 import { useCart } from "../context/CartContext";
@@ -34,7 +34,7 @@ function slugify(str) {
 }
 
 export default function Order() {
-  const { items: cartItems, addItem, setQty, totalItems, subtotal, setDrawerOpen } = useCart();
+  const { items: cartItems, addItem, setQty, clearCart, totalItems, subtotal, setDrawerOpen } = useCart();
   const { tableNumber, tableValid, setTable } = useTable();
   const [searchParams] = useSearchParams();
 
@@ -45,6 +45,10 @@ export default function Order() {
   const [activeDrinkCat, setActiveDrinkCat] = useState(DRINK_CATEGORY_ORDER[0]);
   const [soupModal, setSoupModal] = useState(null); // dish object when open
   const [traditionalModal, setTraditionalModal] = useState(null); // swallow-only picker
+
+  const [placing, setPlacing] = useState(false);
+  const [orderConfirmed, setOrderConfirmed] = useState(null);
+  const [placeError, setPlaceError] = useState("");
 
   const foodSectionRefs = useRef({});
   const drinkSectionRefs = useRef({});
@@ -182,6 +186,44 @@ export default function Order() {
 
   const getCartItem = useCallback((id) => cartItems.find((i) => i.id === id), [cartItems]);
   const getNationalCartItems = useCallback((id) => cartItems.filter((i) => i.baseId === id), [cartItems]);
+
+  async function handleConfirmOrder() {
+    if (totalItems === 0 || placing) return;
+    setPlaceError("");
+    setPlacing(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderType: "dine-in",
+          tableNumber,
+          orderSource: "qr",
+          placedBy: "guest",
+          guestName: `Table ${tableNumber}`,
+          guestPhone: "—",
+          items: cartItems.map((i) => ({
+            id: i.id,
+            name: i.name,
+            price: i.price,
+            qty: i.qty,
+            menuType: i.menuType || "food",
+          })),
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        clearCart();
+        setOrderConfirmed(json.orderNumber || "Received");
+      } else {
+        setPlaceError(json.error || "Failed to place order. Please try again.");
+      }
+    } catch {
+      setPlaceError("Network error. Please try again.");
+    } finally {
+      setPlacing(false);
+    }
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--charcoal, #0f0d0a)" }}>
@@ -405,36 +447,142 @@ export default function Order() {
         />
       )}
 
-      {/* Floating cart bar */}
-      {totalItems > 0 && (
-        <div
-          style={{
+      {/* Floating bar — dine-in: Confirm Order / regular: View Cart */}
+      {totalItems > 0 && !orderConfirmed && (
+        tableValid ? (
+          <div style={{
             position: "fixed",
             bottom: 24,
             left: "50%",
             transform: "translateX(-50%)",
             zIndex: 100,
-            background: "var(--gold, #C9A84C)",
-            borderRadius: 99,
-            padding: "14px 24px",
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
-            gap: 16,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-            cursor: "pointer",
-            whiteSpace: "nowrap",
-          }}
-          onClick={() => setDrawerOpen(true)}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <ShoppingBag size={18} style={{ color: "#0f0d0a" }} />
-            <span style={{ background: "#0f0d0a", color: "var(--gold, #C9A84C)", borderRadius: 99, fontSize: 11, fontWeight: 700, padding: "2px 7px" }}>
-              {totalItems}
+            gap: 8,
+            width: "min(480px, calc(100vw - 48px))",
+          }}>
+            {placeError && (
+              <div style={{ background: "rgba(239,68,68,0.9)", color: "#fff", fontSize: 12, fontWeight: 600, padding: "8px 16px", borderRadius: 8, width: "100%", textAlign: "center" }}>
+                {placeError}
+              </div>
+            )}
+            <button
+              onClick={handleConfirmOrder}
+              disabled={placing}
+              style={{
+                width: "100%",
+                background: placing ? "#a07840" : "var(--gold, #C9A84C)",
+                borderRadius: 99,
+                padding: "16px 28px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                cursor: placing ? "not-allowed" : "pointer",
+                border: "none",
+                whiteSpace: "nowrap",
+                fontFamily: "inherit",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <UtensilsCrossed size={18} style={{ color: "#0f0d0a" }} />
+                <span style={{ background: "#0f0d0a", color: "var(--gold, #C9A84C)", borderRadius: 99, fontSize: 11, fontWeight: 700, padding: "2px 7px" }}>
+                  {totalItems}
+                </span>
+              </div>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#0f0d0a", letterSpacing: "0.03em" }}>
+                {placing ? "Sending to kitchen…" : `Confirm Order — ${fmtPrice(subtotal)}`}
+              </span>
+              {!placing && <span style={{ fontSize: 16, color: "#0f0d0a" }}>→</span>}
+            </button>
+          </div>
+        ) : (
+          <div
+            style={{
+              position: "fixed",
+              bottom: 24,
+              left: "50%",
+              transform: "translateX(-50%)",
+              zIndex: 100,
+              background: "var(--gold, #C9A84C)",
+              borderRadius: 99,
+              padding: "14px 24px",
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+            }}
+            onClick={() => setDrawerOpen(true)}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <ShoppingBag size={18} style={{ color: "#0f0d0a" }} />
+              <span style={{ background: "#0f0d0a", color: "var(--gold, #C9A84C)", borderRadius: 99, fontSize: 11, fontWeight: 700, padding: "2px 7px" }}>
+                {totalItems}
+              </span>
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 700, color: "#0f0d0a", letterSpacing: "0.03em" }}>
+              View Cart — {fmtPrice(subtotal)}
             </span>
           </div>
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#0f0d0a", letterSpacing: "0.03em" }}>
-            View Cart — {fmtPrice(subtotal)}
-          </span>
+        )
+      )}
+
+      {/* Order confirmed overlay */}
+      {orderConfirmed && (
+        <div style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 500,
+          background: "#0f0d0a",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "40px 24px",
+          textAlign: "center",
+        }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: "50%",
+            background: "rgba(34,197,94,0.15)",
+            border: "2px solid rgba(34,197,94,0.4)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            marginBottom: 28,
+          }}>
+            <ChefHat size={32} style={{ color: "#22c55e" }} />
+          </div>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.25em", textTransform: "uppercase", color: "#c8a96e", marginBottom: 12 }}>
+            Order Received
+          </p>
+          <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(32px, 5vw, 52px)", fontWeight: 700, color: "#F5F0E8", margin: "0 0 16px", lineHeight: 1.15 }}>
+            Your order is<br />on its way!
+          </h2>
+          <p style={{ fontSize: 15, color: "#9C8E7A", margin: "0 0 8px", lineHeight: 1.6 }}>
+            Order <span style={{ color: "#c8a96e", fontWeight: 700 }}>#{orderConfirmed}</span> has been sent to the kitchen.
+          </p>
+          <p style={{ fontSize: 14, color: "#9C8E7A", margin: "0 0 40px", lineHeight: 1.6 }}>
+            Relax — your food will arrive at <span style={{ color: "#F5F0E8", fontWeight: 600 }}>Table {tableNumber}</span>.<br />
+            Payment when you're ready to leave.
+          </p>
+          <button
+            onClick={() => setOrderConfirmed(null)}
+            style={{
+              background: "transparent",
+              border: "1px solid rgba(200,169,110,0.4)",
+              color: "#c8a96e",
+              borderRadius: 99,
+              padding: "12px 32px",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+              letterSpacing: "0.06em",
+              fontFamily: "inherit",
+            }}
+          >
+            Order More
+          </button>
         </div>
       )}
     </div>
