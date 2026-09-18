@@ -8,6 +8,10 @@ JAVA_SRC="$ROOT/android/app/src/main/java/ng/blackrockrestaurantng/app"
 echo "==> [Kitchen] Swapping Capacitor config..."
 cp "$ROOT/capacitor.config.kitchen.json" "$ROOT/capacitor.config.json"
 
+echo "==> [Kitchen] Setting applicationId in build.gradle..."
+sed -i '' 's/applicationId "ng\.blackrockrestaurantng\.[^"]*"/applicationId "ng.blackrockrestaurantng.kitchen"/' \
+  "$ROOT/android/app/build.gradle"
+
 echo "==> [Kitchen] Copying kiosk MainActivity + BootReceiver..."
 cp "$ROOT/native/kitchen/MainActivity.java"  "$JAVA_SRC/MainActivity.java"
 cp "$ROOT/native/kitchen/BootReceiver.java"  "$JAVA_SRC/BootReceiver.java"

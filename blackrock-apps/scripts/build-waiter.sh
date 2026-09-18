@@ -8,6 +8,10 @@ JAVA_SRC="$ROOT/android/app/src/main/java/ng/blackrockrestaurantng/app"
 echo "==> [Waiter] Swapping Capacitor config..."
 cp "$ROOT/capacitor.config.waiter.json" "$ROOT/capacitor.config.json"
 
+echo "==> [Waiter] Setting applicationId in build.gradle..."
+sed -i '' 's/applicationId "ng\.blackrockrestaurantng\.[^"]*"/applicationId "ng.blackrockrestaurantng.waiter"/' \
+  "$ROOT/android/app/build.gradle"
+
 echo "==> [Waiter] Restoring standard MainActivity (no kiosk mode)..."
 cp "$ROOT/native/default/MainActivity.java" "$JAVA_SRC/MainActivity.java"
 # Remove BootReceiver if it was left from a kitchen build

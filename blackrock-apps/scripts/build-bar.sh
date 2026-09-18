@@ -8,6 +8,10 @@ JAVA_SRC="$ROOT/android/app/src/main/java/ng/blackrockrestaurantng/app"
 echo "==> [Bar] Swapping Capacitor config..."
 cp "$ROOT/capacitor.config.bar.json" "$ROOT/capacitor.config.json"
 
+echo "==> [Bar] Setting applicationId in build.gradle..."
+sed -i '' 's/applicationId "ng\.blackrockrestaurantng\.[^"]*"/applicationId "ng.blackrockrestaurantng.bar"/' \
+  "$ROOT/android/app/build.gradle"
+
 echo "==> [Bar] Restoring standard MainActivity (no kiosk mode)..."
 cp "$ROOT/native/default/MainActivity.java" "$JAVA_SRC/MainActivity.java"
 rm -f "$JAVA_SRC/BootReceiver.java"
