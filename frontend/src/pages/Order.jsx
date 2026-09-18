@@ -492,7 +492,7 @@ export default function Order() {
                 </span>
               </div>
               <span style={{ fontSize: 14, fontWeight: 700, color: "#0f0d0a", letterSpacing: "0.03em" }}>
-                {placing ? "Sending to kitchen…" : `Confirm Order — ${fmtPrice(subtotal)}`}
+                {placing ? "Placing your order…" : `Confirm Order — ${fmtPrice(subtotal)}`}
               </span>
               {!placing && <span style={{ fontSize: 16, color: "#0f0d0a" }}>→</span>}
             </button>
@@ -560,7 +560,7 @@ export default function Order() {
             Your order is<br />on its way!
           </h2>
           <p style={{ fontSize: 15, color: "#9C8E7A", margin: "0 0 8px", lineHeight: 1.6 }}>
-            Order <span style={{ color: "#c8a96e", fontWeight: 700 }}>#{orderConfirmed}</span> has been sent to the kitchen.
+            Order <span style={{ color: "#c8a96e", fontWeight: 700 }}>#{orderConfirmed}</span> — Table {tableNumber}, we're on it.
           </p>
           <p style={{ fontSize: 14, color: "#9C8E7A", margin: "0 0 40px", lineHeight: 1.6 }}>
             Relax — your food will arrive at <span style={{ color: "#F5F0E8", fontWeight: 600 }}>Table {tableNumber}</span>.<br />
