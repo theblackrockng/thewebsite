@@ -3,9 +3,9 @@
   "appName": "BLACKROCK Bar",
   "webDir": "www",
   "server": {
-    "url": "https://blackrockrestaurantng.com/bar-display",
+    "url": "https://www.blackrockrestaurantng.com/bar-display",
     "cleartext": false,
-    "allowNavigation": ["blackrockrestaurantng.com"]
+    "allowNavigation": ["blackrockrestaurantng.com", "www.blackrockrestaurantng.com"]
   },
   "plugins": {
     "PushNotifications": {

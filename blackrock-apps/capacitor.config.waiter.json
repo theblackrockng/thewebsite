@@ -3,9 +3,9 @@
   "appName": "BLACKROCK Waiter",
   "webDir": "www",
   "server": {
-    "url": "https://blackrockrestaurantng.com/waiter",
+    "url": "https://www.blackrockrestaurantng.com/waiter",
     "cleartext": false,
-    "allowNavigation": ["blackrockrestaurantng.com"]
+    "allowNavigation": ["blackrockrestaurantng.com", "www.blackrockrestaurantng.com"]
   },
   "plugins": {
     "PushNotifications": {
