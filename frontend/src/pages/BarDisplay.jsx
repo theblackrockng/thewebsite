@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import PinGate from "../components/PinGate";
 import { Wine, UtensilsCrossed, Package, Truck, RefreshCw } from "lucide-react";
 
 const ACTIVE_STATUSES = ["new", "confirmed", "preparing"];
@@ -48,11 +47,7 @@ function playAlert() {
 }
 
 export default function BarDisplay() {
-  return (
-    <PinGate storageKey="bar">
-      <BarContent />
-    </PinGate>
-  );
+  return <BarContent />;
 }
 
 function BarContent() {
@@ -106,6 +101,25 @@ function BarContent() {
       supabase.removeChannel(channel);
     };
   }, [fetchOrders]);
+
+  useEffect(() => {
+    if (!window.Capacitor?.isNativePlatform()) return;
+    (async () => {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const perm = await PushNotifications.requestPermissions();
+        if (perm.receive !== 'granted') return;
+        await PushNotifications.register();
+        await PushNotifications.addListener('registration', async ({ value: token }) => {
+          await fetch('/api/register-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: 'bar', staff_id: null, fcm_token: token }),
+          });
+        });
+      } catch {}
+    })();
+  }, []);
 
   async function updateStatus(orderId, newStatus) {
     setActionIds((prev) => new Set([...prev, orderId]));

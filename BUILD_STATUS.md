@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-18_
+_Last updated: 2026-09-18 (Part 3–6 push notifications)_
 
 ---
 
@@ -31,6 +31,8 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Waiter auth | `0a54d02` Supabase Auth login replaces PIN gate; role check against staff_profiles |
 | Analytics | `a7c3005` Analytics page (period selector, bar chart, daily table); AnalyticsRoute guard; waiter role in UserManagement |
 | Technical SEO | _pending commit_ robots.txt, sitemap.xml, per-page meta/OG/canonical via react-helmet-async, Restaurant JSON-LD, CSP fix for Google Fonts + Maps |
+| Native Android apps scaffold | _pending commit_ Capacitor project at `blackrock-apps/`; three config variants (kitchen/waiter/bar); kiosk MainActivity + BootReceiver for kitchen; build scripts |
+| FCM push notifications | _pending commit_ `api/_lib/fcm.js` Firebase Admin module; `api/register-device.js`; bar push on new drink orders (orders.js); waiter push on order ready (kitchen-status.js); push token registration in Waiter.jsx + BarDisplay.jsx; PinGate removed from BarDisplay |
 
 ---
 
@@ -69,10 +71,11 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 
 | File | Method | Purpose |
 |------|--------|---------|
-| `orders.js` | GET/POST | List orders / place new order |
+| `orders.js` | GET/POST | List orders / place new order; sends bar FCM push when order has drinks |
 | `initiate-payment.js` | POST | Paystack/Flutterwave payment init (inactive) |
 | `payment-webhook.js` | POST | Payment gateway webhook (inactive) |
-| `kitchen-status.js` | PATCH | Update order status from kitchen/bar display |
+| `kitchen-status.js` | PATCH | Update order status; sends waiter FCM push when status → ready |
+| `register-device.js` | POST | Upsert FCM token into push_tokens table |
 | `send-confirmation.js` | POST | Zoho SMTP order confirmation email |
 | `send-enquiry-reply.js` | POST | Zoho SMTP reply to enquiries |
 | `scheduled-emails.js` | GET | Daily cron: pending reservation reminders |
@@ -153,6 +156,7 @@ Key tables (inferred from code and API usage):
 | `security_logs` | Audit trail of security events |
 | `content_hub_assets` | Social media asset library |
 | `gallery_items` | Gallery section image assignments |
+| `push_tokens` | FCM device tokens — role ('waiter'|'bar'), staff_id (nullable), fcm_token; used for native app push notifications |
 
 ---
 
@@ -164,6 +168,7 @@ Key tables (inferred from code and API usage):
 | Zoho Mail SMTP | Order confirmations, enquiry replies, OTPs, scheduled reminders | Active |
 | Telegram Bot API | Order notifications, staff alerts | Active |
 | Paystack / Flutterwave | Online payment | Code present, not activated |
+| Firebase FCM | Native push notifications (Waiter + Bar apps) | Code complete; requires `FIREBASE_SERVICE_ACCOUNT` env var in Vercel + `push_tokens` table in Supabase |
 
 ---
 
@@ -176,7 +181,7 @@ Key tables (inferred from code and API usage):
 3. **Rooftop / Two Spaces section soft-hidden.** The "Two Spaces" section on the homepage references the rooftop but is hidden (`hidden` class) pending renovation. No spec decision recorded on when/how to reactivate.
 4. **No customer accounts.** Orders are placed as guests. There is no loyalty, repeat-order, or saved-address flow.
 5. **Analytics export.** The analytics page shows data in-browser but there is no CSV/PDF export.
-6. **No push notifications.** Kitchen/bar displays use Supabase Realtime polling + Web Audio. No push notifications for staff mobile devices.
+6. **Push notifications require env + DB setup.** FCM code is complete (fcm.js, register-device.js, push_tokens table). To activate: (a) add `FIREBASE_SERVICE_ACCOUNT` JSON env var to Vercel frontend project, (b) run the push_tokens SQL migration in Supabase (see Part 4 below).
 7. **Waiter name on orders.** `waiter_name` is stored on orders but the waiter app currently sets it from the authenticated staff profile. No explicit assignment of waiter-to-table in the database (only in UI state).
 8. **Netlify legacy files.** `frontend/netlify.toml` and root-level `netlify.toml` artifacts remain. The site deploys on Vercel; these files do nothing but add noise.
 

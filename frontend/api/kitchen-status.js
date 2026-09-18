@@ -9,6 +9,7 @@ const {
   checkUserAgent,
   checkCors,
 } = require('./_lib/security');
+const { sendPush } = require('./_lib/fcm');
 
 // Only allow these kitchen/bar status transitions
 const ALLOWED_TRANSITIONS = {
@@ -84,6 +85,24 @@ module.exports = async function handler(req, res) {
     if (updateErr) {
       console.error('[kitchen-status] update error:', updateErr);
       return res.status(500).json({ error: 'Failed to update order status.' });
+    }
+
+    // Push notification: when order is ready, notify all registered waiters
+    if (status === 'ready') {
+      try {
+        const { data: tokenRows } = await db
+          .from('push_tokens')
+          .select('fcm_token')
+          .eq('role', 'waiter');
+
+        if (tokenRows?.length) {
+          const tokens = tokenRows.map((r) => r.fcm_token);
+          const label = order.table_number ? `Table ${order.table_number}` : 'an order';
+          await sendPush(tokens, 'Order Ready', `${label} is ready for pickup.`, { orderId });
+        }
+      } catch (pushErr) {
+        console.error('[kitchen-status] push error:', pushErr);
+      }
     }
 
     return res.status(200).json({ ok: true });

@@ -15,6 +15,7 @@ const {
 } = require('./_lib/security');
 const { sendBlackRockEmail } = require('./_lib/email');
 const { orderConfirmationEmail } = require('./_lib/templates');
+const { sendPush } = require('./_lib/fcm');
 
 const TOKEN   = process.env.TELEGRAM_BOT_TOKEN   || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
 const CHAT_ID = process.env.TELEGRAM_CHAT_ID     || process.env.REACT_APP_TELEGRAM_CHAT_ID;
@@ -239,6 +240,26 @@ module.exports = async function handler(req, res) {
     const { error: itemsErr } = await db.from('order_items').insert(orderItemsRows);
     if (itemsErr) {
       console.error('[orders] Order items insert error:', itemsErr);
+    }
+
+    // Push notification: if order has drink items, notify all bar tokens
+    const hasDrinks = items.some((i) => i.menuType === 'drink');
+    if (hasDrinks) {
+      try {
+        const { data: tokenRows } = await db
+          .from('push_tokens')
+          .select('fcm_token')
+          .eq('role', 'bar');
+
+        if (tokenRows?.length) {
+          const tokens = tokenRows.map((r) => r.fcm_token);
+          const drinkCount = items.filter((i) => i.menuType === 'drink').reduce((s, i) => s + i.qty, 0);
+          const label = orderType === 'dine-in' ? `Table ${parseInt(tableNumber, 10)}` : guestName.trim();
+          await sendPush(tokens, 'New Drink Order', `${label} — ${drinkCount} drink${drinkCount !== 1 ? 's' : ''}`, { orderId });
+        }
+      } catch (pushErr) {
+        console.error('[orders] bar push error:', pushErr);
+      }
     }
 
     // Telegram notification (fire-and-forget in background, but await for main flow)

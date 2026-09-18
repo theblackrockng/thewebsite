@@ -95,6 +95,26 @@ function WaiterAuth() {
     return () => subscription.unsubscribe();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  useEffect(() => {
+    if (!profile?.id) return;
+    if (!window.Capacitor?.isNativePlatform()) return;
+    (async () => {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const perm = await PushNotifications.requestPermissions();
+        if (perm.receive !== 'granted') return;
+        await PushNotifications.register();
+        await PushNotifications.addListener('registration', async ({ value: token }) => {
+          await fetch('/api/register-device', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: 'waiter', staff_id: profile.id, fcm_token: token }),
+          });
+        });
+      } catch {}
+    })();
+  }, [profile?.id]);
+
   async function handleSignIn(e) {
     e.preventDefault();
     setError("");
