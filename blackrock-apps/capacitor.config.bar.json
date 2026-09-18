@@ -1,0 +1,15 @@
+{
+  "appId": "ng.blackrockrestaurantng.bar",
+  "appName": "BLACKROCK Bar",
+  "webDir": "www",
+  "server": {
+    "url": "https://blackrockrestaurantng.com/bar-display",
+    "cleartext": false,
+    "allowNavigation": ["blackrockrestaurantng.com"]
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}
