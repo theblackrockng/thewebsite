@@ -106,7 +106,7 @@ function BarContent() {
     if (!window.Capacitor?.isNativePlatform()) return;
     (async () => {
       try {
-        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const PushNotifications = window.Capacitor.Plugins.PushNotifications;
         const perm = await PushNotifications.requestPermissions();
         if (perm.receive !== 'granted') return;
         await PushNotifications.register();
