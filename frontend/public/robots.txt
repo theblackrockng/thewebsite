@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+Disallow: /content-hub/
+Disallow: /kitchen-display
+Disallow: /bar-display
+Disallow: /waiter
+Disallow: /order
+Disallow: /checkout
+Disallow: /order-confirmation/
+
+Sitemap: https://blackrockrestaurantng.com/sitemap.xml

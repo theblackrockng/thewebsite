@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Calendar, User, Tag } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import SectionHeader from "../components/SectionHeader";
+import SEO from "../components/SEO";
 
 function fmtDate(ts) {
   if (!ts) return "";
@@ -134,6 +135,11 @@ export default function Blog() {
 
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
+      <SEO
+        title="Journal"
+        description="Recipes, behind-the-scenes moments, and stories from BLACKROCK Restaurant &amp; Lounge in Ikeja, Lagos."
+        canonical="/blog"
+      />
       {/* Header */}
       <section className="bg-[var(--charcoal)] pt-16 pb-12 md:pt-24 md:pb-20">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 text-center">

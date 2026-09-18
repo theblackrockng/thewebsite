@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Phone, Mail, MapPin, MessageCircle, Clock, Send, Check, ExternalLink } from "lucide-react";
 import { BRAND } from "../lib/data";
 import SectionHeader from "../components/SectionHeader";
+import SEO from "../components/SEO";
 
 export default function Contact() {
   const [form, setForm] = useState({ name: "", email: "", message: "", _hp: "" });
@@ -63,6 +64,11 @@ export default function Contact() {
 
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
+      <SEO
+        title="Contact"
+        description="Contact BLACKROCK Restaurant &amp; Lounge. Call, WhatsApp, or email us. 11 Ajao Road, off Adeniyi Jones Road, Ikeja, Lagos. Open daily 10 AM – 11:59 PM."
+        canonical="/contact"
+      />
       {/* Header */}
       <section className="relative h-[420px] md:h-[520px] overflow-hidden flex items-center justify-center" data-testid="contact-header">
         <img src="/contactushero.jpg" alt="BlackRock dining room" className="absolute inset-0 w-full h-full object-cover" />

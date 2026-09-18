@@ -6,6 +6,7 @@ import { IMAGES } from "../lib/data";
 import { supabase } from "../lib/supabase";
 import SectionHeader from "../components/SectionHeader";
 import OrderNowLink from "../components/OrderNowLink";
+import SEO from "../components/SEO";
 
 const values = [
   { num: "01", title: "Roots on the plate", body: "Every dish traces back to a Nigerian market, a family kitchen, a recipe passed down without being written. We cook with memory and intention, not just ingredients." },
@@ -45,6 +46,11 @@ export default function About() {
 
   return (
     <div className="page-enter">
+      <SEO
+        title="About Us"
+        description="BLACKROCK was built on one belief — great food deserves a great experience. Our story, our kitchen, our promise to every guest in Ikeja, Lagos."
+        canonical="/about"
+      />
       {/* Hero */}
       <section className="relative h-[50vh] md:h-[65vh] min-h-[320px] overflow-hidden" data-testid="about-hero">
         <img src={heroImage} alt="" className="w-full h-full object-cover object-center" />

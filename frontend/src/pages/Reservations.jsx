@@ -6,6 +6,7 @@ import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { OCCASIONS, BRAND, IMAGES, MENU } from "../lib/data";
 import { supabase } from "../lib/supabase";
+import SEO from "../components/SEO";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -342,6 +343,11 @@ export default function Reservations() {
 
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
+      <SEO
+        title="Make a Reservation"
+        description="Reserve a table at BLACKROCK Restaurant &amp; Lounge, Ikeja. Date nights, birthdays, corporate dining, proposals, private events — we'll shape the experience around you."
+        canonical="/reservations"
+      />
       {/* Hero */}
       <section
         className="relative pt-12 pb-10 md:pt-20 md:pb-14 overflow-hidden"

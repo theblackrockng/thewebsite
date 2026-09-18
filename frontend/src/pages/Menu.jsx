@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import SectionHeader from "../components/SectionHeader";
 import OrderNowLink from "../components/OrderNowLink";
+import SEO from "../components/SEO";
 
 const categoryImages = {
   "Starters":           "/images/menu/starters.jpg",
@@ -177,6 +178,21 @@ export default function MenuPage() {
 
   return (
     <div className="page-enter">
+      <SEO
+        title="Menu"
+        description="Explore BLACKROCK's full menu — Nigerian classics, charcoal grills, continental dishes, cocktails and more. Available daily in Ikeja, Lagos."
+        canonical="/menu"
+        schema={{
+          "@context": "https://schema.org",
+          "@type": "Menu",
+          "name": "BLACKROCK Restaurant Menu",
+          "url": "https://blackrockrestaurantng.com/menu",
+          "hasMenuSection": [
+            { "@type": "MenuSection", "name": "Food" },
+            { "@type": "MenuSection", "name": "Drinks" }
+          ]
+        }}
+      />
       {/* Header */}
       <section className="relative overflow-hidden" data-testid="menu-header">
         <div className="absolute inset-0">

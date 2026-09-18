@@ -1,18 +1,81 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#000000" />
-        <meta name="description" content="The Black Rock Lagos — Premium Restaurant, Lounge & Rooftop in Ikeja, Lagos." />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
-        <title>The Black Rock Lagos</title>
-        <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
-    </head>
-    <body>
-        <noscript>You need to enable JavaScript to run this app.</noscript>
-        <div id="root"></div>
-    </body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f0d0a" />
+    <meta name="description" content="BLACKROCK is a premium restaurant and rooftop lounge in Ikeja, Lagos. Exceptional Nigerian and continental cuisine, private dining, and events. Open daily 10 AM – 11:59 PM." />
+
+    <!-- Open Graph (static fallback — social crawlers don't run JS) -->
+    <meta property="og:type"         content="website" />
+    <meta property="og:site_name"    content="BLACKROCK Restaurant &amp; Lounge" />
+    <meta property="og:title"        content="BLACKROCK Restaurant &amp; Lounge – Ikeja, Lagos" />
+    <meta property="og:description"  content="Premium restaurant and rooftop lounge in Ikeja, Lagos. Exceptional Nigerian and continental cuisine, private dining, and events." />
+    <meta property="og:image"        content="https://blackrockrestaurantng.com/hero-poster.jpg" />
+    <meta property="og:image:width"  content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:url"          content="https://blackrockrestaurantng.com/" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card"        content="summary_large_image" />
+    <meta name="twitter:title"       content="BLACKROCK Restaurant &amp; Lounge – Ikeja, Lagos" />
+    <meta name="twitter:description" content="Premium restaurant and rooftop lounge in Ikeja, Lagos. Exceptional Nigerian and continental cuisine, private dining, and events." />
+    <meta name="twitter:image"       content="https://blackrockrestaurantng.com/hero-poster.jpg" />
+
+    <!-- Preload LCP hero image -->
+    <link rel="preload" as="image" href="/hero-poster.jpg" fetchpriority="high" />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
+
+    <title>BLACKROCK Restaurant &amp; Lounge – Fine Dining &amp; Rooftop Lounge in Ikeja, Lagos</title>
+
+    <!-- Restaurant JSON-LD (static — crawlers see this even without running JS) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Restaurant",
+      "name": "BLACKROCK Restaurant & Lounge",
+      "url": "https://blackrockrestaurantng.com",
+      "logo": "https://blackrockrestaurantng.com/logo.png",
+      "image": "https://blackrockrestaurantng.com/hero-poster.jpg",
+      "description": "Premium restaurant and rooftop lounge in Ikeja, Lagos. Exceptional Nigerian and continental cuisine, private dining, and events.",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "11 Ajao Road, off Adeniyi Jones Road",
+        "addressLocality": "Ikeja",
+        "addressRegion": "Lagos",
+        "addressCountry": "NG"
+      },
+      "geo": {
+        "@type": "GeoCoordinates",
+        "latitude": 6.6018,
+        "longitude": 3.3515
+      },
+      "telephone": "+2349030482774",
+      "email": "info@blackrockrestaurantng.com",
+      "openingHoursSpecification": [
+        {
+          "@type": "OpeningHoursSpecification",
+          "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+          "opens": "10:00",
+          "closes": "23:59"
+        }
+      ],
+      "servesCuisine": ["Nigerian", "Continental", "African"],
+      "priceRange": "₦₦₦",
+      "hasMenu": "https://blackrockrestaurantng.com/menu",
+      "acceptsReservations": true,
+      "currenciesAccepted": "NGN"
+    }
+    </script>
+
+    <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+  </body>
 </html>

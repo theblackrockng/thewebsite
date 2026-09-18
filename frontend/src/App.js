@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 
 import "@/App.css";
 
@@ -109,25 +110,27 @@ function MainLayout() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <CartProvider>
-          <TableProvider>
-            <FeatureFlagProvider>
-              <ThemeLoader />
-              <ScrollToTop />
-              <Routes>
-                <Route path="/content-hub/*" element={<ContentHubLayout />} />
-                <Route path="/kitchen-display" element={<KitchenDisplay />} />
-                <Route path="/bar-display" element={<BarDisplay />} />
-                <Route path="/waiter" element={<OrderRoute><Waiter /></OrderRoute>} />
-                <Route path="*" element={<MainLayout />} />
-              </Routes>
-            </FeatureFlagProvider>
-          </TableProvider>
-        </CartProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <CartProvider>
+            <TableProvider>
+              <FeatureFlagProvider>
+                <ThemeLoader />
+                <ScrollToTop />
+                <Routes>
+                  <Route path="/content-hub/*" element={<ContentHubLayout />} />
+                  <Route path="/kitchen-display" element={<KitchenDisplay />} />
+                  <Route path="/bar-display" element={<BarDisplay />} />
+                  <Route path="/waiter" element={<OrderRoute><Waiter /></OrderRoute>} />
+                  <Route path="*" element={<MainLayout />} />
+                </Routes>
+              </FeatureFlagProvider>
+            </TableProvider>
+          </CartProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </HelmetProvider>
   );
 }
 

@@ -6,6 +6,7 @@ import { IMAGES } from "../lib/data";
 import { supabase } from "../lib/supabase";
 import SectionHeader from "../components/SectionHeader";
 import OrderNowLink from "../components/OrderNowLink";
+import SEO from "../components/SEO";
 
 const FALLBACK_AMBIENCE = [
   { src: IMAGES.heroRooftop,  tag: "Ambience", label: "Lagos by night" },
@@ -129,6 +130,11 @@ export default function Gallery() {
 
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
+      <SEO
+        title="Gallery"
+        description="A look inside BLACKROCK — food, drinks, and ambience from our restaurant and rooftop lounge in Ikeja, Lagos."
+        canonical="/gallery"
+      />
       {/* Header */}
       <section className="bg-[var(--charcoal)] pt-16 pb-12 md:pt-24" data-testid="gallery-header">
         <div className="max-w-[1440px] mx-auto px-6 md:px-12 text-center">
@@ -190,7 +196,7 @@ export default function Gallery() {
               >
                 <img
                   src={g.src}
-                  alt={g.label || "BlackRock"}
+                  alt={g.label || "BLACKROCK dining"}
                   loading="lazy"
                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />

@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase";
 import SectionHeader from "../components/SectionHeader";
 import BrandMark from "../components/BrandMark";
 import OrderNowLink from "../components/OrderNowLink";
+import SEO from "../components/SEO";
 
 const occasionPreview = OCCASIONS;
 
@@ -79,13 +80,16 @@ export default function Home() {
   }, []);
   return (
     <div className="page-enter">
+      <SEO canonical="/" />
       {/* HERO */}
       <section className="relative h-screen min-h-[580px] md:min-h-[720px] w-full overflow-hidden" data-testid="hero-section">
         <div className="absolute inset-0">
           <img
             src={heroImage}
-            alt="BlackRock Restaurant"
+            alt="BLACKROCK Restaurant interior and dining room in Ikeja Lagos"
             className="w-full h-full object-cover ken-burns"
+            fetchpriority="high"
+            loading="eager"
           />
           {/* Overlay */}
           <div className="absolute inset-0 bg-black/60" />
@@ -187,7 +191,7 @@ export default function Home() {
           <div className="flex marquee" style={{ willChange: "transform" }}>
             {[...foodReel, ...foodReel].map((src, i) => (
               <div key={i} className="img-hover flex-shrink-0" style={{ width: 200, height: 200, marginRight: 12 }}>
-                <img src={src} alt="BlackRock dish" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <img src={src} alt="" loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
               </div>
             ))}
           </div>

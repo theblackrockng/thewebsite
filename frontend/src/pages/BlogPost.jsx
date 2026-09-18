@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, Calendar, User, Tag } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import SEO from "../components/SEO";
 
 function fmtDate(ts) {
   if (!ts) return "";
@@ -70,6 +71,27 @@ export default function BlogPost() {
 
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
+      <SEO
+        title={post.title}
+        description={post.excerpt || `Read "${post.title}" on the BLACKROCK Journal.`}
+        canonical={`/blog/${post.slug}`}
+        ogImage={post.cover_image_url || undefined}
+        schema={{
+          "@context": "https://schema.org",
+          "@type": "BlogPosting",
+          "headline": post.title,
+          "description": post.excerpt || "",
+          "image": post.cover_image_url || "https://blackrockrestaurantng.com/hero-poster.jpg",
+          "datePublished": post.published_at,
+          "author": { "@type": "Organization", "name": "BLACKROCK Restaurant & Lounge" },
+          "publisher": {
+            "@type": "Organization",
+            "name": "BLACKROCK Restaurant & Lounge",
+            "logo": { "@type": "ImageObject", "url": "https://blackrockrestaurantng.com/logo.png" }
+          },
+          "mainEntityOfPage": `https://blackrockrestaurantng.com/blog/${post.slug}`
+        }}
+      />
       {/* Cover image */}
       {post.cover_image_url && (
         <div className="w-full aspect-[21/9] md:aspect-[3/1] overflow-hidden">
