@@ -18,7 +18,7 @@ public class MainActivity extends BridgeActivity {
     }
 
     @Override
-    protected void onResume() {
+    public void onResume() {
         super.onResume();
         // Apply kiosk fullscreen after bridge is fully initialized.
         // BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE / IMMERSIVE_STICKY re-hides bars
