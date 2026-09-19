@@ -2,6 +2,7 @@ package ng.blackrockrestaurantng.app;
 
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -10,20 +11,24 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
 
+    private static final String TAG = "KitchenKiosk";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        Log.d(TAG, "onCreate: START");
         super.onCreate(savedInstanceState);
-        // Keep screen on — safe to set here, does not touch layout or insets
+        Log.d(TAG, "onCreate: super.onCreate() COMPLETE — bridge should have called loadUrl()");
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        Log.d(TAG, "onCreate: FLAG_KEEP_SCREEN_ON set — done");
     }
 
     @Override
     public void onResume() {
+        Log.d(TAG, "onResume: START — calling super.onResume()");
         super.onResume();
-        // Apply kiosk fullscreen after bridge is fully initialized.
-        // BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE / IMMERSIVE_STICKY re-hides bars
-        // automatically — no onWindowFocusChanged callback needed.
+        Log.d(TAG, "onResume: super.onResume() COMPLETE — calling hideSystemUI()");
         hideSystemUI();
+        Log.d(TAG, "onResume: hideSystemUI() COMPLETE — done");
     }
 
     @Override
