@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
+import { authHeader } from "../../lib/authHeader";
 import { useStaff } from "../../context/StaffContext";
 import {
   Check, X, RefreshCw, Loader2, Search, Plus,
@@ -247,7 +248,7 @@ function EmailModal({ reservation, onClose }) {
     try {
       const res = await fetch("/api/send-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ to: reservation.email, subject, body }),
       });
       const data = await res.json().catch(() => ({}));

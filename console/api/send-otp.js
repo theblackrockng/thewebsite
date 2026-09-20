@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { sendBlackRockEmail } from './_lib/email.js';
 import { applySecurityHeaders } from './_lib/security.js';
+import { requireStaff } from './_lib/auth.js';
 
 let _supabase = null;
 function getSupabase() {
@@ -27,8 +28,12 @@ export default async function handler(req, res) {
   applySecurityHeaders(res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { userId, purpose, email, name } = req.body || {};
-  if (!userId || !purpose || !email) return res.status(400).json({ error: 'Missing required fields' });
+  const staff = await requireStaff(req, res, 'any');
+  if (!staff) return;
+  const userId = staff.user.id;
+
+  const { purpose, email, name } = req.body || {};
+  if (!purpose || !email) return res.status(400).json({ error: 'Missing required fields' });
   if (!PURPOSE_LABELS[purpose]) return res.status(400).json({ error: 'Invalid purpose' });
 
   const supabase = getSupabase();

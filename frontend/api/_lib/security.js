@@ -264,7 +264,10 @@ const EVENT_LABELS = {
   ip_blocked:          'IP Blocked',
 };
 
-async function logAndAlert({ eventType, severity, ip, endpoint, payload, userAgent }) {
+// alert: pass false to only write the security_logs row and skip the
+// email/Telegram alert entirely (e.g. routine successful sign-ins).
+// Defaults to true so every existing caller keeps its current behavior.
+async function logAndAlert({ eventType, severity, ip, endpoint, payload, userAgent, alert = true }) {
   const db = getDb();
   const timestamp = toWAT();
   const recommendation = SEVERITY_REC[severity] || 'Monitor activity.';
@@ -287,6 +290,8 @@ async function logAndAlert({ eventType, severity, ip, endpoint, payload, userAge
       console.error('[security] log insert failed:', err.message);
     }
   }
+
+  if (!alert) return;
 
   // 2. Alert email (all severity levels)
   try {

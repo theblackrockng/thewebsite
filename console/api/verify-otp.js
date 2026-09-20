@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { applySecurityHeaders } from './_lib/security.js';
+import { requireStaff } from './_lib/auth.js';
 
 let _supabase = null;
 function getSupabase() {
@@ -15,8 +16,12 @@ export default async function handler(req, res) {
   applySecurityHeaders(res);
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { userId, purpose, code } = req.body || {};
-  if (!userId || !purpose || !code) return res.status(400).json({ error: 'Missing required fields' });
+  const staff = await requireStaff(req, res, 'any');
+  if (!staff) return;
+  const userId = staff.user.id;
+
+  const { purpose, code } = req.body || {};
+  if (!purpose || !code) return res.status(400).json({ error: 'Missing required fields' });
 
   const supabase = getSupabase();
   if (!supabase) return res.status(500).json({ error: 'Service unavailable' });

@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { requireStaff } from "./_lib/auth.js";
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://jwklezuaqesptccsnesr.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -10,6 +11,10 @@ export default async function handler(req, res) {
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  // Super Admin only.
+  const staff = await requireStaff(req, res, []);
+  if (!staff) return;
 
   try {
     if (!serviceRoleKey) {

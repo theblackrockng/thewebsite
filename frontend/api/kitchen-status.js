@@ -9,6 +9,7 @@ const {
   checkUserAgent,
   checkCors,
 } = require('./_lib/security');
+const { requireStaff } = require('./_lib/auth');
 const { sendPush } = require('./_lib/fcm');
 
 // Only allow these kitchen/bar status transitions
@@ -17,6 +18,8 @@ const ALLOWED_TRANSITIONS = {
   confirmed: ['preparing'],
   preparing: ['ready'],
 };
+
+const STATUS_ROLES = ['kitchen', 'bar', 'waiter', 'front_desk', 'manager'];
 
 let _db = null;
 function getDb() {
@@ -35,6 +38,9 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed' });
+
+  const staff = await requireStaff(req, res, STATUS_ROLES);
+  if (!staff) return;
 
   const ip = getIP(req);
 

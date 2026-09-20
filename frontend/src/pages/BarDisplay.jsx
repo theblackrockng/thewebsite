@@ -1,6 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import { Wine, UtensilsCrossed, Package, Truck, RefreshCw } from "lucide-react";
+import { authHeader } from "../lib/staffAuth";
+import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
+import { Wine, UtensilsCrossed, Package, Truck, RefreshCw, LogOut } from "lucide-react";
+
+const BAR_ROLES = ["bar"];
 
 const ACTIVE_STATUSES = ["new", "confirmed", "preparing"];
 
@@ -47,7 +51,11 @@ function playAlert() {
 }
 
 export default function BarDisplay() {
-  return <BarContent />;
+  return (
+    <StaffLoginGate allowedRoles={BAR_ROLES} title="Bar">
+      <BarContent />
+    </StaffLoginGate>
+  );
 }
 
 function BarContent() {
@@ -113,7 +121,7 @@ function BarContent() {
         await PushNotifications.addListener('registration', async ({ value: token }) => {
           await fetch('/api/register-device', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
             body: JSON.stringify({ role: 'bar', staff_id: null, fcm_token: token }),
           });
         });
@@ -126,7 +134,7 @@ function BarContent() {
     try {
       const res = await fetch("/api/kitchen-status", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ orderId, status: newStatus }),
       });
       if (res.ok) {
@@ -162,12 +170,15 @@ function BarContent() {
             <div style={{ fontSize: 11, color: "#9C8E7A", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600 }}>Bar Display</div>
           </div>
         </div>
-        <button
-          onClick={fetchOrders}
-          style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 7, padding: "6px 10px", color: "#9C8E7A", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}
-        >
-          <RefreshCw size={12} />
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            onClick={fetchOrders}
+            style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 7, padding: "6px 10px", color: "#9C8E7A", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}
+          >
+            <RefreshCw size={12} />
+          </button>
+          <SignOutButton />
+        </div>
       </div>
 
       <div style={{ fontSize: 12, color: "#9C8E7A", marginBottom: 16, textAlign: "center" }}>
@@ -195,6 +206,18 @@ function BarContent() {
         </div>
       )}
     </div>
+  );
+}
+
+function SignOutButton() {
+  const { signOut } = useStaffSession();
+  return (
+    <button
+      onClick={signOut}
+      style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 7, padding: "6px 10px", color: "#9C8E7A", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}
+    >
+      <LogOut size={12} />
+    </button>
   );
 }
 

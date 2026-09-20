@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
+import { authHeader } from "../../lib/authHeader";
 import { useAuth } from "../../context/AuthContext";
 import { UserPlus, Shield, Users, Edit2, ToggleLeft, ToggleRight, X, Check, Loader, Mail, Send, Copy, ExternalLink, Trash2, AlertTriangle, UserCircle } from "lucide-react";
 
@@ -21,12 +22,18 @@ const DEFAULT_PERMS = {
   menu: false, media: false, content: false, users: false, settings: false,
 };
 
-const ROLE_OPTIONS = ["waiter", "staff", "manager", "content_creator", "social_media_manager", "super_admin"];
+const ROLE_OPTIONS = ["waiter", "kitchen", "bar", "front_desk", "staff", "manager", "content_creator", "social_media_manager", "super_admin"];
+
+// Roles that only sign in on a staff-facing display/tablet, not the console.
+const OPERATIONS_ROLES = ["waiter", "kitchen", "bar", "front_desk"];
 
 const ROLE_COLORS = {
   super_admin:          { bg: "rgba(200,169,110,0.15)", text: "var(--ds-gold)",  label: "Super Admin" },
   manager:              { bg: "rgba(99,179,237,0.15)",  text: "#63b3ed",         label: "Manager" },
   waiter:               { bg: "rgba(251,146,60,0.15)",  text: "#fb923c",         label: "Waiter" },
+  kitchen:              { bg: "rgba(34,197,94,0.13)",   text: "#22c55e",         label: "Kitchen" },
+  bar:                  { bg: "rgba(56,189,248,0.13)",  text: "#38bdf8",         label: "Bar" },
+  front_desk:           { bg: "rgba(200,169,110,0.13)", text: "#c8a96e",         label: "Front Desk" },
   content_creator:      { bg: "rgba(139,92,246,0.15)",  text: "#a78bfa",         label: "Content Creator" },
   social_media_manager: { bg: "rgba(236,72,153,0.13)",  text: "#f472b6",         label: "Social Media Manager" },
   staff:                { bg: "rgba(160,174,192,0.12)", text: "var(--ds-muted)", label: "Staff" },
@@ -34,10 +41,13 @@ const ROLE_COLORS = {
 
 const CONTENT_ONLY_PERMS = { ...Object.fromEntries(Object.keys(DEFAULT_PERMS).map(k => [k, false])), dashboard: true, content: true, media: true };
 
-const WAITER_PERMS = Object.fromEntries(Object.keys(DEFAULT_PERMS).map(k => [k, false]));
+const OPERATIONS_PERMS = Object.fromEntries(Object.keys(DEFAULT_PERMS).map(k => [k, false]));
 
 const ROLE_PRESETS = {
-  waiter:               WAITER_PERMS,
+  waiter:               OPERATIONS_PERMS,
+  kitchen:              OPERATIONS_PERMS,
+  bar:                  OPERATIONS_PERMS,
+  front_desk:           OPERATIONS_PERMS,
   content_creator:      CONTENT_ONLY_PERMS,
   social_media_manager: CONTENT_ONLY_PERMS,
 };
@@ -96,7 +106,7 @@ function InviteModal({ onClose, onSuccess, currentUserId }) {
     try {
       const res = await fetch("/api/invite", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({
           email: form.email,
           full_name: form.full_name,
@@ -249,20 +259,29 @@ function EditModal({ staff, onClose, onSave }) {
   const [role, setRole]     = useState(staff.role);
   const [perms, setPerms]   = useState({ ...DEFAULT_PERMS, ...staff.permissions });
   const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState("");
 
   const togglePerm = (key) => setPerms(p => ({ ...p, [key]: !p[key] }));
 
   const save = async () => {
     setSaving(true);
+    setError("");
     const updates = {
+      userId: staff.id,
       role,
       permissions: role === "super_admin"
         ? Object.fromEntries(PERMISSIONS.map(p => [p.key, true]))
         : perms,
     };
-    await supabase.from("staff_profiles").update(updates).eq("id", staff.id);
-    onSave();
+    const res = await fetch("/api/update-staff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify(updates),
+    });
+    const data = await res.json().catch(() => ({}));
     setSaving(false);
+    if (!res.ok) { setError(data.error || "Failed to save changes."); return; }
+    onSave();
   };
 
   return (
@@ -327,6 +346,12 @@ function EditModal({ staff, onClose, onSave }) {
             </div>
           )}
 
+          {error && (
+            <div style={{ fontSize: 12.5, color: "#ef4444", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 7, padding: "8px 12px" }}>
+              {error}
+            </div>
+          )}
+
           <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
             <button onClick={onClose} style={{
               flex: 1, padding: "10px", borderRadius: 7, border: "1px solid var(--ds-border)",
@@ -365,7 +390,7 @@ function TelegramInviteModal({ member, onClose }) {
     try {
       const res  = await fetch("/api/telegram-invite", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ name }),
       });
       const data = await res.json();
@@ -736,7 +761,16 @@ export default function UserManagement() {
   useEffect(() => { fetchStaff(); }, []);
 
   const toggleActive = async (member) => {
-    await supabase.from("staff_profiles").update({ active: !member.active }).eq("id", member.id);
+    const res = await fetch("/api/update-staff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ userId: member.id, active: !member.active }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      showToast(data.error || "Failed to update staff member.");
+      return;
+    }
     setStaff(s => s.map(m => m.id === member.id ? { ...m, active: !m.active } : m));
     showToast(`${member.full_name || "Staff"} ${!member.active ? "activated" : "deactivated"}`);
   };
@@ -747,7 +781,7 @@ export default function UserManagement() {
     try {
       const res = await fetch("/api/delete-staff", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ userId: deleteTarget.id }),
       });
       const text = await res.text();
@@ -771,6 +805,7 @@ export default function UserManagement() {
   const managers           = staff.filter(m => m.role === "manager");
   const contentCreators    = staff.filter(m => m.role === "content_creator");
   const socialMediaManagers = staff.filter(m => m.role === "social_media_manager");
+  const operations         = staff.filter(m => OPERATIONS_ROLES.includes(m.role));
   const regular            = staff.filter(m => m.role === "staff");
 
   const tableHeader = (
@@ -911,6 +946,21 @@ export default function UserManagement() {
               <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
                 {tableHeader}
                 {socialMediaManagers.map(m => (
+                  <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} isSuperAdmin={isSuperAdmin} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} onDelete={setDeleteTarget} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Operations (waiter, kitchen, bar, front desk) */}
+          {operations.length > 0 && (
+            <section>
+              <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ds-muted)", marginBottom: 12 }}>
+                Operations
+              </div>
+              <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
+                {tableHeader}
+                {operations.map(m => (
                   <StaffRow key={m.id} member={m} currentUserId={session?.user?.id} isSuperAdmin={isSuperAdmin} onEdit={setEditTarget} onToggle={toggleActive} onTelegram={setTelegramTarget} onDelete={setDeleteTarget} />
                 ))}
               </div>

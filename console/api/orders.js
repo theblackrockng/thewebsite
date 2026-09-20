@@ -1,7 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
+import { requireStaff } from "./_lib/auth.js";
 
 const supabaseUrl = process.env.SUPABASE_URL || "https://jwklezuaqesptccsnesr.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const ORDER_ROLES = ["kitchen", "bar", "waiter", "front_desk", "manager"];
 
 function getDb() {
   if (!serviceRoleKey) return null;
@@ -14,6 +17,9 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
   if (req.method === "OPTIONS") return res.status(200).end();
+
+  const staff = await requireStaff(req, res, ORDER_ROLES);
+  if (!staff) return;
 
   const db = getDb();
   if (!db) return res.status(500).json({ error: "Server misconfiguration" });

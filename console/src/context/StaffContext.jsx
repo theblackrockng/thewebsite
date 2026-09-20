@@ -4,19 +4,16 @@ import { useAuth } from "./AuthContext";
 
 const StaffContext = createContext(null);
 
-const SUPER_ADMIN_PERMISSIONS = {
-  dashboard: true, reservations: true, enquiries: true,
-  menu: true, media: true, content: true, users: true, settings: true, analytics: true,
-};
-
 export function StaffProvider({ children }) {
   const { session } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [notSetUp, setNotSetUp] = useState(false);
 
   useEffect(() => {
-    if (!session?.user) { setProfile(null); setLoading(false); return; }
+    if (!session?.user) { setProfile(null); setNotSetUp(false); setLoading(false); return; }
 
+    let mounted = true;
     async function load() {
       setLoading(true);
       const { data } = await supabase
@@ -25,24 +22,21 @@ export function StaffProvider({ children }) {
         .eq("id", session.user.id)
         .maybeSingle();
 
-      if (data) {
+      if (!mounted) return;
+
+      if (data && data.active !== false) {
         setProfile(data);
+        setNotSetUp(false);
       } else {
-        // No profile yet — create a default one for this user
-        const fallback = {
-          id: session.user.id,
-          email: session.user.email,
-          full_name: session.user.email?.split("@")[0] ?? "Admin",
-          role: "staff",
-          permissions: SUPER_ADMIN_PERMISSIONS, // permissive until admin assigns role
-          active: true,
-        };
-        await supabase.from("staff_profiles").upsert(fallback, { onConflict: "id" });
-        setProfile(fallback);
+        // No profile row, or the row exists but is deactivated. Never
+        // create one from the client — invite.js creates it server-side.
+        setProfile(null);
+        setNotSetUp(true);
       }
       setLoading(false);
     }
     load();
+    return () => { mounted = false; };
   }, [session]);
 
   const isSuperAdmin = profile?.role === "super_admin";
@@ -54,7 +48,7 @@ export function StaffProvider({ children }) {
   }
 
   return (
-    <StaffContext.Provider value={{ profile, loading, isSuperAdmin, isManager, hasPermission, setProfile }}>
+    <StaffContext.Provider value={{ profile, loading, notSetUp, isSuperAdmin, isManager, hasPermission, setProfile }}>
       {children}
     </StaffContext.Provider>
   );

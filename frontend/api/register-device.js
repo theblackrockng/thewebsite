@@ -2,6 +2,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { applySecurityHeaders, getCorsHeaders } = require('./_lib/security');
+const { requireStaff } = require('./_lib/auth');
 
 let _db = null;
 function getDb() {
@@ -29,6 +30,9 @@ module.exports = async function handler(req, res) {
   if (!fcm_token || typeof fcm_token !== 'string') {
     return res.status(400).json({ error: 'Missing fcm_token.' });
   }
+
+  const staff = await requireStaff(req, res, [role]);
+  if (!staff) return;
 
   const db = getDb();
   if (!db) return res.status(500).json({ error: 'Database not configured.' });

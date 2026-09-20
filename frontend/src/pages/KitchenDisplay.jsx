@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
-import PinGate from "../components/PinGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw } from "lucide-react";
+import { authHeader } from "../lib/staffAuth";
+import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut } from "lucide-react";
+
+const KITCHEN_ROLES = ["kitchen"];
 
 const ACTIVE_STATUSES = ["new", "confirmed", "preparing"];
 
@@ -54,9 +57,9 @@ function playAlert() {
 
 export default function KitchenDisplay() {
   return (
-    <PinGate storageKey="kitchen">
+    <StaffLoginGate allowedRoles={KITCHEN_ROLES} title="Kitchen">
       <KitchenContent />
-    </PinGate>
+    </StaffLoginGate>
   );
 }
 
@@ -117,7 +120,7 @@ function KitchenContent() {
     try {
       const res = await fetch("/api/kitchen-status", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ orderId, status: newStatus }),
       });
       if (res.ok) {
@@ -159,6 +162,7 @@ function KitchenContent() {
           <div style={{ fontSize: 13, color: "#9C8E7A", fontVariantNumeric: "tabular-nums" }}>
             <LiveClock />
           </div>
+          <SignOutButton />
         </div>
       </div>
 
@@ -263,6 +267,18 @@ function OrderCard({ order, loading, onStatusUpdate }) {
         </button>
       </div>
     </div>
+  );
+}
+
+function SignOutButton() {
+  const { signOut } = useStaffSession();
+  return (
+    <button
+      onClick={signOut}
+      style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 7, padding: "7px 12px", color: "#9C8E7A", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}
+    >
+      <LogOut size={13} /> Sign Out
+    </button>
   );
 }
 

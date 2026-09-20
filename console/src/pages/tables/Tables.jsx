@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { QrCode, Plus, Pencil, Trash2, Download, Check, X, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import QRCodeStyling from "qr-code-styling";
+import { authHeader } from "../../lib/authHeader";
 
 const API_BASE = "/api/tables";
 
@@ -170,7 +171,7 @@ function TableFormModal({ table, onClose, onSaved }) {
     try {
       const res = await fetch(API_BASE, {
         method: isEdit ? "PATCH" : "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify(
           isEdit
             ? { id: table.id, table_number: Number(tableNumber), qr_slug: slug, active }
@@ -271,7 +272,7 @@ function DeleteConfirm({ table, onClose, onDeleted }) {
     try {
       await fetch(API_BASE, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ id: table.id }),
       });
       onDeleted(table.id);

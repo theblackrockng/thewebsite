@@ -27,14 +27,38 @@ import SiteImages from "./pages/images/SiteImages";
 import Tables from "./pages/tables/Tables";
 import Analytics from "./pages/analytics/Analytics";
 
+function NotSetUpScreen() {
+  const { signOut } = useAuth();
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#1a1a1a", padding: 24 }}>
+      <div style={{ maxWidth: 380, textAlign: "center" }}>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 700, color: "#f5f0e8", margin: "0 0 10px" }}>
+          Account Not Set Up
+        </div>
+        <p style={{ fontSize: 13, color: "#9c8e7a", margin: "0 0 24px", lineHeight: 1.5 }}>
+          Your account does not have an active staff profile. Contact your administrator to get access.
+        </p>
+        <button
+          onClick={signOut}
+          style={{ background: "transparent", border: "1px solid #2e2820", borderRadius: 7, padding: "10px 20px", color: "#9c8e7a", fontSize: 13, cursor: "pointer" }}
+        >
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }) {
-  const { session, loading } = useAuth();
-  if (loading) return (
+  const { session, loading: authLoading } = useAuth();
+  const { loading: staffLoading, notSetUp } = useStaff();
+  if (authLoading || staffLoading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--charcoal)" }}>
       <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Loading...</div>
     </div>
   );
   if (!session) return <Navigate to="/login" replace />;
+  if (notSetUp) return <NotSetUpScreen />;
   return <Layout>{children}</Layout>;
 }
 

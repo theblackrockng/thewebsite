@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { supabase } from "../../lib/supabase";
+import { authHeader } from "../../lib/authHeader";
 import {
   RefreshCw, Loader2, Search, Eye, MessageSquare, Trash2,
   Send, X, AlertTriangle, Mail,
@@ -515,7 +516,7 @@ export default function Enquiries() {
     try {
       const res = await fetch("/api/send-email", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({
           to: e.email,
           subject: "Re: Your enquiry to BLACKROCK Restaurant & Lounge",

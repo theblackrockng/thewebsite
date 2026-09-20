@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { requireStaff, roleRank } from "./_lib/auth.js";
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "https://jwklezuaqesptccsnesr.supabase.co";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -10,6 +11,10 @@ export default async function handler(req, res) {
 
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  // Super Admin only.
+  const staff = await requireStaff(req, res, []);
+  if (!staff) return;
 
   try {
     if (!serviceRoleKey) {
@@ -26,6 +31,11 @@ export default async function handler(req, res) {
     const { email, full_name, role, permissions, invited_by } = req.body ?? {};
 
     if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const requestedRole = role || "staff";
+    if (roleRank(requestedRole) > roleRank(staff.profile.role)) {
+      return res.status(403).json({ error: "You cannot assign a role higher than your own." });
+    }
 
     const defaultPermissions = {
       dashboard: true,

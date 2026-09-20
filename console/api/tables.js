@@ -1,7 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
+import { requireStaff } from "./_lib/auth.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || "https://jwklezuaqesptccsnesr.supabase.co";
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// "website_manager" in the spec maps to the existing "manager" role — there
+// is no separate website_manager role in staff_profiles today.
+const TABLE_MANAGE_ROLES = ["manager"];
 
 function getDb() {
   if (!SERVICE_ROLE_KEY) return null;
@@ -17,7 +22,8 @@ export default async function handler(req, res) {
   const db = getDb();
   if (!db) return res.status(500).json({ error: "Server misconfiguration" });
 
-  // GET — list all tables
+  // GET — list all tables (left open; not used by any customer ordering flow,
+  // but kept available as requested)
   if (req.method === "GET") {
     const { data, error } = await db
       .from("tables")
@@ -29,6 +35,9 @@ export default async function handler(req, res) {
 
   // POST — create a new table
   if (req.method === "POST") {
+    const staff = await requireStaff(req, res, TABLE_MANAGE_ROLES);
+    if (!staff) return;
+
     const { table_number, qr_slug, active = true } = req.body || {};
     if (!table_number || !Number.isInteger(Number(table_number)) || Number(table_number) < 1) {
       return res.status(400).json({ error: "Valid table number required." });
@@ -48,6 +57,9 @@ export default async function handler(req, res) {
 
   // PATCH — update a table
   if (req.method === "PATCH") {
+    const staff = await requireStaff(req, res, TABLE_MANAGE_ROLES);
+    if (!staff) return;
+
     const { id, table_number, qr_slug, active } = req.body || {};
     if (!id) return res.status(400).json({ error: "Missing table id." });
     const updates = {};
@@ -68,6 +80,9 @@ export default async function handler(req, res) {
 
   // DELETE — remove a table
   if (req.method === "DELETE") {
+    const staff = await requireStaff(req, res, TABLE_MANAGE_ROLES);
+    if (!staff) return;
+
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: "Missing table id." });
     const { error } = await db.from("tables").delete().eq("id", id);

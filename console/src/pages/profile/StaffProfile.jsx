@@ -8,6 +8,7 @@ import {
   ShieldAlert, ChevronRight, AlertTriangle, Mail,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { authHeader } from "../../lib/authHeader";
 import { useAuth } from "../../context/AuthContext";
 import { useStaff } from "../../context/StaffContext";
 
@@ -130,8 +131,8 @@ function useOTP(session, purpose) {
     setSending(true); setOtpError(""); setSent(false); setVerified(false); setCode("");
     try {
       const r = await fetch("/api/send-otp", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: session.user.id, purpose, email, name }),
+        method: "POST", headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ purpose, email, name }),
       });
       const d = await r.json();
       if (!r.ok) { setOtpError(d.error || "Failed to send code"); return false; }
@@ -146,8 +147,8 @@ function useOTP(session, purpose) {
     setVerifying(true); setOtpError("");
     try {
       const r = await fetch("/api/verify-otp", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: session.user.id, purpose, code: code.trim() }),
+        method: "POST", headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ purpose, code: code.trim() }),
       });
       const d = await r.json();
       if (!r.ok) { setOtpError(d.error || "Invalid code"); return false; }
@@ -698,24 +699,42 @@ function AdminControls({ target, onUpdate }) {
 
   async function handleRoleSave() {
     setSavingRole(true); setResult({ type: "", msg: "" });
-    await supabase.from("staff_profiles").update({ role }).eq("id", target.id);
+    const res = await fetch("/api/update-staff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ userId: target.id, role }),
+    });
+    const data = await res.json().catch(() => ({}));
     setSavingRole(false);
+    if (!res.ok) { setResult({ type: "error", msg: data.error || "Failed to update role." }); return; }
     onUpdate({ role });
     setResult({ type: "success", msg: `Role updated to ${ROLE_COLORS[role]?.label ?? role}.` });
   }
 
   async function handleSuspend() {
     setWorking(true);
-    await supabase.from("staff_profiles").update({ active: false, status: "suspended" }).eq("id", target.id);
+    const res = await fetch("/api/update-staff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ userId: target.id, active: false, status: "suspended" }),
+    });
+    const data = await res.json().catch(() => ({}));
     setWorking(false); setSuspendOpen(false);
+    if (!res.ok) { setResult({ type: "error", msg: data.error || "Failed to suspend account." }); return; }
     onUpdate({ active: false, status: "suspended" });
     setResult({ type: "success", msg: `${targetName}'s account has been suspended.` });
   }
 
   async function handleReactivate() {
     setWorking(true);
-    await supabase.from("staff_profiles").update({ active: true, status: "active" }).eq("id", target.id);
+    const res = await fetch("/api/update-staff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ userId: target.id, active: true, status: "active" }),
+    });
+    const data = await res.json().catch(() => ({}));
     setWorking(false);
+    if (!res.ok) { setResult({ type: "error", msg: data.error || "Failed to reactivate account." }); return; }
     onUpdate({ active: true, status: "active" });
     setResult({ type: "success", msg: `${targetName}'s account has been reactivated.` });
   }
@@ -1095,8 +1114,12 @@ export default function StaffProfile() {
                 <select value={profile?.role ?? "staff"}
                   onChange={async e => {
                     const newRole = e.target.value;
-                    await supabase.from("staff_profiles").update({ role: newRole }).eq("id", profile.id);
-                    updateProfile({ role: newRole });
+                    const res = await fetch("/api/update-staff", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+                      body: JSON.stringify({ userId: profile.id, role: newRole }),
+                    });
+                    if (res.ok) updateProfile({ role: newRole });
                   }}
                   style={{ ...inputStyle(false), maxWidth: 260 }}>
                   {ROLE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}

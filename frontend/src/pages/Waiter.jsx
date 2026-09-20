@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
+import { loginStaff, authHeader } from "../lib/staffAuth";
+import IdleLock from "../components/IdleLock";
 import { MENU } from "../lib/data";
 import { Plus, Minus, X, Check, ChevronLeft, UtensilsCrossed, AlertCircle, LogOut } from "lucide-react";
 
@@ -107,7 +109,7 @@ function WaiterAuth() {
         await PushNotifications.addListener('registration', async ({ value: token }) => {
           await fetch('/api/register-device', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
             body: JSON.stringify({ role: 'waiter', staff_id: profile.id, fcm_token: token }),
           });
         });
@@ -120,9 +122,10 @@ function WaiterAuth() {
     setError("");
     setSigningIn(true);
     try {
-      const { data, error: authErr } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-      if (authErr) { setError("Incorrect email or password."); return; }
-      const valid = await loadProfile(data.user.id);
+      const { error: loginErr } = await loginStaff(email.trim(), password);
+      if (loginErr) { setError(loginErr); return; }
+      const { data: { session } } = await supabase.auth.getSession();
+      const valid = await loadProfile(session.user.id);
       if (!valid) {
         await supabase.auth.signOut();
         setError("Your account doesn't have waiter access. Contact your manager.");
@@ -193,7 +196,11 @@ function WaiterAuth() {
     );
   }
 
-  return <WaiterApp waiterName={profile.name} waiterRole={profile.role} onSignOut={handleSignOut} />;
+  return (
+    <IdleLock idleMinutes={5}>
+      <WaiterApp waiterName={profile.name} waiterRole={profile.role} onSignOut={handleSignOut} />
+    </IdleLock>
+  );
 }
 
 function WaiterApp({ waiterName, waiterRole, onSignOut }) {

@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
+import { authHeader } from "../../lib/authHeader";
 import { useAuth } from "../../context/AuthContext";
 import {
   Package, Truck, Search, RefreshCw, Loader2, X,
@@ -247,7 +248,7 @@ export default function Orders() {
     setLoading(true);
     setFetchError(null);
     try {
-      const res = await fetch("/api/orders");
+      const res = await fetch("/api/orders", { headers: await authHeader() });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to fetch orders");
       const data = json.data || [];
@@ -283,7 +284,7 @@ export default function Orders() {
     try {
       const res = await fetch("/api/order-items", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ order_id: order.id }),
       });
       const json = await res.json();
@@ -302,7 +303,7 @@ export default function Orders() {
 
       const res = await fetch("/api/orders", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify(patch),
       });
       const json = await res.json();
@@ -338,7 +339,7 @@ export default function Orders() {
     try {
       const res = await fetch("/api/orders", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ id: orderId, payment_status: newPaymentStatus }),
       });
       const json = await res.json();
