@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-18 (Part 3–6 push notifications)_
+_Last updated: 2026-09-20 (console operations screen)_
 
 ---
 
@@ -33,6 +33,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Technical SEO | _pending commit_ robots.txt, sitemap.xml, per-page meta/OG/canonical via react-helmet-async, Restaurant JSON-LD, CSP fix for Google Fonts + Maps |
 | Native Android apps scaffold | _pending commit_ Capacitor project at `blackrock-apps/`; three config variants (kitchen/waiter/bar); kiosk MainActivity + BootReceiver for kitchen; build scripts |
 | FCM push notifications | _pending commit_ `api/_lib/fcm.js` Firebase Admin module; `api/register-device.js`; bar push on new drink orders (orders.js); waiter push on order ready (kitchen-status.js); push token registration in Waiter.jsx + BarDisplay.jsx; PinGate removed from BarDisplay |
+| Console operations screen | _pending commit_ kitchen/bar/waiter/front_desk accounts get `OperationsScreen` (link to their website screen + sign out) instead of the console Layout; guard in `ProtectedRoute` and `AnalyticsRoute`; sidebar role labels for Kitchen, Bar, Front Desk |
 
 ---
 
@@ -61,8 +62,8 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `/content-hub/:id` | ContentHubAsset.jsx | Asset detail |
 | `/content-hub/guide` | ContentHubGuide.jsx | Guide page |
 | `/content-hub/login` | ContentHubLogin.jsx | Auth for content hub |
-| `/kitchen` | KitchenDisplay.jsx | Live kitchen order display (Supabase Realtime) |
-| `/bar` | BarDisplay.jsx | Live bar order display (Supabase Realtime) |
+| `/kitchen-display` | KitchenDisplay.jsx | Live kitchen order display (Supabase Realtime) |
+| `/bar-display` | BarDisplay.jsx | Live bar order display (Supabase Realtime) |
 | `/waiter` | Waiter.jsx | Waiter app — Supabase Auth login, table select, place orders |
 
 **Frontend Contexts:** `AuthContext`, `CartContext`, `FeatureFlagContext`, `TableContext`
@@ -115,6 +116,8 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `/login` | Login.jsx | Public |
 | `/reset-password` | ResetPassword.jsx | Public (invite/recovery hash) |
 | `/welcome` | Welcome.jsx | Public |
+
+Accounts with role `kitchen`, `bar`, `waiter` or `front_desk` never see the console Layout: every route above resolves to `OperationsScreen` for them (`ProtectedRoute` / `AnalyticsRoute` in `App.jsx`; `SuperAdminRoute` redirects to `/`). `WEBSITE_ORIGIN` in `App.jsx` sets the website link target.
 
 **Console Contexts:** `AuthContext`, `StaffContext`
 
@@ -184,6 +187,8 @@ Key tables (inferred from code and API usage):
 6. **Push notifications require env + DB setup.** FCM code is complete (fcm.js, register-device.js, push_tokens table). To activate: (a) add `FIREBASE_SERVICE_ACCOUNT` JSON env var to Vercel frontend project, (b) run the push_tokens SQL migration in Supabase (see Part 4 below).
 7. **Waiter name on orders.** `waiter_name` is stored on orders but the waiter app currently sets it from the authenticated staff profile. No explicit assignment of waiter-to-table in the database (only in UI state).
 8. **Netlify legacy files.** `frontend/netlify.toml` and root-level `netlify.toml` artifacts remain. The site deploys on Vercel; these files do nothing but add noise.
+9. **Front desk screen not built.** `front_desk` accounts can be invited and land on `OperationsScreen`, which says the screen is coming soon. There is no website route for it yet.
+10. **Console operations access not enforced by database policies.** Keeping kitchen/bar/waiter/front_desk accounts out of the console is a UI gate only (`OperationsScreen`). Console pages read and write Supabase tables directly with the anon client, so those accounts could still reach data through the API unless RLS policies restrict them. Live RLS policies are not in the repo (only `staff_profiles` in `supabase/migrations/003`) and need reviewing in Supabase.
 
 ---
 
@@ -197,7 +202,7 @@ Key tables (inferred from code and API usage):
 - **`/console-internal-br2026` security by obscurity.** The feature control route is hidden by URL path; it is also gated by `super_admin` role, but the path is visible in the compiled JS bundle.
 - **Blog editor TipTap version pinned to 3.30.2** to work around peer dependency conflicts. Future upgrades need care.
 - **`OrderRoute` flag bypass via `?table=` param** is intentional (QR dine-in bypasses the feature flag) but undocumented — someone could visit `/order?table=1` even when ordering is disabled.
-- **Kitchen/Bar displays** at `/kitchen` and `/bar` are public routes with no auth. Anyone who knows the URL can see live orders.
+- **Kitchen/Bar displays** at `/kitchen-display` and `/bar-display` are public routes with no auth. Anyone who knows the URL can see live orders.
 - **`supabase.auth.admin` calls in console API** require `SUPABASE_SERVICE_ROLE_KEY`. If that var is missing from the Vercel project, invite and delete-staff silently fail.
 
 ---

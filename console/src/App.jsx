@@ -49,9 +49,53 @@ function NotSetUpScreen() {
   );
 }
 
+const WEBSITE_ORIGIN = "https://www.blackrockrestaurantng.com";
+
+const OPERATIONS_SCREENS = {
+  kitchen:    { label: "Kitchen",    path: "/kitchen-display" },
+  bar:        { label: "Bar",        path: "/bar-display" },
+  waiter:     { label: "Waiter",     path: "/waiter" },
+  front_desk: { label: "Front Desk", path: null },
+};
+
+function OperationsScreen({ role }) {
+  const { signOut } = useAuth();
+  const screen = OPERATIONS_SCREENS[role];
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#1a1a1a", padding: 24 }}>
+      <div style={{ maxWidth: 380, textAlign: "center" }}>
+        <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, fontWeight: 700, color: "#f5f0e8", margin: "0 0 10px" }}>
+          This account is for the {screen.label} screen
+        </div>
+        <p style={{ fontSize: 13, color: "#9c8e7a", margin: "0 0 24px", lineHeight: 1.5 }}>
+          {screen.path
+            ? "The admin console is not used with this account. Open your screen and sign in there."
+            : "The admin console is not used with this account. The Front Desk screen is coming soon."}
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+          {screen.path && (
+            <a
+              href={WEBSITE_ORIGIN + screen.path}
+              style={{ background: "#c8a96e", borderRadius: 7, padding: "10px 20px", color: "#000", fontSize: 13, fontWeight: 600, textDecoration: "none" }}
+            >
+              Open {screen.label} screen
+            </a>
+          )}
+          <button
+            onClick={signOut}
+            style={{ background: "transparent", border: "1px solid #2e2820", borderRadius: 7, padding: "10px 20px", color: "#9c8e7a", fontSize: 13, cursor: "pointer" }}
+          >
+            Sign Out
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }) {
   const { session, loading: authLoading } = useAuth();
-  const { loading: staffLoading, notSetUp } = useStaff();
+  const { profile, loading: staffLoading, notSetUp } = useStaff();
   if (authLoading || staffLoading) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--charcoal)" }}>
       <div className="text-xs uppercase tracking-[0.2em] text-[var(--muted)]">Loading...</div>
@@ -59,6 +103,7 @@ function ProtectedRoute({ children }) {
   );
   if (!session) return <Navigate to="/login" replace />;
   if (notSetUp) return <NotSetUpScreen />;
+  if (OPERATIONS_SCREENS[profile?.role]) return <OperationsScreen role={profile.role} />;
   return <Layout>{children}</Layout>;
 }
 
@@ -80,6 +125,7 @@ function AnalyticsRoute({ children }) {
   const { profile, loading: staffLoading } = useStaff();
   if (authLoading || staffLoading) return null;
   if (!session) return <Navigate to="/login" replace />;
+  if (OPERATIONS_SCREENS[profile?.role]) return <OperationsScreen role={profile.role} />;
   const allowed = profile?.role === "super_admin" || profile?.permissions?.analytics === true;
   if (!allowed) return <Navigate to="/" replace />;
   return <Layout>{children}</Layout>;

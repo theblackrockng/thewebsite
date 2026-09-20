@@ -155,7 +155,10 @@ function SidebarContent({ pathname, pendingCount, newEnqCount, newOrdersCount, s
     super_admin: { label: "Super Admin", color: "var(--ds-gold)" },
     manager:     { label: "Manager",     color: "#63b3ed" },
     waiter:      { label: "Waiter",      color: "#fb923c" },
-    content_creator:      { label: "Content Creator",      color: "#a78bfa" },
+    kitchen:     { label: "Kitchen",     color: "#22c55e" },
+    bar:         { label: "Bar",         color: "#38bdf8" },
+    front_desk:  { label: "Front Desk",  color: "#c8a96e" },
+    content_creator:     { label: "Content Creator",      color: "#a78bfa" },
     social_media_manager: { label: "Social Media Manager", color: "#f472b6" },
   };
   const roleLabel  = ROLE_META[role]?.label ?? "Staff";
