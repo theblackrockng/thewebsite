@@ -55,7 +55,7 @@ const OPERATIONS_SCREENS = {
   kitchen:    { label: "Kitchen",    path: "/kitchen-display" },
   bar:        { label: "Bar",        path: "/bar-display" },
   waiter:     { label: "Waiter",     path: "/waiter" },
-  front_desk: { label: "Front Desk", path: null },
+  front_desk: { label: "Front Desk", path: "/front-desk-display" },
 };
 
 function OperationsScreen({ role }) {
