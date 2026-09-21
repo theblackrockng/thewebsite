@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-21 (front desk order monitor)_
+_Last updated: 2026-09-21 (front desk actions moved to website endpoint)_
 
 ---
 
@@ -33,7 +33,8 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Technical SEO | _pending commit_ robots.txt, sitemap.xml, per-page meta/OG/canonical via react-helmet-async, Restaurant JSON-LD, CSP fix for Google Fonts + Maps |
 | Native Android apps scaffold | _pending commit_ Capacitor project at `blackrock-apps/`; three config variants (kitchen/waiter/bar); kiosk MainActivity + BootReceiver for kitchen; build scripts |
 | FCM push notifications | _pending commit_ `api/_lib/fcm.js` Firebase Admin module; `api/register-device.js`; bar push on new drink orders (orders.js); waiter push on order ready (kitchen-status.js); push token registration in Waiter.jsx + BarDisplay.jsx; PinGate removed from BarDisplay |
-| Front Desk order monitor | _pending commit_ `frontend/src/pages/FrontDeskDisplay.jsx` at `/front-desk-display` (StaffLoginGate for front_desk, manager, super_admin; tabs, stat cards, Realtime with 15s polling fallback, sound alert, wake lock, light/dark); confirm, complete and payment actions call the console `PATCH /api/orders`; console origin added to website CSP `connect-src` |
+| Front Desk order monitor | _pending commit_ `frontend/src/pages/FrontDeskDisplay.jsx` at `/front-desk-display` (StaffLoginGate for front_desk, manager, super_admin; tabs, stat cards, Realtime with 15s polling fallback, sound alert, wake lock, light/dark); confirm, complete and payment actions (see next row) |
+| Front Desk actions on website endpoint | _pending commit_ `frontend/api/front-desk-orders.js` replaces the cross-origin console PATCH (which returned 401); `FrontDeskDisplay` calls `/api/front-desk-orders`; persistent fixed error banner with HTTP status; console origin removed from website CSP |
 | Console operations screen | _pending commit_ kitchen/bar/waiter/front_desk accounts get `OperationsScreen` (link to their website screen + sign out) instead of the console Layout; guard in `ProtectedRoute` and `AnalyticsRoute`; sidebar role labels for Kitchen, Bar, Front Desk; front_desk links to `/front-desk-display` |
 
 ---
@@ -65,7 +66,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `/content-hub/login` | ContentHubLogin.jsx | Auth for content hub |
 | `/kitchen-display` | KitchenDisplay.jsx | Live kitchen order display (Supabase Realtime) |
 | `/bar-display` | BarDisplay.jsx | Live bar order display (Supabase Realtime) |
-| `/front-desk-display` | FrontDeskDisplay.jsx | Front desk order monitor; roles front_desk, manager, super_admin; Realtime + 15s polling fallback; can confirm, complete and mark paid |
+| `/front-desk-display` | FrontDeskDisplay.jsx | Front desk order monitor; roles front_desk, manager, super_admin; Realtime + 15s polling fallback; can confirm, complete and mark paid via `/api/front-desk-orders` |
 | `/waiter` | Waiter.jsx | Waiter app — Supabase Auth login, table select, place orders |
 
 **Frontend Contexts:** `AuthContext`, `CartContext`, `FeatureFlagContext`, `TableContext`
@@ -78,6 +79,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `initiate-payment.js` | POST | Paystack/Flutterwave payment init (inactive) |
 | `payment-webhook.js` | POST | Payment gateway webhook (inactive) |
 | `kitchen-status.js` | PATCH | Update order status; sends waiter FCM push when status → ready |
+| `front-desk-orders.js` | PATCH | Front desk / manager only: confirm (new only), complete (any active status), mark paid or proof received; whitelisted transitions, sets `confirmed_by` from the verified profile, Telegram notice on status changes |
 | `register-device.js` | POST | Upsert FCM token into push_tokens table |
 | `send-confirmation.js` | POST | Zoho SMTP order confirmation email |
 | `send-enquiry-reply.js` | POST | Zoho SMTP reply to enquiries |
@@ -190,7 +192,6 @@ Key tables (inferred from code and API usage):
 7. **Waiter name on orders.** `waiter_name` is stored on orders but the waiter app currently sets it from the authenticated staff profile. No explicit assignment of waiter-to-table in the database (only in UI state).
 8. **Netlify legacy files.** `frontend/netlify.toml` and root-level `netlify.toml` artifacts remain. The site deploys on Vercel; these files do nothing but add noise.
 9. **Console operations access not enforced by database policies.** Keeping kitchen/bar/waiter/front_desk accounts out of the console is a UI gate only (`OperationsScreen`). Console pages read and write Supabase tables directly with the anon client, so those accounts could still reach data through the API unless RLS policies restrict them. Live RLS policies are not in the repo (only `staff_profiles` in `supabase/migrations/003`) and need reviewing in Supabase.
-10. **Front desk actions rely on the console orders endpoint.** Confirm, complete and payment updates call `https://console.blackrockrestaurantng.com/api/orders` (PATCH) cross-origin. That endpoint allows `front_desk` but does not validate status or payment transitions, and the website has no equivalent endpoint with a transition whitelist. `kitchen-status` cannot confirm or complete an order and has no payment action.
 
 ---
 

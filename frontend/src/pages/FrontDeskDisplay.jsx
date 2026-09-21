@@ -2,14 +2,11 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X } from "lucide-react";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
 
-// Order status and payment updates go through the console's role-checked
-// PATCH endpoint (it allows front_desk). kitchen-status cannot confirm or
-// complete an order and has no payment action.
-const ORDERS_API = "https://console.blackrockrestaurantng.com/api/orders";
+const ORDERS_API = "/api/front-desk-orders";
 
 const POLL_MS = 15000;
 const FLASH_MS = 45000;
@@ -104,7 +101,6 @@ export default function FrontDeskDisplay() {
 }
 
 function FrontDeskContent() {
-  const { profile } = useStaffSession();
   const [isDark, setIsDark] = useState(() => {
     try { return localStorage.getItem("blackrock-frontdesk-theme") === "dark"; } catch { return false; }
   });
@@ -128,7 +124,6 @@ function FrontDeskContent() {
   const mutedRef = useRef(false);
   const inFlightRef = useRef(false);
   const pendingRef = useRef(false);
-  const errorTimerRef = useRef(null);
 
   useEffect(() => { mutedRef.current = muted; }, [muted]);
 
@@ -278,15 +273,8 @@ function FrontDeskContent() {
     };
   }, [fetchOrders]);
 
-  function showError(msg) {
-    setActionError(msg);
-    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
-    errorTimerRef.current = setTimeout(() => setActionError(""), 5000);
-  }
-
-  useEffect(() => () => { if (errorTimerRef.current) clearTimeout(errorTimerRef.current); }, []);
-
-  async function patchOrder(orderId, fields) {
+  async function patchOrder(orderId, fields, actionLabel) {
+    setActionError("");
     setActionIds((prev) => new Set([...prev, orderId]));
     try {
       const res = await fetch(ORDERS_API, {
@@ -296,20 +284,20 @@ function FrontDeskContent() {
       });
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        showError(json.error || "Could not update the order. Please try again.");
+        setActionError(`${actionLabel} failed. HTTP ${res.status}: ${json.error || res.statusText || "No message from the server."}`);
         return;
       }
       setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...fields } : o)));
-    } catch {
-      showError("Could not reach the server. Please try again.");
+    } catch (err) {
+      setActionError(`${actionLabel} failed. Network error: ${err?.message || "could not reach the server."}`);
     } finally {
       setActionIds((prev) => { const n = new Set(prev); n.delete(orderId); return n; });
     }
   }
 
-  const confirmOrder = (id) => patchOrder(id, { order_status: "confirmed", confirmed_by: profile?.full_name || "Front Desk" });
-  const completeOrder = (id) => patchOrder(id, { order_status: "completed" });
-  const setPayment = (id, payment_status) => patchOrder(id, { payment_status });
+  const confirmOrder = (id) => patchOrder(id, { order_status: "confirmed" }, "Confirm");
+  const completeOrder = (id) => patchOrder(id, { order_status: "completed" }, "Mark Completed");
+  const setPayment = (id, payment_status) => patchOrder(id, { payment_status }, payment_status === "paid" ? "Mark Paid" : "Proof Received");
 
   const counts = useMemo(() => {
     const today = startOfToday();
@@ -425,8 +413,23 @@ function FrontDeskContent() {
       </div>
 
       {actionError && (
-        <div role="alert" style={{ marginBottom: 16, padding: "14px 18px", borderRadius: 10, border: `1px solid ${t.accent}`, background: t.card, color: t.accent, fontSize: 17, fontWeight: 600 }}>
-          {actionError}
+        <div
+          role="alert"
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+            padding: "18px 32px", background: BURGUNDY, color: "#ffffff",
+            fontSize: 20, fontWeight: 700, boxShadow: "0 4px 18px rgba(0,0,0,0.35)",
+          }}
+        >
+          <span>{actionError}</span>
+          <button
+            onClick={() => setActionError("")}
+            aria-label="Dismiss error"
+            style={{ background: "transparent", border: "2px solid #ffffff", borderRadius: 8, color: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 16, fontWeight: 700, fontFamily: "inherit", flexShrink: 0 }}
+          >
+            <X size={18} /> Dismiss
+          </button>
         </div>
       )}
 
@@ -479,8 +482,9 @@ function OrderCard({ order, t, now, flashing, busy, onConfirm, onComplete, onPay
   const canConfirm = order.order_status === "new";
   const canComplete = order.order_status === "ready";
   const isPaid = order.payment_status === "paid";
-  const canMarkPaid = !isPaid && !closed && order.payment_status !== "failed";
-  const canProof = order.payment_status === "awaiting_proof" && !closed;
+  const cancelled = order.order_status === "cancelled";
+  const canMarkPaid = !isPaid && !cancelled && order.payment_status !== "failed";
+  const canProof = order.payment_status === "awaiting_proof" && !cancelled;
 
   const actionBtn = (bg, color) => ({
     flex: 1, minWidth: 140, padding: "16px 20px", borderRadius: 10, border: "none",
