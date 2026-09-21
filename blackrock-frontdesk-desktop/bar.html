@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+  <title>BLACKROCK Front Desk</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+    body { font-family: 'DM Sans', 'Segoe UI', Arial, sans-serif; user-select: none; cursor: default; }
+    .bar {
+      box-sizing: border-box;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      background: #7a1c1c;
+      border-bottom: 1px solid #c8a96e;
+      color: #c8a96e;
+      transform: translateY(-100%);
+      transition: transform 160ms ease-out;
+    }
+    body.show .bar { transform: translateY(0); }
+    .label { font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; }
+    .buttons { display: flex; gap: 8px; }
+    button {
+      height: 18px;
+      padding: 0 12px;
+      border: 1px solid #c8a96e;
+      border-radius: 4px;
+      background: transparent;
+      color: #c8a96e;
+      font: 600 11px/1 'DM Sans', 'Segoe UI', Arial, sans-serif;
+      cursor: pointer;
+    }
+    button:hover { background: rgba(200, 169, 110, 0.18); }
+    button.close { background: #c8a96e; color: #7a1c1c; }
+    button.close:hover { background: #e0c78f; }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <div class="label">Blackrock Front Desk</div>
+    <div class="buttons">
+      <button data-action="minimize">Minimize</button>
+      <button data-action="toggle-fullscreen">Exit full screen</button>
+      <button class="close" data-action="close">Close</button>
+    </div>
+  </div>
+</body>
+</html>

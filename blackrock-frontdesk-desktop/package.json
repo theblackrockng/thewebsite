@@ -1,6 +1,6 @@
 {
   "name": "blackrock-frontdesk-desktop",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "BLACKROCK Front Desk order monitor for Windows",
   "main": "main.js",
   "author": "BLACKROCK Restaurant & Lounge",
@@ -21,6 +21,8 @@
     "files": [
       "main.js",
       "offline.html",
+      "bar.html",
+      "bar-preload.js",
       "package.json",
       "build/icon.ico"
     ],
