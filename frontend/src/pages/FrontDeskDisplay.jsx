@@ -43,6 +43,7 @@ const TABS = [
   { key: "all",    label: "All Orders" },
   { key: "table",  label: "Table Orders" },
   { key: "online", label: "Online Orders" },
+  { key: "completed", label: "Completed Today" },
 ];
 
 const STAT_KEYS = ["new", "confirmed", "preparing", "ready", "completed"];
@@ -69,10 +70,45 @@ function timeSince(iso, now) {
   return rem ? `${h}h ${rem}m ago` : `${h}h ago`;
 }
 
+// Lagos is UTC+1 all year with no daylight saving, so midnight there is a fixed offset.
 function startOfToday() {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
+  const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  return new Date(`${ymd}T00:00:00+01:00`).getTime();
+}
+
+function fmtLagosTime(iso) {
+  return new Date(iso).toLocaleTimeString("en-NG", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit", hour12: true });
+}
+
+// The orders table has no completion timestamp, so the time an order was
+// completed from this screen is remembered in this browser only.
+const COMPLETED_KEY = "blackrock-frontdesk-completed";
+
+function loadCompletedMap() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(COMPLETED_KEY) || "{}");
+    const cutoff = startOfToday() - 86400000;
+    return Object.fromEntries(Object.entries(raw).filter(([, v]) => new Date(v).getTime() >= cutoff));
+  } catch {
+    return {};
+  }
+}
+
+function saveCompletedMap(map) {
+  try { localStorage.setItem(COMPLETED_KEY, JSON.stringify(map)); } catch {}
+}
+
+function completedFilter(map) {
+  const today = startOfToday();
+  const ids = Object.entries(map).filter(([, v]) => new Date(v).getTime() >= today).map(([id]) => id);
+  const parts = [`created_at.gte.${new Date(today).toISOString()}`];
+  if (ids.length > 0) parts.push(`id.in.(${ids.join(",")})`);
+  return parts.join(",");
+}
+
+function completionInfo(order, map) {
+  const iso = map[order.id] || order.completed_at || order.updated_at || null;
+  return iso ? { iso, known: true } : { iso: order.created_at, known: false };
 }
 
 function isTableOrder(o) {
@@ -107,6 +143,10 @@ function FrontDeskContent() {
   const t = THEMES[isDark ? "dark" : "light"];
 
   const [orders, setOrders] = useState([]);
+  const [completedOrders, setCompletedOrders] = useState([]);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [completedLoaded, setCompletedLoaded] = useState(false);
+  const [completedMap, setCompletedMap] = useState(loadCompletedMap);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("all");
   const [connected, setConnected] = useState(false);
@@ -124,6 +164,12 @@ function FrontDeskContent() {
   const mutedRef = useRef(false);
   const inFlightRef = useRef(false);
   const pendingRef = useRef(false);
+  const tabRef = useRef(tab);
+  const ordersRef = useRef(orders);
+  const completedMapRef = useRef(completedMap);
+  tabRef.current = tab;
+  ordersRef.current = orders;
+  completedMapRef.current = completedMap;
 
   useEffect(() => { mutedRef.current = muted; }, [muted]);
 
@@ -172,20 +218,48 @@ function FrontDeskContent() {
     inFlightRef.current = true;
     try {
       const startISO = new Date(startOfToday()).toISOString();
-      const { data, error } = await supabase
+      const doneFilter = completedFilter(completedMapRef.current);
+      const wantList = tabRef.current === "completed";
+
+      const activeReq = supabase
         .from("orders")
         .select("*, order_items(*)")
+        .neq("order_status", "completed")
         .or(`created_at.gte.${startISO},order_status.in.(${ACTIVE_STATUSES.join(",")})`)
         .order("created_at", { ascending: false })
         .limit(300);
 
+      const countReq = supabase
+        .from("orders")
+        .select("id", { count: "exact", head: true })
+        .eq("order_status", "completed")
+        .or(doneFilter);
+
+      const listReq = wantList
+        ? supabase
+            .from("orders")
+            .select("*, order_items(*)")
+            .eq("order_status", "completed")
+            .or(doneFilter)
+            .order("created_at", { ascending: false })
+            .limit(200)
+        : Promise.resolve(null);
+
+      const [{ data, error }, countRes, listRes] = await Promise.all([activeReq, countReq, listReq]);
+
       if (!mountedRef.current) return;
       if (error) { setLoading(false); return; }
 
-      const list = data || [];
+      const list = (data || []).filter((o) => !completedMapRef.current[o.id]);
       setOrders(list);
       setLoading(false);
       setLastUpdated(new Date());
+
+      if (countRes && !countRes.error && countRes.count !== null) setCompletedCount(countRes.count);
+      if (listRes && !listRes.error) {
+        setCompletedOrders(listRes.data || []);
+        setCompletedLoaded(true);
+      }
 
       const ids = new Set(list.map((o) => o.id));
       if (knownIdsRef.current) {
@@ -232,6 +306,10 @@ function FrontDeskContent() {
       supabase.removeChannel(channel);
     };
   }, [fetchOrders]);
+
+  useEffect(() => {
+    if (tab === "completed") fetchOrders();
+  }, [tab, fetchOrders]);
 
   useEffect(() => {
     if (connected) return undefined;
@@ -287,7 +365,20 @@ function FrontDeskContent() {
         setActionError(`${actionLabel} failed. HTTP ${res.status}: ${json.error || res.statusText || "No message from the server."}`);
         return;
       }
-      setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...fields } : o)));
+      if (fields.order_status === "completed") {
+        const doneAt = new Date().toISOString();
+        const moved = ordersRef.current.find((o) => o.id === orderId);
+        const nextMap = { ...completedMapRef.current, [orderId]: doneAt };
+        saveCompletedMap(nextMap);
+        setCompletedMap(nextMap);
+        setOrders((prev) => prev.filter((o) => o.id !== orderId));
+        if (moved) {
+          setCompletedOrders((prev) => (prev.some((o) => o.id === orderId) ? prev : [{ ...moved, order_status: "completed" }, ...prev]));
+        }
+        setCompletedCount((c) => c + 1);
+      } else {
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...fields } : o)));
+      }
     } catch (err) {
       setActionError(`${actionLabel} failed. Network error: ${err?.message || "could not reach the server."}`);
     } finally {
@@ -300,30 +391,32 @@ function FrontDeskContent() {
   const setPayment = (id, payment_status) => patchOrder(id, { payment_status }, payment_status === "paid" ? "Mark Paid" : "Proof Received");
 
   const counts = useMemo(() => {
-    const today = startOfToday();
-    const c = { new: 0, confirmed: 0, preparing: 0, ready: 0, completed: 0 };
+    const c = { new: 0, confirmed: 0, preparing: 0, ready: 0, completed: completedCount };
     orders.forEach((o) => {
-      if (o.order_status === "completed") {
-        const ts = new Date(o.updated_at || o.created_at).getTime();
-        if (ts >= today) c.completed += 1;
-      } else if (c[o.order_status] !== undefined) {
-        c[o.order_status] += 1;
-      }
+      if (c[o.order_status] !== undefined && o.order_status !== "completed") c[o.order_status] += 1;
     });
     return c;
-  }, [orders]);
+  }, [orders, completedCount]);
 
   const tabCounts = useMemo(() => ({
     all: orders.length,
     table: orders.filter(isTableOrder).length,
     online: orders.filter((o) => !isTableOrder(o)).length,
-  }), [orders]);
+    completed: completedCount,
+  }), [orders, completedCount]);
 
-  const visible = orders.filter((o) => {
-    if (tab === "table") return isTableOrder(o);
-    if (tab === "online") return !isTableOrder(o);
-    return true;
-  });
+  const isCompletedTab = tab === "completed";
+
+  const visible = useMemo(() => {
+    if (isCompletedTab) {
+      return completedOrders
+        .map((o) => ({ order: o, info: completionInfo(o, completedMap) }))
+        .sort((a, b) => new Date(b.info.iso) - new Date(a.info.iso));
+    }
+    return orders
+      .filter((o) => (tab === "table" ? isTableOrder(o) : tab === "online" ? !isTableOrder(o) : true))
+      .map((o) => ({ order: o, info: null }));
+  }, [isCompletedTab, completedOrders, completedMap, orders, tab]);
 
   const pill = {
     background: t.card, border: `1px solid ${t.border}`, borderRadius: 10, padding: "10px 16px",
@@ -384,12 +477,28 @@ function FrontDeskContent() {
 
       {/* Stat cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 16, margin: "24px 0" }}>
-        {STAT_KEYS.map((key) => (
-          <div key={key} style={{ background: t.card, border: `1px solid ${t.border}`, borderTop: `5px solid ${STATUS_CFG[key].color}`, borderRadius: 12, padding: "16px 20px" }}>
-            <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.muted }}>{STATUS_CFG[key].label}</div>
-            <div style={{ fontSize: 48, fontWeight: 800, color: STATUS_CFG[key].color, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{counts[key]}</div>
-          </div>
-        ))}
+        {STAT_KEYS.map((key) => {
+          const opensTab = key === "completed";
+          return (
+            <div
+              key={key}
+              role={opensTab ? "button" : undefined}
+              tabIndex={opensTab ? 0 : undefined}
+              onClick={opensTab ? () => setTab("completed") : undefined}
+              onKeyDown={opensTab ? (e) => { if (e.key === "Enter" || e.key === " ") setTab("completed"); } : undefined}
+              style={{
+                background: t.card, borderTop: `5px solid ${STATUS_CFG[key].color}`, borderRadius: 12, padding: "16px 20px",
+                border: `1px solid ${opensTab && isCompletedTab ? t.gold : t.border}`, borderTopWidth: 5, borderTopColor: STATUS_CFG[key].color,
+                cursor: opensTab ? "pointer" : "default",
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.muted }}>
+                {STATUS_CFG[key].label}{opensTab ? " Today" : ""}
+              </div>
+              <div style={{ fontSize: 48, fontWeight: 800, color: STATUS_CFG[key].color, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{counts[key]}</div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Tabs */}
@@ -434,22 +543,23 @@ function FrontDeskContent() {
       )}
 
       {/* Order list */}
-      {loading ? (
+      {loading || (isCompletedTab && !completedLoaded) ? (
         <div style={{ textAlign: "center", color: t.muted, padding: "80px 0", fontSize: 20 }}>Loading orders...</div>
       ) : visible.length === 0 ? (
         <div style={{ textAlign: "center", padding: "80px 0" }}>
           <UtensilsCrossed size={56} style={{ color: t.border, marginBottom: 16 }} />
-          <p style={{ color: t.muted, fontSize: 20, margin: 0 }}>No orders to show</p>
+          <p style={{ color: t.muted, fontSize: 20, margin: 0 }}>{isCompletedTab ? "No completed orders today" : "No orders to show"}</p>
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))", gap: 20 }}>
-          {visible.map((order) => (
+          {visible.map(({ order, info }) => (
             <OrderCard
               key={order.id}
               order={order}
               t={t}
               now={now}
-              flashing={flashIds.has(order.id)}
+              completion={info}
+              flashing={!isCompletedTab && flashIds.has(order.id)}
               busy={actionIds.has(order.id)}
               onConfirm={confirmOrder}
               onComplete={completeOrder}
@@ -474,17 +584,20 @@ function Badge({ cfg }) {
   );
 }
 
-function OrderCard({ order, t, now, flashing, busy, onConfirm, onComplete, onPayment }) {
+function OrderCard({ order, t, now, completion, flashing, busy, onConfirm, onComplete, onPayment }) {
   const statusCfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
   const payCfg = PAYMENT_CFG[order.payment_status] ?? { label: order.payment_status || "Unknown", color: "#6b7280" };
   const items = order.order_items || [];
-  const closed = order.order_status === "completed" || order.order_status === "cancelled";
-  const canConfirm = order.order_status === "new";
-  const canComplete = order.order_status === "ready";
-  const isPaid = order.payment_status === "paid";
+  const readOnly = !!completion;
   const cancelled = order.order_status === "cancelled";
-  const canMarkPaid = !isPaid && !cancelled && order.payment_status !== "failed";
-  const canProof = order.payment_status === "awaiting_proof" && !cancelled;
+  const canConfirm = !readOnly && order.order_status === "new";
+  const canComplete = !readOnly && order.order_status === "ready";
+  const isPaid = order.payment_status === "paid";
+  const canMarkPaid = !readOnly && !isPaid && !cancelled && order.payment_status !== "failed";
+  const canProof = !readOnly && order.payment_status === "awaiting_proof" && !cancelled;
+  const timeLine = readOnly
+    ? (completion.known ? `Completed ${fmtLagosTime(completion.iso)}` : `Placed ${fmtLagosTime(order.created_at)}`)
+    : timeSince(order.created_at, now);
 
   const actionBtn = (bg, color) => ({
     flex: 1, minWidth: 140, padding: "16px 20px", borderRadius: 10, border: "none",
@@ -497,7 +610,7 @@ function OrderCard({ order, t, now, flashing, busy, onConfirm, onComplete, onPay
       className={flashing ? "fd-flash" : undefined}
       style={{
         background: t.card, borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column",
-        border: `2px solid ${flashing ? t.gold : t.border}`, opacity: closed ? 0.72 : 1,
+        border: `2px solid ${flashing ? t.gold : t.border}`, opacity: cancelled ? 0.72 : 1,
       }}
     >
       <div style={{ background: t.cardHead, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, borderBottom: `1px solid ${t.border}` }}>
@@ -518,7 +631,7 @@ function OrderCard({ order, t, now, flashing, busy, onConfirm, onComplete, onPay
             )}
             <Badge cfg={statusCfg} />
           </div>
-          <span style={{ fontSize: 16, color: t.muted, fontWeight: 600 }}>{timeSince(order.created_at, now)}</span>
+          <span style={{ fontSize: 16, color: t.muted, fontWeight: 600 }}>{timeLine}</span>
         </div>
       </div>
 
