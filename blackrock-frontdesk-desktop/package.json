@@ -1,0 +1,52 @@
+{
+  "name": "blackrock-frontdesk-desktop",
+  "version": "1.0.0",
+  "description": "BLACKROCK Front Desk order monitor for Windows",
+  "main": "main.js",
+  "author": "BLACKROCK Restaurant & Lounge",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "build": {
+    "appId": "com.blackrockrestaurantng.frontdesk",
+    "productName": "BLACKROCK Front Desk",
+    "artifactName": "BLACKROCK-Front-Desk-Setup-${version}.${ext}",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "offline.html",
+      "package.json",
+      "build/icon.ico"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "BLACKROCK Front Desk",
+      "deleteAppDataOnUninstall": false
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.4.3",
+    "electron-builder": "^26.15.3"
+  }
+}

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'">
+  <title>BLACKROCK Front Desk</title>
+  <style>
+    html, body { margin: 0; height: 100%; }
+    body {
+      background: #7a1c1c;
+      color: #c8a96e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      text-align: center;
+      font-family: 'DM Sans', 'Segoe UI', Arial, sans-serif;
+      cursor: default;
+      user-select: none;
+    }
+    .brand {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 54px;
+      font-weight: 700;
+      letter-spacing: 12px;
+      text-transform: uppercase;
+    }
+    .rule { width: 180px; height: 2px; background: #c8a96e; opacity: 0.6; }
+    .message { font-size: 44px; font-weight: 700; }
+    .hint { font-size: 22px; color: #e6d3a8; opacity: 0.85; }
+    .dot {
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #c8a96e;
+      animation: pulse 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(0.7); opacity: 0.5; }
+      50%      { transform: scale(1.15); opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="brand">Blackrock</div>
+  <div class="rule"></div>
+  <div class="message">No internet connection. Reconnecting...</div>
+  <div class="dot"></div>
+  <div class="hint">Trying again every 10 seconds. This screen reloads by itself when the connection is back.</div>
+</body>
+</html>
