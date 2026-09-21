@@ -1,0 +1,12 @@
+{
+  "webDir": "www",
+  "server": {
+    "cleartext": false,
+    "allowNavigation": ["blackrockrestaurantng.com", "www.blackrockrestaurantng.com"]
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    }
+  }
+}

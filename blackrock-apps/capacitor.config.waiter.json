@@ -1,15 +1,7 @@
 {
   "appId": "ng.blackrockrestaurantng.waiter",
   "appName": "BLACKROCK Waiter",
-  "webDir": "www",
   "server": {
-    "url": "https://www.blackrockrestaurantng.com/waiter",
-    "cleartext": false,
-    "allowNavigation": ["blackrockrestaurantng.com", "www.blackrockrestaurantng.com"]
-  },
-  "plugins": {
-    "PushNotifications": {
-      "presentationOptions": ["badge", "sound", "alert"]
-    }
+    "url": "https://www.blackrockrestaurantng.com/waiter"
   }
 }

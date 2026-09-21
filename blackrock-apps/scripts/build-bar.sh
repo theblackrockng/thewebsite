@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 set -e
 
+export JAVA_HOME="$(/usr/libexec/java_home -v 21)"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
 JAVA_SRC="$ROOT/android/app/src/main/java/ng/blackrockrestaurantng/app"
 
-echo "==> [Bar] Swapping Capacitor config..."
-cp "$ROOT/capacitor.config.bar.json" "$ROOT/capacitor.config.json"
+echo "==> [Bar] Merging Capacitor config (base + bar)..."
+jq -s '.[0] * .[1]' "$ROOT/capacitor.config.base.json" "$ROOT/capacitor.config.bar.json" > "$ROOT/capacitor.config.json"
 
 echo "==> [Bar] Setting applicationId in build.gradle..."
 sed -i '' 's/applicationId "ng\.blackrockrestaurantng\.[^"]*"/applicationId "ng.blackrockrestaurantng.bar"/' \

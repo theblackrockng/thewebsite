@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-21 (front desk completed_at and session handling)_
+_Last updated: 2026-09-21 (native apps: Chrome redirect fix for Bar and Waiter; shared config base; build:all)_
 
 ---
 
@@ -31,7 +31,9 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Waiter auth | `0a54d02` Supabase Auth login replaces PIN gate; role check against staff_profiles |
 | Analytics | `a7c3005` Analytics page (period selector, bar chart, daily table); AnalyticsRoute guard; waiter role in UserManagement |
 | Technical SEO | _pending commit_ robots.txt, sitemap.xml, per-page meta/OG/canonical via react-helmet-async, Restaurant JSON-LD, CSP fix for Google Fonts + Maps |
-| Native Android apps scaffold | _pending commit_ Capacitor project at `blackrock-apps/`; three config variants (kitchen/waiter/bar); kiosk MainActivity + BootReceiver for kitchen; build scripts |
+| Native Android apps scaffold | Capacitor project at `blackrock-apps/`; three config variants (kitchen/waiter/bar); kiosk MainActivity + BootReceiver for kitchen; build scripts |
+| Native apps Chrome redirect fix | `allowNavigation` (both `blackrockrestaurantng.com` and `www.`) + `server.url` pointing at `www.` to skip 308 redirect; applied to all three configs in `7bd6bb9` + `931abcd`; Bar and Waiter APKs rebuilt Sep 21 |
+| Native apps shared config base + build:all | `capacitor.config.base.json` holds all shared fields; per-app configs hold only appId, appName, server.url; build scripts use `jq -s '.[0] * .[1]'` to merge; `npm run build:all` builds all three and copies APKs to `APPs/` |
 | FCM push notifications | _pending commit_ `api/_lib/fcm.js` Firebase Admin module; `api/register-device.js`; bar push on new drink orders (orders.js); waiter push on order ready (kitchen-status.js); push token registration in Waiter.jsx + BarDisplay.jsx; PinGate removed from BarDisplay |
 | Front Desk order monitor | _pending commit_ `frontend/src/pages/FrontDeskDisplay.jsx` at `/front-desk-display` (StaffLoginGate for front_desk, manager, super_admin; tabs, stat cards, Realtime with 15s polling fallback, sound alert, wake lock, light/dark); confirm, complete and payment actions (see next row) |
 | Front Desk actions on website endpoint | _pending commit_ `frontend/api/front-desk-orders.js` replaces the cross-origin console PATCH (which returned 401); `FrontDeskDisplay` calls `/api/front-desk-orders`; persistent fixed error banner with HTTP status; console origin removed from website CSP |
