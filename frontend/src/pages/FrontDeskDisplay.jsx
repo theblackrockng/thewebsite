@@ -6,8 +6,8 @@ import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2,
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
 
-const ORDERS_API = "/api/front-desk-orders";
-const RESERVATIONS_API = "/api/front-desk-reservations";
+const ORDERS_API = "/api/front-desk?resource=orders";
+const RESERVATIONS_API = "/api/front-desk?resource=reservations";
 
 const POLL_MS = 15000;
 const FLASH_MS = 45000;

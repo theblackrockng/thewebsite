@@ -16,6 +16,9 @@
     }
   ],
   "routes": [
+    { "src": "/api/front-desk-orders",       "dest": "/api/front-desk?resource=orders" },
+    { "src": "/api/front-desk-reservations", "dest": "/api/front-desk?resource=reservations" },
+    { "src": "/api/telegram-setup",          "dest": "/api/telegram-webhook?action=setup" },
     { "handle": "filesystem" },
     { "src": "/.*", "dest": "/index.html" }
   ],
