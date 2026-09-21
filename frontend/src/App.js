@@ -34,6 +34,7 @@ import OrderConfirmation from "./pages/OrderConfirmation";
 import Waiter from "./pages/Waiter";
 import KitchenDisplay from "./pages/KitchenDisplay";
 import BarDisplay from "./pages/BarDisplay";
+import FrontDeskDisplay from "./pages/FrontDeskDisplay";
 
 function OrderRoute({ children }) {
   const { orderingEnabled, loading } = useFeatureFlags();
@@ -122,6 +123,7 @@ function App() {
                   <Route path="/content-hub/*" element={<ContentHubLayout />} />
                   <Route path="/kitchen-display" element={<KitchenDisplay />} />
                   <Route path="/bar-display" element={<BarDisplay />} />
+                  <Route path="/front-desk-display" element={<FrontDeskDisplay />} />
                   <Route path="/waiter" element={<OrderRoute><Waiter /></OrderRoute>} />
                   <Route path="*" element={<MainLayout />} />
                 </Routes>

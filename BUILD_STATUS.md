@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-20 (console operations screen)_
+_Last updated: 2026-09-21 (front desk order monitor)_
 
 ---
 
@@ -33,6 +33,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Technical SEO | _pending commit_ robots.txt, sitemap.xml, per-page meta/OG/canonical via react-helmet-async, Restaurant JSON-LD, CSP fix for Google Fonts + Maps |
 | Native Android apps scaffold | _pending commit_ Capacitor project at `blackrock-apps/`; three config variants (kitchen/waiter/bar); kiosk MainActivity + BootReceiver for kitchen; build scripts |
 | FCM push notifications | _pending commit_ `api/_lib/fcm.js` Firebase Admin module; `api/register-device.js`; bar push on new drink orders (orders.js); waiter push on order ready (kitchen-status.js); push token registration in Waiter.jsx + BarDisplay.jsx; PinGate removed from BarDisplay |
+| Front Desk order monitor | _pending commit_ `frontend/src/pages/FrontDeskDisplay.jsx` at `/front-desk-display` (StaffLoginGate for front_desk, manager, super_admin; tabs, stat cards, Realtime with 15s polling fallback, sound alert, wake lock, light/dark); confirm, complete and payment actions call the console `PATCH /api/orders`; console origin added to website CSP `connect-src` |
 | Console operations screen | _pending commit_ kitchen/bar/waiter/front_desk accounts get `OperationsScreen` (link to their website screen + sign out) instead of the console Layout; guard in `ProtectedRoute` and `AnalyticsRoute`; sidebar role labels for Kitchen, Bar, Front Desk |
 
 ---
@@ -64,6 +65,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `/content-hub/login` | ContentHubLogin.jsx | Auth for content hub |
 | `/kitchen-display` | KitchenDisplay.jsx | Live kitchen order display (Supabase Realtime) |
 | `/bar-display` | BarDisplay.jsx | Live bar order display (Supabase Realtime) |
+| `/front-desk-display` | FrontDeskDisplay.jsx | Front desk order monitor; roles front_desk, manager, super_admin; Realtime + 15s polling fallback; can confirm, complete and mark paid |
 | `/waiter` | Waiter.jsx | Waiter app — Supabase Auth login, table select, place orders |
 
 **Frontend Contexts:** `AuthContext`, `CartContext`, `FeatureFlagContext`, `TableContext`
@@ -187,8 +189,9 @@ Key tables (inferred from code and API usage):
 6. **Push notifications require env + DB setup.** FCM code is complete (fcm.js, register-device.js, push_tokens table). To activate: (a) add `FIREBASE_SERVICE_ACCOUNT` JSON env var to Vercel frontend project, (b) run the push_tokens SQL migration in Supabase (see Part 4 below).
 7. **Waiter name on orders.** `waiter_name` is stored on orders but the waiter app currently sets it from the authenticated staff profile. No explicit assignment of waiter-to-table in the database (only in UI state).
 8. **Netlify legacy files.** `frontend/netlify.toml` and root-level `netlify.toml` artifacts remain. The site deploys on Vercel; these files do nothing but add noise.
-9. **Front desk screen not built.** `front_desk` accounts can be invited and land on `OperationsScreen`, which says the screen is coming soon. There is no website route for it yet.
+9. **Console does not link to the Front Desk screen yet.** The screen now exists at `/front-desk-display`, but `OPERATIONS_SCREENS.front_desk.path` in `console/src/App.jsx` is still `null`, so `front_desk` accounts see "coming soon" on the console instead of a link.
 10. **Console operations access not enforced by database policies.** Keeping kitchen/bar/waiter/front_desk accounts out of the console is a UI gate only (`OperationsScreen`). Console pages read and write Supabase tables directly with the anon client, so those accounts could still reach data through the API unless RLS policies restrict them. Live RLS policies are not in the repo (only `staff_profiles` in `supabase/migrations/003`) and need reviewing in Supabase.
+11. **Front desk actions rely on the console orders endpoint.** Confirm, complete and payment updates call `https://console.blackrockrestaurantng.com/api/orders` (PATCH) cross-origin. That endpoint allows `front_desk` but does not validate status or payment transitions, and the website has no equivalent endpoint with a transition whitelist. `kitchen-status` cannot confirm or complete an order and has no payment action.
 
 ---
 
@@ -202,6 +205,7 @@ Key tables (inferred from code and API usage):
 - **`/console-internal-br2026` security by obscurity.** The feature control route is hidden by URL path; it is also gated by `super_admin` role, but the path is visible in the compiled JS bundle.
 - **Blog editor TipTap version pinned to 3.30.2** to work around peer dependency conflicts. Future upgrades need care.
 - **`OrderRoute` flag bypass via `?table=` param** is intentional (QR dine-in bypasses the feature flag) but undocumented — someone could visit `/order?table=1` even when ordering is disabled.
+- **Front Desk monitor read access is unverified.** `FrontDeskDisplay` reads `orders` and `order_items` and subscribes to Realtime with the staff session, like the kitchen display. The live RLS policies for those tables are not in the repo, so whether `front_desk` can read them needs checking in Supabase. If not, the page loads empty.
 - **Kitchen/Bar displays** at `/kitchen-display` and `/bar-display` are public routes with no auth. Anyone who knows the URL can see live orders.
 - **`supabase.auth.admin` calls in console API** require `SUPABASE_SERVICE_ROLE_KEY`. If that var is missing from the Vercel project, invite and delete-staff silently fail.
 
