@@ -2,11 +2,12 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users } from "lucide-react";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
 
 const ORDERS_API = "/api/front-desk-orders";
+const RESERVATIONS_API = "/api/front-desk-reservations";
 
 const POLL_MS = 15000;
 const FLASH_MS = 45000;
@@ -53,6 +54,26 @@ const TABS = [
 
 const STAT_KEYS = ["new", "confirmed", "preparing", "ready", "completed"];
 
+const RES_STATUS_CFG = {
+  pending:     { label: "Pending",     color: "#d97706" },
+  confirmed:   { label: "Confirmed",   color: "#16a34a" },
+  rescheduled: { label: "Rescheduled", color: "#8b5cf6" },
+  cancelled:   { label: "Cancelled",   color: "#dc2626" },
+};
+
+const RES_TABS = [
+  { key: "today",    label: "Today" },
+  { key: "upcoming", label: "Upcoming" },
+  { key: "pending",  label: "Pending" },
+  { key: "past",     label: "Past 7 Days" },
+];
+
+const RES_STATS = [
+  { key: "pending",   label: "Pending",   color: "#d97706", opens: "pending" },
+  { key: "confirmed", label: "Confirmed", color: "#16a34a" },
+  { key: "today",     label: "Today",     color: GOLD,      opens: "today" },
+];
+
 function fmtPrice(n) {
   return `₦${Number(n || 0).toLocaleString("en-NG")}`;
 }
@@ -96,6 +117,39 @@ function completedTodayFilter(hasColumn) {
 
 function completionInfo(order) {
   return order.completed_at ? { iso: order.completed_at, known: true } : { iso: order.created_at, known: false };
+}
+
+function lagosToday() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+function fmtResDate(date, today) {
+  if (date === today) return "Today";
+  const d = new Date(`${date}T12:00:00Z`);
+  const tomorrow = new Date(`${today}T12:00:00Z`);
+  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  if (d.getTime() === tomorrow.getTime()) return "Tomorrow";
+  return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" });
+}
+
+function fmtResTime(t) {
+  if (!t) return "No time";
+  if (/[AaPp][Mm]/.test(t)) return t.trim();
+  const [h, m] = t.split(":");
+  const hr = parseInt(h, 10);
+  return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`;
+}
+
+function fmtOccasion(o) {
+  return o.split("-").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+}
+
+function isTouchDevice() {
+  try { return window.matchMedia("(pointer: coarse)").matches; } catch { return false; }
+}
+
+function isOpenPending(r, today) {
+  return r.status === "pending" && r.date >= today;
 }
 
 const audio = { ctx: null, muted: false };
@@ -156,6 +210,26 @@ async function ensureSession(force = false) {
   } catch {
     return "offline";
   }
+}
+
+// Resolves to the Response, "lost" when the sign-in cannot be recovered, or
+// "offline" when a 401 could not be refreshed because the network is down.
+async function apiRequest(url, method, body) {
+  const send = async () => fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  if ((await ensureSession()) === "lost") return "lost";
+  let res = await send();
+  if (res.status === 401) {
+    const recovered = await ensureSession(true);
+    if (recovered === "lost") return "lost";
+    if (recovered === "offline") return "offline";
+    res = await send();
+    if (res.status === 401) return "lost";
+  }
+  return res;
 }
 
 function isTableOrder(o) {
@@ -243,6 +317,21 @@ function FrontDeskMain({ onSessionLost }) {
   const [audioReady, setAudioReady] = useState(() => !!audio.ctx);
   const [muted, setMuted] = useState(() => audio.muted);
 
+  const [view, setView] = useState("orders");
+  const [reservations, setReservations] = useState([]);
+  const [resToday, setResToday] = useState(lagosToday);
+  const [resLoaded, setResLoaded] = useState(false);
+  const [resOk, setResOk] = useState(true);
+  const [resUpdated, setResUpdated] = useState(null);
+  const [resTab, setResTab] = useState("today");
+  const [resFlashIds, setResFlashIds] = useState(() => new Set());
+  const [resActionIds, setResActionIds] = useState(() => new Set());
+  const [resPollError, setResPollError] = useState("");
+  const [cancelTarget, setCancelTarget] = useState(null);
+
+  const knownResIdsRef = useRef(null);
+  const resInFlightRef = useRef(false);
+  const resPendingRef = useRef(false);
   const knownIdsRef = useRef(null);
   const mountedRef = useRef(true);
   const inFlightRef = useRef(false);
@@ -368,6 +457,63 @@ function FrontDeskMain({ onSessionLost }) {
     }
   }, [checkSession]);
 
+  // Reservations are polled, not subscribed to: the list comes from a service-role
+  // endpoint and the reservations RLS policies for front_desk are not in the repo.
+  const fetchReservations = useCallback(async () => {
+    if (resInFlightRef.current) { resPendingRef.current = true; return; }
+    resInFlightRef.current = true;
+    try {
+      const res = await apiRequest(RESERVATIONS_API, "GET");
+      if (!mountedRef.current) return;
+      if (res === "lost") { lostRef.current(); return; }
+      if (res === "offline") { setResOk(false); return; }
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        if (!mountedRef.current) return;
+        setResOk(false);
+        setResPollError(`Could not load reservations. HTTP ${res.status}: ${json.error || res.statusText || "No message from the server."}`);
+        return;
+      }
+      const json = await res.json();
+      if (!mountedRef.current) return;
+
+      const list = json.reservations || [];
+      const today = json.today || lagosToday();
+      setReservations(list);
+      setResToday(today);
+      setResLoaded(true);
+      setResOk(true);
+      setResPollError("");
+      setResUpdated(new Date());
+
+      const ids = new Set(list.filter((r) => isOpenPending(r, today)).map((r) => r.id));
+      if (knownResIdsRef.current) {
+        const arrivals = [...ids].filter((id) => !knownResIdsRef.current.has(id));
+        if (arrivals.length > 0) {
+          setResFlashIds((prev) => new Set([...prev, ...arrivals]));
+          playChime();
+          setTimeout(() => {
+            if (!mountedRef.current) return;
+            setResFlashIds((prev) => {
+              const n = new Set(prev);
+              arrivals.forEach((id) => n.delete(id));
+              return n;
+            });
+          }, FLASH_MS);
+        }
+      }
+      knownResIdsRef.current = ids;
+    } catch {
+      if (mountedRef.current) setResOk(false);
+    } finally {
+      resInFlightRef.current = false;
+      if (resPendingRef.current && mountedRef.current) {
+        resPendingRef.current = false;
+        fetchReservations();
+      }
+    }
+  }, []);
+
   const subscribe = useCallback(() => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     const channel = supabase
@@ -414,11 +560,11 @@ function FrontDeskMain({ onSessionLost }) {
     let last = Date.now();
     const driftId = setInterval(() => {
       const n = Date.now();
-      if (n - last > WAKE_GAP_MS) { checkSession(); fetchOrders(); }
+      if (n - last > WAKE_GAP_MS) { checkSession(); fetchOrders(); fetchReservations(); }
       last = n;
     }, 5000);
     const onVisible = () => { if (document.visibilityState === "visible") checkSession(); };
-    const onOnline = () => { checkSession(); fetchOrders(); };
+    const onOnline = () => { checkSession(); fetchOrders(); fetchReservations(); };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onOnline);
     return () => {
@@ -427,7 +573,13 @@ function FrontDeskMain({ onSessionLost }) {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("online", onOnline);
     };
-  }, [checkSession, fetchOrders]);
+  }, [checkSession, fetchOrders, fetchReservations]);
+
+  useEffect(() => {
+    fetchReservations();
+    const id = setInterval(fetchReservations, POLL_MS);
+    return () => clearInterval(id);
+  }, [fetchReservations]);
 
   useEffect(() => {
     if (tab === "completed") fetchOrders();
@@ -465,6 +617,7 @@ function FrontDeskMain({ onSessionLost }) {
     function onVisible() {
       if (document.visibilityState === "visible") {
         fetchOrders();
+        fetchReservations();
         acquire();
       }
     }
@@ -476,7 +629,7 @@ function FrontDeskMain({ onSessionLost }) {
       document.removeEventListener("visibilitychange", onVisible);
       if (sentinel) sentinel.release().catch(() => {});
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, fetchReservations]);
 
   async function sendPatch(orderId, fields) {
     return fetch(ORDERS_API, {
@@ -535,6 +688,55 @@ function FrontDeskMain({ onSessionLost }) {
   const completeOrder = (id) => patchOrder(id, { order_status: "completed" }, "Mark Completed");
   const setPayment = (id, payment_status) => patchOrder(id, { payment_status }, payment_status === "paid" ? "Mark Paid" : "Proof Received");
 
+  async function patchReservation(id, status, actionLabel) {
+    setActionError("");
+    setResActionIds((prev) => new Set([...prev, id]));
+    try {
+      const res = await apiRequest(RESERVATIONS_API, "PATCH", { id, status });
+      if (res === "lost") { onSessionLost(); return; }
+      if (res === "offline") {
+        setActionError(`${actionLabel} failed. HTTP 401 and the sign-in could not be refreshed because the network is down. Try again.`);
+        return;
+      }
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setActionError(`${actionLabel} failed. HTTP ${res.status}: ${json.error || res.statusText || "No message from the server."}`);
+        if (res.status === 400 || res.status === 409) fetchReservations();
+        return;
+      }
+      setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+      fetchReservations();
+    } catch (err) {
+      setActionError(`${actionLabel} failed. Network error: ${err?.message || "could not reach the server."}`);
+    } finally {
+      setResActionIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    }
+  }
+
+  const confirmReservation = (id) => patchReservation(id, "confirmed", "Confirm");
+  const cancelReservation = (id) => patchReservation(id, "cancelled", "Cancel Booking");
+
+  const resLists = useMemo(() => {
+    const live = reservations.filter((r) => r.status !== "cancelled");
+    const past = reservations
+      .filter((r) => r.date < resToday)
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    return {
+      today: live.filter((r) => r.date === resToday),
+      upcoming: live.filter((r) => r.date > resToday),
+      pending: reservations.filter((r) => isOpenPending(r, resToday)),
+      past,
+    };
+  }, [reservations, resToday]);
+
+  const resCounts = useMemo(() => ({
+    pending: resLists.pending.length,
+    confirmed: reservations.filter((r) => r.status === "confirmed" && r.date >= resToday).length,
+    today: resLists.today.length,
+    upcoming: resLists.upcoming.length,
+    past: resLists.past.length,
+  }), [resLists, reservations, resToday]);
+
   const counts = useMemo(() => {
     const c = { new: 0, confirmed: 0, preparing: 0, ready: 0, completed: completedCount };
     orders.forEach((o) => {
@@ -563,6 +765,11 @@ function FrontDeskMain({ onSessionLost }) {
       .map((o) => ({ order: o, info: null }));
   }, [isCompletedTab, completedOrders, orders, tab]);
 
+  const onReservations = view === "reservations";
+  const switchBadge = onReservations ? counts.new : resCounts.pending;
+  const linkOk = onReservations ? resOk : connected;
+  const viewUpdated = onReservations ? resUpdated : lastUpdated;
+
   const pill = {
     background: t.card, border: `1px solid ${t.border}`, borderRadius: 10, padding: "10px 16px",
     color: t.muted, cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
@@ -581,25 +788,49 @@ function FrontDeskMain({ onSessionLost }) {
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, paddingBottom: 20, borderBottom: `1px solid ${t.border}` }}>
-        <div>
-          <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 30, fontWeight: 700, color: t.gold, letterSpacing: "4px", textTransform: "uppercase", lineHeight: 1 }}>BLACKROCK</div>
-          <div style={{ fontSize: 15, color: t.muted, letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, marginTop: 6 }}>Front Desk Orders</div>
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 28 }}>
+          <div>
+            <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 30, fontWeight: 700, color: t.gold, letterSpacing: "4px", textTransform: "uppercase", lineHeight: 1 }}>BLACKROCK</div>
+            <div style={{ fontSize: 15, color: t.muted, letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, marginTop: 6 }}>Front Desk</div>
+          </div>
+
+          <button
+            onClick={() => setView(onReservations ? "orders" : "reservations")}
+            style={{
+              display: "flex", alignItems: "center", gap: 14, padding: "16px 28px", borderRadius: 12,
+              background: t.gold, color: t.onGold, border: `2px solid ${t.gold}`, cursor: "pointer",
+              fontSize: 26, fontWeight: 800, fontFamily: "inherit", letterSpacing: "0.02em",
+            }}
+          >
+            {onReservations ? <UtensilsCrossed size={28} /> : <CalendarDays size={28} />}
+            {onReservations ? "Orders" : "Reservations"}
+            <span
+              aria-label={onReservations ? `${counts.new} new orders waiting` : `${resCounts.pending} pending reservations`}
+              style={{
+                minWidth: 40, height: 40, padding: "0 12px", borderRadius: 99, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                background: switchBadge > 0 ? t.accent : "rgba(0,0,0,0.18)", color: switchBadge > 0 ? "#ffffff" : t.onGold,
+              }}
+            >
+              {switchBadge}
+            </span>
+          </button>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
           <div
-            title={connected ? "Live updates connected" : "Live updates lost, checking every 15 seconds"}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: `1px solid ${connected ? "#16a34a" : t.accent}`, color: connected ? "#16a34a" : t.accent, fontSize: 15, fontWeight: 700 }}
+            title={linkOk ? "Live updates connected" : (onReservations ? "Could not reach the server, retrying every 15 seconds" : "Live updates lost, checking every 15 seconds")}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: `1px solid ${linkOk ? "#16a34a" : t.accent}`, color: linkOk ? "#16a34a" : t.accent, fontSize: 15, fontWeight: 700 }}
           >
-            {connected ? <Wifi size={18} /> : <WifiOff size={18} />}
-            {connected ? "Connected" : "Reconnecting"}
+            {linkOk ? <Wifi size={18} /> : <WifiOff size={18} />}
+            {linkOk ? "Connected" : "Reconnecting"}
           </div>
 
           <div style={{ fontSize: 15, color: t.muted, fontVariantNumeric: "tabular-nums" }}>
-            Last updated {lastUpdated ? fmtSeconds(lastUpdated) : "..."}
+            Last updated {viewUpdated ? fmtSeconds(viewUpdated) : "..."}
           </div>
 
-          <button onClick={fetchOrders} style={pill}><RefreshCw size={18} /> Refresh</button>
+          <button onClick={onReservations ? fetchReservations : fetchOrders} style={pill}><RefreshCw size={18} /> Refresh</button>
 
           {!audioReady ? (
             <button onClick={enableSound} style={{ ...pill, background: t.gold, color: t.onGold, border: `1px solid ${t.gold}` }}>
@@ -620,6 +851,44 @@ function FrontDeskMain({ onSessionLost }) {
         </div>
       </div>
 
+      {(actionError || resPollError) && (
+        <div
+          role="alert"
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+            padding: "18px 32px", background: BURGUNDY, color: "#ffffff",
+            fontSize: 20, fontWeight: 700, boxShadow: "0 4px 18px rgba(0,0,0,0.35)",
+          }}
+        >
+          <span>{actionError || resPollError}</span>
+          <button
+            onClick={() => { setActionError(""); setResPollError(""); }}
+            aria-label="Dismiss error"
+            style={{ background: "transparent", border: "2px solid #ffffff", borderRadius: 8, color: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 16, fontWeight: 700, fontFamily: "inherit", flexShrink: 0 }}
+          >
+            <X size={18} /> Dismiss
+          </button>
+        </div>
+      )}
+
+      {onReservations ? (
+        <ReservationsView
+          t={t}
+          now={now}
+          today={resToday}
+          tab={resTab}
+          setTab={setResTab}
+          lists={resLists}
+          counts={resCounts}
+          loaded={resLoaded}
+          flashIds={resFlashIds}
+          actionIds={resActionIds}
+          onConfirm={confirmReservation}
+          onAskCancel={setCancelTarget}
+        />
+      ) : (
+      <>
       {/* Stat cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 16, margin: "24px 0" }}>
         {STAT_KEYS.map((key) => {
@@ -666,27 +935,6 @@ function FrontDeskMain({ onSessionLost }) {
         })}
       </div>
 
-      {actionError && (
-        <div
-          role="alert"
-          style={{
-            position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
-            display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
-            padding: "18px 32px", background: BURGUNDY, color: "#ffffff",
-            fontSize: 20, fontWeight: 700, boxShadow: "0 4px 18px rgba(0,0,0,0.35)",
-          }}
-        >
-          <span>{actionError}</span>
-          <button
-            onClick={() => setActionError("")}
-            aria-label="Dismiss error"
-            style={{ background: "transparent", border: "2px solid #ffffff", borderRadius: 8, color: "#ffffff", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", fontSize: 16, fontWeight: 700, fontFamily: "inherit", flexShrink: 0 }}
-          >
-            <X size={18} /> Dismiss
-          </button>
-        </div>
-      )}
-
       {/* Order list */}
       {loading || (isCompletedTab && !completedLoaded) ? (
         <div style={{ textAlign: "center", color: t.muted, padding: "80px 0", fontSize: 20 }}>Loading orders...</div>
@@ -713,6 +961,221 @@ function FrontDeskMain({ onSessionLost }) {
           ))}
         </div>
       )}
+      </>
+      )}
+
+      {cancelTarget && (
+        <CancelDialog
+          t={t}
+          reservation={cancelTarget}
+          today={resToday}
+          busy={resActionIds.has(cancelTarget.id)}
+          onKeep={() => setCancelTarget(null)}
+          onCancel={() => { const id = cancelTarget.id; setCancelTarget(null); cancelReservation(id); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReservationsView({ t, now, today, tab, setTab, lists, counts, loaded, flashIds, actionIds, onConfirm, onAskCancel }) {
+  const isPast = tab === "past";
+  const visible = lists[tab];
+
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 16, margin: "24px 0" }}>
+        {RES_STATS.map((s) => {
+          const clickable = !!s.opens;
+          const open = () => setTab(s.opens);
+          return (
+            <div
+              key={s.key}
+              role={clickable ? "button" : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              onClick={clickable ? open : undefined}
+              onKeyDown={clickable ? (e) => { if (e.key === "Enter" || e.key === " ") open(); } : undefined}
+              style={{
+                background: t.card, borderRadius: 12, padding: "16px 20px",
+                border: `1px solid ${clickable && tab === s.opens ? t.gold : t.border}`, borderTopWidth: 5, borderTopColor: s.color,
+                cursor: clickable ? "pointer" : "default",
+              }}
+            >
+              <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.muted }}>{s.label}</div>
+              <div style={{ fontSize: 48, fontWeight: 800, color: s.color, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{counts[s.key]}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
+        {RES_TABS.map((tb) => {
+          const active = tab === tb.key;
+          return (
+            <button
+              key={tb.key}
+              onClick={() => setTab(tb.key)}
+              style={{
+                padding: "14px 26px", borderRadius: 10, fontSize: 18, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+                background: active ? t.gold : t.card, color: active ? t.onGold : t.muted,
+                border: `1px solid ${active ? t.gold : t.border}`,
+              }}
+            >
+              {tb.label} <span style={{ opacity: 0.75, marginLeft: 6 }}>{counts[tb.key]}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {!loaded ? (
+        <div style={{ textAlign: "center", color: t.muted, padding: "80px 0", fontSize: 20 }}>Loading reservations...</div>
+      ) : visible.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "80px 0" }}>
+          <CalendarDays size={56} style={{ color: t.border, marginBottom: 16 }} />
+          <p style={{ color: t.muted, fontSize: 20, margin: 0 }}>
+            {isPast ? "No reservations in the last 7 days" : tab === "pending" ? "No pending reservations" : tab === "upcoming" ? "No upcoming reservations" : "No reservations today"}
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))", gap: 20 }}>
+          {visible.map((r) => (
+            <ReservationCard
+              key={r.id}
+              r={r}
+              t={t}
+              now={now}
+              today={today}
+              readOnly={isPast}
+              flashing={!isPast && flashIds.has(r.id)}
+              busy={actionIds.has(r.id)}
+              onConfirm={onConfirm}
+              onAskCancel={onAskCancel}
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+function ReservationCard({ r, t, now, today, readOnly, flashing, busy, onConfirm, onAskCancel }) {
+  const cfg = RES_STATUS_CFG[r.status] ?? { label: r.status, color: "#6b7280" };
+  const canConfirm = !readOnly && (r.status === "pending" || r.status === "rescheduled");
+  const canCancel = !readOnly && r.status !== "cancelled";
+  const guests = r.party ? `${r.party} ${r.party === "1" ? "guest" : "guests"}` : "Party size not given";
+  const phoneHref = r.phone && isTouchDevice() ? `tel:${r.phone.replace(/[^\d+]/g, "")}` : null;
+
+  const actionBtn = (bg, color) => ({
+    flex: 1, minWidth: 140, padding: "16px 20px", borderRadius: 10, border: "none",
+    background: bg, color, fontSize: 18, fontWeight: 800, cursor: busy ? "not-allowed" : "pointer",
+    opacity: busy ? 0.6 : 1, fontFamily: "inherit", letterSpacing: "0.02em",
+  });
+
+  const phoneLine = (
+    <>
+      <Phone size={22} style={{ color: t.gold, flexShrink: 0 }} />
+      {r.phone || "No phone number"}
+    </>
+  );
+
+  return (
+    <div
+      className={flashing ? "fd-flash" : undefined}
+      style={{
+        background: t.card, borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column",
+        border: `2px solid ${flashing ? t.gold : t.border}`, opacity: r.status === "cancelled" ? 0.72 : 1,
+      }}
+    >
+      <div style={{ background: t.cardHead, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, minWidth: 0 }}>
+          <CalendarDays size={24} style={{ color: t.gold, flexShrink: 0 }} />
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 30, fontWeight: 800, color: t.text, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{fmtResTime(r.time)}</div>
+            <div style={{ fontSize: 18, color: t.muted, marginTop: 2, fontWeight: 600 }}>{fmtResDate(r.date, today)}</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {flashing && (
+              <span style={{ background: t.gold, color: t.onGold, borderRadius: 99, padding: "5px 12px", fontSize: 14, fontWeight: 800, letterSpacing: "0.08em" }}>NEW BOOKING</span>
+            )}
+            <Badge cfg={cfg} />
+          </div>
+          <span style={{ fontSize: 16, color: t.muted, fontWeight: 600 }}>Booked {timeSince(r.created_at, now).toLowerCase()}</span>
+        </div>
+      </div>
+
+      <div style={{ padding: "16px 20px", flex: 1, display: "flex", flexDirection: "column", gap: 10 }}>
+        <div style={{ fontSize: 28, fontWeight: 800, color: t.text, lineHeight: 1.15, wordBreak: "break-word" }}>{r.name}</div>
+
+        {phoneHref ? (
+          <a href={phoneHref} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 22, fontWeight: 700, color: t.text, textDecoration: "underline", textDecorationColor: t.gold }}>{phoneLine}</a>
+        ) : (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 22, fontWeight: 700, color: t.text }}>{phoneLine}</div>
+        )}
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 22, fontWeight: 700, color: t.text }}>
+          <Users size={22} style={{ color: t.gold, flexShrink: 0 }} />
+          {guests}
+        </div>
+
+        {(r.occasion || r.is_concierge) && (
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            {r.occasion && (
+              <span style={{ borderRadius: 99, padding: "5px 14px", fontSize: 16, fontWeight: 700, color: t.gold, border: `1.5px solid ${t.gold}` }}>{fmtOccasion(r.occasion)}</span>
+            )}
+            {r.is_concierge && (
+              <span style={{ borderRadius: 99, padding: "5px 14px", fontSize: 16, fontWeight: 700, color: t.muted, border: `1.5px solid ${t.border}` }}>Concierge</span>
+            )}
+          </div>
+        )}
+
+        {r.notes && (
+          <div style={{ padding: "10px 14px", borderRadius: 8, border: `1px solid ${t.accent}`, color: t.accent, fontSize: 17, fontStyle: "italic", wordBreak: "break-word" }}>
+            Note: {r.notes}
+          </div>
+        )}
+      </div>
+
+      {(canConfirm || canCancel) && (
+        <div style={{ padding: "0 20px 18px", display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {canConfirm && (
+            <button disabled={busy} onClick={() => onConfirm(r.id)} style={actionBtn(t.gold, t.onGold)}>
+              {busy ? "Updating..." : "Confirm"}
+            </button>
+          )}
+          {canCancel && (
+            <button disabled={busy} onClick={() => onAskCancel(r)} style={{ ...actionBtn("transparent", t.accent), border: `2px solid ${t.accent}` }}>
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CancelDialog({ t, reservation, today, busy, onKeep, onCancel }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{ position: "fixed", inset: 0, zIndex: 900, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+    >
+      <div style={{ background: t.card, color: t.text, border: `2px solid ${t.border}`, borderRadius: 16, padding: 32, maxWidth: 560, width: "100%", display: "flex", flexDirection: "column", gap: 24 }}>
+        <div style={{ fontSize: 32, fontWeight: 800, lineHeight: 1.15 }}>Cancel this booking?</div>
+        <div style={{ fontSize: 22, color: t.muted, lineHeight: 1.4 }}>
+          <strong style={{ color: t.text }}>{reservation.name}</strong>, {fmtResDate(reservation.date, today)} at {fmtResTime(reservation.time)}. This cannot be undone and cancelled bookings cannot be confirmed again.
+        </div>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <button onClick={onKeep} style={{ flex: 1, minWidth: 180, padding: "18px 20px", borderRadius: 10, border: `2px solid ${t.border}`, background: "transparent", color: t.text, fontSize: 20, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>
+            Keep Booking
+          </button>
+          <button disabled={busy} onClick={onCancel} style={{ flex: 1, minWidth: 180, padding: "18px 20px", borderRadius: 10, border: "none", background: BURGUNDY, color: "#ffffff", fontSize: 20, fontWeight: 800, cursor: busy ? "not-allowed" : "pointer", fontFamily: "inherit" }}>
+            Cancel Booking
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

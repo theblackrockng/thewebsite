@@ -37,6 +37,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Front Desk actions on website endpoint | _pending commit_ `frontend/api/front-desk-orders.js` replaces the cross-origin console PATCH (which returned 401); `FrontDeskDisplay` calls `/api/front-desk-orders`; persistent fixed error banner with HTTP status; console origin removed from website CSP |
 | Front Desk Completed Today | _pending commit_ `FrontDeskDisplay.jsx`: fourth tab and clickable Completed card, Lagos-time day boundary, completed orders removed from All/Table/Online and moved instantly on Mark Completed, count from a head query, list fetched only when the tab is open |
 | Front Desk completed_at, Mark Paid on completed, stay signed in | _pending commit_ `front-desk-orders.js` sets `completed_at` on complete (retries without it if the column is missing); Mark Paid button on Completed Today; session refresh every 2 min, checked before each action and on tab visible, wake and online; one silent refresh and retry on 401; red "Signed out. Tap to sign in" screen with repeating alert; `StaffLoginGate` gets an optional `renderSignedOut` prop and no longer drops a signed-in screen when a profile refresh fails |
+| Front Desk reservations view | _pending commit_ `frontend/api/front-desk-reservations.js` (GET list with `range` filter, PATCH confirm or cancel; roles front_desk, manager, super_admin; whitelisted transitions; Telegram notice on confirm and cancel, same content as the console) and `FrontDeskDisplay.jsx`: header now reads "Front Desk" with one large switch button (Reservations with pending badge, or Orders with new-orders badge); reservations view with stat cards, Today/Upcoming/Pending/Past 7 Days tabs, tap-to-call on touch devices, cancel confirmation dialog; both data sets poll in the background so badges and chimes work from either view |
 | Console operations screen | _pending commit_ kitchen/bar/waiter/front_desk accounts get `OperationsScreen` (link to their website screen + sign out) instead of the console Layout; guard in `ProtectedRoute` and `AnalyticsRoute`; sidebar role labels for Kitchen, Bar, Front Desk; front_desk links to `/front-desk-display` |
 
 ---
@@ -68,7 +69,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `/content-hub/login` | ContentHubLogin.jsx | Auth for content hub |
 | `/kitchen-display` | KitchenDisplay.jsx | Live kitchen order display (Supabase Realtime) |
 | `/bar-display` | BarDisplay.jsx | Live bar order display (Supabase Realtime) |
-| `/front-desk-display` | FrontDeskDisplay.jsx | Front desk order monitor; roles front_desk, manager, super_admin; Realtime + 15s polling fallback; can confirm, complete and mark paid via `/api/front-desk-orders` |
+| `/front-desk-display` | FrontDeskDisplay.jsx | Front desk screen with Orders and Reservations views (one switch button in the header); roles front_desk, manager, super_admin; orders via Realtime + 15s polling fallback and `/api/front-desk-orders`; reservations via 15s polling and `/api/front-desk-reservations` |
 | `/waiter` | Waiter.jsx | Waiter app — Supabase Auth login, table select, place orders |
 
 **Frontend Contexts:** `AuthContext`, `CartContext`, `FeatureFlagContext`, `TableContext`
@@ -82,6 +83,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `payment-webhook.js` | POST | Payment gateway webhook (inactive) |
 | `kitchen-status.js` | PATCH | Update order status; sends waiter FCM push when status → ready |
 | `front-desk-orders.js` | PATCH | Front desk / manager only: confirm (new only), complete (any active status), mark paid (also on completed orders) or proof received; sets `completed_at` on complete; whitelisted transitions, sets `confirmed_by` from the verified profile, Telegram notice on status changes |
+| `front-desk-reservations.js` | GET, PATCH | Front desk / manager / super_admin: GET lists reservations from 7 days ago onward (optional `range` = all, today, upcoming, pending, past; Lagos day boundary; only display fields returned, no email); PATCH `{id, status}` allows pending or rescheduled to confirmed, and pending, rescheduled or confirmed to cancelled, never backwards, never on past dates; Telegram notice on change; separate rate limit buckets for reads and writes |
 | `register-device.js` | POST | Upsert FCM token into push_tokens table |
 | `send-confirmation.js` | POST | Zoho SMTP order confirmation email |
 | `send-enquiry-reply.js` | POST | Zoho SMTP reply to enquiries |
@@ -209,6 +211,9 @@ Key tables (inferred from code and API usage):
 - **Blog editor TipTap version pinned to 3.30.2** to work around peer dependency conflicts. Future upgrades need care.
 - **`OrderRoute` flag bypass via `?table=` param** is intentional (QR dine-in bypasses the feature flag) but undocumented — someone could visit `/order?table=1` even when ordering is disabled.
 - **Front Desk monitor read access is unverified.** `FrontDeskDisplay` reads `orders` and `order_items` and subscribes to Realtime with the staff session, like the kitchen display. The live RLS policies for those tables are not in the repo, so whether `front_desk` can read them needs checking in Supabase. If not, the page loads empty.
+- **Front Desk reservations read through the website endpoint, not Realtime.** The `reservations` RLS policies are not in the repo, so the screen polls `/api/front-desk-reservations` every 15 seconds (service role) instead of subscribing. A new booking can take up to 15 seconds to show and chime.
+- **Confirm and Cancel on the Front Desk send no guest email.** This matches the console, which only sends Telegram on Confirm and Cancel (guest emails are the booking email, the daily reminder cron and the manual Send Email). Confirming does not email the guest.
+- **Front Desk reservations has no Seated, No show, Reschedule or manual add.** The console has no seated or no-show status and the brief excluded editing and manual add. Pre-selected meals and guest email are not shown on the Front Desk card.
 - **Kitchen/Bar displays** at `/kitchen-display` and `/bar-display` are public routes with no auth. Anyone who knows the URL can see live orders.
 - **`supabase.auth.admin` calls in console API** require `SUPABASE_SERVICE_ROLE_KEY`. If that var is missing from the Vercel project, invite and delete-staff silently fail.
 
