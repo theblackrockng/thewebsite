@@ -33,6 +33,10 @@ function getDb() {
   return _db;
 }
 
+function isMissingColumn(err) {
+  return err && (err.code === 'PGRST204' || err.code === '42703' || /completed_at/i.test(err.message || ''));
+}
+
 function escapeHtml(s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -123,6 +127,9 @@ module.exports = async function handler(req, res) {
       if (nextStatus === 'confirmed') {
         updates.confirmed_by = staff.profile.full_name || staff.profile.email || 'Front Desk';
       }
+      if (nextStatus === 'completed') {
+        updates.completed_at = new Date().toISOString();
+      }
       guard = { column: 'order_status', value: order.order_status };
     } else {
       if (order.order_status === 'cancelled') {
@@ -138,9 +145,16 @@ module.exports = async function handler(req, res) {
       guard = { column: 'payment_status', value: order.payment_status };
     }
 
-    let query = db.from('orders').update(updates).eq('id', id);
-    query = guard.value === null ? query.is(guard.column, null) : query.eq(guard.column, guard.value);
-    const { data: changed, error: updateErr } = await query.select('id');
+    const runUpdate = (values) => {
+      const q = db.from('orders').update(values).eq('id', id);
+      return (guard.value === null ? q.is(guard.column, null) : q.eq(guard.column, guard.value)).select('id');
+    };
+
+    let { data: changed, error: updateErr } = await runUpdate(updates);
+    if (updateErr && updates.completed_at && isMissingColumn(updateErr)) {
+      const { completed_at: _skip, ...withoutColumn } = updates;
+      ({ data: changed, error: updateErr } = await runUpdate(withoutColumn));
+    }
 
     if (updateErr) {
       console.error('[front-desk-orders] update error:', updateErr);

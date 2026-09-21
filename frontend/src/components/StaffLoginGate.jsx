@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from "react";
+import { createContext, useContext, useState, useEffect, useRef } from "react";
 import { LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { loginStaff, loadStaffProfile, signOutStaff } from "../lib/staffAuth";
@@ -16,13 +16,17 @@ export function useStaffSession() {
 // Front Desk). Replaces the old client-side PinGate. A PIN still exists,
 // but only as the IdleLock re-lock screen rendered once a session is
 // established — it is never the access control.
-export default function StaffLoginGate({ children, allowedRoles, title, idleMinutes = 5 }) {
+export default function StaffLoginGate({ children, allowedRoles, title, idleMinutes = 5, renderSignedOut }) {
   const [booting, setBooting] = useState(true);
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [signingIn, setSigningIn] = useState(false);
+  const [lost, setLost] = useState(false);
+  const signedInRef = useRef(false);
+  const manualOutRef = useRef(false);
+  const wantsLostRef = useRef(Boolean(renderSignedOut));
 
   useEffect(() => {
     let mounted = true;
@@ -30,8 +34,15 @@ export default function StaffLoginGate({ children, allowedRoles, title, idleMinu
     async function bootstrap(session) {
       if (session?.user) {
         const p = await loadStaffProfile(session.user.id);
-        if (mounted) setProfile(p);
+        if (!mounted) return;
+        // A failed profile lookup on a token refresh must not sign an already signed-in screen out.
+        if (p || !signedInRef.current) setProfile(p);
+        if (p) signedInRef.current = true;
       } else if (mounted) {
+        // Only a session that disappeared without the user pressing Sign Out counts as lost.
+        if (signedInRef.current && !manualOutRef.current && wantsLostRef.current) setLost(true);
+        signedInRef.current = false;
+        manualOutRef.current = false;
         setProfile(null);
       }
     }
@@ -50,10 +61,12 @@ export default function StaffLoginGate({ children, allowedRoles, title, idleMinu
   async function handleSignIn(e) {
     e.preventDefault();
     setError("");
+    setLost(false);
     setSigningIn(true);
     try {
       const { error: err, profile: p } = await loginStaff(email.trim(), password);
       if (err) { setError(err); return; }
+      signedInRef.current = true;
       setProfile(p);
     } finally {
       setSigningIn(false);
@@ -61,7 +74,11 @@ export default function StaffLoginGate({ children, allowedRoles, title, idleMinu
   }
 
   async function handleSignOut() {
+    manualOutRef.current = true;
     await signOutStaff();
+    manualOutRef.current = false;
+    signedInRef.current = false;
+    setLost(false);
     setProfile(null);
     setEmail("");
     setPassword("");
@@ -73,6 +90,10 @@ export default function StaffLoginGate({ children, allowedRoles, title, idleMinu
         <div style={{ fontSize: 11, color: "#9C8E7A", letterSpacing: "0.2em", textTransform: "uppercase" }}>Loading…</div>
       </div>
     );
+  }
+
+  if (!profile && lost && renderSignedOut) {
+    return renderSignedOut({ onSignIn: () => setLost(false) });
   }
 
   if (!profile) {

@@ -10,6 +10,11 @@ const ORDERS_API = "/api/front-desk-orders";
 
 const POLL_MS = 15000;
 const FLASH_MS = 45000;
+const SESSION_CHECK_MS = 120000;
+const SESSION_MARGIN_MS = 300000;
+const WAKE_GAP_MS = 30000;
+const ALERT_REPEAT_MS = 15000;
+const REPROBE_MS = 600000;
 const ACTIVE_STATUSES = ["new", "confirmed", "preparing", "ready"];
 
 const GOLD = "#c8a96e";
@@ -80,35 +85,77 @@ function fmtLagosTime(iso) {
   return new Date(iso).toLocaleTimeString("en-NG", { timeZone: "Africa/Lagos", hour: "2-digit", minute: "2-digit", hour12: true });
 }
 
-// The orders table has no completion timestamp, so the time an order was
-// completed from this screen is remembered in this browser only.
-const COMPLETED_KEY = "blackrock-frontdesk-completed";
+// Orders completed from the console do not set completed_at, so fall back to the
+// placed date for those. Without the column at all, use the placed date alone.
+function completedTodayFilter(hasColumn) {
+  const start = new Date(startOfToday()).toISOString();
+  return hasColumn
+    ? `completed_at.gte.${start},and(completed_at.is.null,created_at.gte.${start})`
+    : `created_at.gte.${start}`;
+}
 
-function loadCompletedMap() {
+function completionInfo(order) {
+  return order.completed_at ? { iso: order.completed_at, known: true } : { iso: order.created_at, known: false };
+}
+
+const audio = { ctx: null, muted: false };
+
+function unlockAudio() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return false;
+  if (!audio.ctx) audio.ctx = new Ctx();
+  audio.ctx.resume();
+  return true;
+}
+
+function playTones(list) {
+  const ctx = audio.ctx;
+  if (!ctx || ctx.state !== "running" || audio.muted) return;
   try {
-    const raw = JSON.parse(localStorage.getItem(COMPLETED_KEY) || "{}");
-    const cutoff = startOfToday() - 86400000;
-    return Object.fromEntries(Object.entries(raw).filter(([, v]) => new Date(v).getTime() >= cutoff));
+    list.forEach(({ freq, at, len, vol, type }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = ctx.currentTime + at;
+      osc.type = type || "sine";
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(vol, start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + len);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + len + 0.05);
+    });
+  } catch {}
+}
+
+function playChime() {
+  playTones([{ freq: 660, at: 0, len: 0.6, vol: 0.18 }, { freq: 880, at: 0.22, len: 0.6, vol: 0.18 }]);
+}
+
+function playAlert() {
+  playTones([
+    { freq: 880, at: 0, len: 0.3, vol: 0.35, type: "square" },
+    { freq: 660, at: 0.4, len: 0.3, vol: 0.35, type: "square" },
+    { freq: 880, at: 0.8, len: 0.3, vol: 0.35, type: "square" },
+    { freq: 660, at: 1.2, len: 0.3, vol: 0.35, type: "square" },
+  ]);
+}
+
+// "ok": signed in with a token good for a while. "offline": could not reach the
+// auth server, so keep going. "lost": there is no session that can be recovered.
+async function ensureSession(force = false) {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const session = data?.session;
+    if (session && !force && session.expires_at * 1000 - Date.now() > SESSION_MARGIN_MS) return "ok";
+    const { data: refreshed, error } = await supabase.auth.refreshSession();
+    if (!error && refreshed?.session) return "ok";
+    if (error?.name === "AuthRetryableFetchError") return "offline";
+    return "lost";
   } catch {
-    return {};
+    return "offline";
   }
-}
-
-function saveCompletedMap(map) {
-  try { localStorage.setItem(COMPLETED_KEY, JSON.stringify(map)); } catch {}
-}
-
-function completedFilter(map) {
-  const today = startOfToday();
-  const ids = Object.entries(map).filter(([, v]) => new Date(v).getTime() >= today).map(([id]) => id);
-  const parts = [`created_at.gte.${new Date(today).toISOString()}`];
-  if (ids.length > 0) parts.push(`id.in.(${ids.join(",")})`);
-  return parts.join(",");
-}
-
-function completionInfo(order, map) {
-  const iso = map[order.id] || order.completed_at || order.updated_at || null;
-  return iso ? { iso, known: true } : { iso: order.created_at, known: false };
 }
 
 function isTableOrder(o) {
@@ -130,13 +177,52 @@ function OrderIcon({ order, color }) {
 
 export default function FrontDeskDisplay() {
   return (
-    <StaffLoginGate allowedRoles={FRONT_DESK_ROLES} title="Front Desk">
+    <StaffLoginGate
+      allowedRoles={FRONT_DESK_ROLES}
+      title="Front Desk"
+      renderSignedOut={({ onSignIn }) => <SignedOutScreen onSignIn={onSignIn} />}
+    >
       <FrontDeskContent />
     </StaffLoginGate>
   );
 }
 
 function FrontDeskContent() {
+  const { signOut } = useStaffSession();
+  const [lost, setLost] = useState(false);
+  const handleLost = useCallback(() => setLost(true), []);
+  if (lost) return <SignedOutScreen onSignIn={signOut} />;
+  return <FrontDeskMain onSessionLost={handleLost} />;
+}
+
+function SignedOutScreen({ onSignIn }) {
+  useEffect(() => {
+    playAlert();
+    const id = setInterval(playAlert, ALERT_REPEAT_MS);
+    return () => clearInterval(id);
+  }, []);
+
+  function handleTap() {
+    if (audio.ctx) audio.ctx.resume();
+    onSignIn();
+  }
+
+  return (
+    <button
+      onClick={handleTap}
+      style={{
+        position: "fixed", inset: 0, width: "100%", height: "100%", background: "#b91c1c", color: "#ffffff",
+        border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", gap: 24, padding: 32, textAlign: "center", fontFamily: "'DM Sans', 'Montserrat', sans-serif",
+      }}
+    >
+      <span style={{ fontSize: 72, fontWeight: 800, lineHeight: 1.1 }}>Signed out. Tap to sign in</span>
+      <span style={{ fontSize: 28, fontWeight: 600 }}>New orders are not updating on this screen.</span>
+    </button>
+  );
+}
+
+function FrontDeskMain({ onSessionLost }) {
   const [isDark, setIsDark] = useState(() => {
     try { return localStorage.getItem("blackrock-frontdesk-theme") === "dark"; } catch { return false; }
   });
@@ -146,7 +232,6 @@ function FrontDeskContent() {
   const [completedOrders, setCompletedOrders] = useState([]);
   const [completedCount, setCompletedCount] = useState(0);
   const [completedLoaded, setCompletedLoaded] = useState(false);
-  const [completedMap, setCompletedMap] = useState(loadCompletedMap);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("all");
   const [connected, setConnected] = useState(false);
@@ -155,23 +240,27 @@ function FrontDeskContent() {
   const [flashIds, setFlashIds] = useState(() => new Set());
   const [actionIds, setActionIds] = useState(() => new Set());
   const [actionError, setActionError] = useState("");
-  const [audioReady, setAudioReady] = useState(false);
-  const [muted, setMuted] = useState(false);
+  const [audioReady, setAudioReady] = useState(() => !!audio.ctx);
+  const [muted, setMuted] = useState(() => audio.muted);
 
   const knownIdsRef = useRef(null);
   const mountedRef = useRef(true);
-  const audioCtxRef = useRef(null);
-  const mutedRef = useRef(false);
   const inFlightRef = useRef(false);
   const pendingRef = useRef(false);
   const tabRef = useRef(tab);
   const ordersRef = useRef(orders);
-  const completedMapRef = useRef(completedMap);
+  const completedIdsRef = useRef(new Set());
+  const hasColRef = useRef(null);
+  const probedAtRef = useRef(0);
+  const channelRef = useRef(null);
+  const lostRef = useRef(onSessionLost);
   tabRef.current = tab;
   ordersRef.current = orders;
-  completedMapRef.current = completedMap;
+  lostRef.current = onSessionLost;
 
-  useEffect(() => { mutedRef.current = muted; }, [muted]);
+  const checkSession = useCallback(async () => {
+    if ((await ensureSession()) === "lost" && mountedRef.current) lostRef.current();
+  }, []);
 
   function toggleTheme() {
     setIsDark((prev) => {
@@ -181,44 +270,32 @@ function FrontDeskContent() {
     });
   }
 
-  function enableSound() {
-    try {
-      const Ctx = window.AudioContext || window.webkitAudioContext;
-      if (!Ctx) return;
-      if (!audioCtxRef.current) audioCtxRef.current = new Ctx();
-      audioCtxRef.current.resume();
-      setAudioReady(true);
-      playChime();
-    } catch {}
+  function toggleMuted() {
+    audio.muted = !audio.muted;
+    setMuted(audio.muted);
   }
 
-  function playChime() {
-    const ctx = audioCtxRef.current;
-    if (!ctx || ctx.state !== "running") return;
-    try {
-      [660, 880].forEach((freq, i) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        const start = ctx.currentTime + i * 0.22;
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, start);
-        gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(0.18, start + 0.03);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.6);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(start);
-        osc.stop(start + 0.65);
-      });
-    } catch {}
+  function enableSound() {
+    if (unlockAudio()) {
+      setAudioReady(true);
+      playChime();
+    }
   }
 
   const fetchOrders = useCallback(async () => {
     if (inFlightRef.current) { pendingRef.current = true; return; }
     inFlightRef.current = true;
     try {
+      if (hasColRef.current === null || (hasColRef.current === false && Date.now() - probedAtRef.current > REPROBE_MS)) {
+        const { error: probeErr } = await supabase.from("orders").select("completed_at").limit(1);
+        probedAtRef.current = Date.now();
+        if (!probeErr) hasColRef.current = true;
+        else if (probeErr.code === "42703" || /completed_at/i.test(probeErr.message || "")) hasColRef.current = false;
+      }
+      const hasCol = hasColRef.current === true;
+
       const startISO = new Date(startOfToday()).toISOString();
-      const doneFilter = completedFilter(completedMapRef.current);
+      const doneFilter = completedTodayFilter(hasCol);
       const wantList = tabRef.current === "completed";
 
       const activeReq = supabase
@@ -248,9 +325,13 @@ function FrontDeskContent() {
       const [{ data, error }, countRes, listRes] = await Promise.all([activeReq, countReq, listReq]);
 
       if (!mountedRef.current) return;
-      if (error) { setLoading(false); return; }
+      if (error) {
+        if (error.code === "PGRST301" || /jwt|token/i.test(error.message || "")) checkSession();
+        setLoading(false);
+        return;
+      }
 
-      const list = (data || []).filter((o) => !completedMapRef.current[o.id]);
+      const list = (data || []).filter((o) => !completedIdsRef.current.has(o.id));
       setOrders(list);
       setLoading(false);
       setLastUpdated(new Date());
@@ -266,7 +347,7 @@ function FrontDeskContent() {
         const arrivals = [...ids].filter((id) => !knownIdsRef.current.has(id));
         if (arrivals.length > 0) {
           setFlashIds((prev) => new Set([...prev, ...arrivals]));
-          if (!mutedRef.current) playChime();
+          playChime();
           setTimeout(() => {
             if (!mountedRef.current) return;
             setFlashIds((prev) => {
@@ -285,27 +366,68 @@ function FrontDeskContent() {
         fetchOrders();
       }
     }
-  }, []);
+  }, [checkSession]);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    fetchOrders();
-
+  const subscribe = useCallback(() => {
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
     const channel = supabase
-      .channel("frontdesk-orders-watch")
+      .channel(`frontdesk-orders-${Date.now()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
         fetchOrders();
       })
       .subscribe((status) => {
-        if (!mountedRef.current) return;
+        if (!mountedRef.current || channelRef.current !== channel) return;
         setConnected(status === "SUBSCRIBED");
       });
+    channelRef.current = channel;
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    fetchOrders();
+    subscribe();
 
     return () => {
       mountedRef.current = false;
-      supabase.removeChannel(channel);
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, subscribe]);
+
+  // The client pushes a refreshed token to joined Realtime channels by itself.
+  // This only steps in if the channel did not come back, then reconciles.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "TOKEN_REFRESHED") return;
+      setTimeout(() => {
+        if (!mountedRef.current) return;
+        if (channelRef.current && channelRef.current.state !== "joined") subscribe();
+        fetchOrders();
+      }, 2000);
+    });
+    return () => subscription.unsubscribe();
+  }, [subscribe, fetchOrders]);
+
+  useEffect(() => {
+    checkSession();
+    const checkId = setInterval(checkSession, SESSION_CHECK_MS);
+    let last = Date.now();
+    const driftId = setInterval(() => {
+      const n = Date.now();
+      if (n - last > WAKE_GAP_MS) { checkSession(); fetchOrders(); }
+      last = n;
+    }, 5000);
+    const onVisible = () => { if (document.visibilityState === "visible") checkSession(); };
+    const onOnline = () => { checkSession(); fetchOrders(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      clearInterval(checkId);
+      clearInterval(driftId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [checkSession, fetchOrders]);
 
   useEffect(() => {
     if (tab === "completed") fetchOrders();
@@ -313,9 +435,14 @@ function FrontDeskContent() {
 
   useEffect(() => {
     if (connected) return undefined;
-    const id = setInterval(fetchOrders, POLL_MS);
+    let misses = 0;
+    const id = setInterval(() => {
+      fetchOrders();
+      misses += 1;
+      if (misses % 4 === 0) subscribe();
+    }, POLL_MS);
     return () => clearInterval(id);
-  }, [connected, fetchOrders]);
+  }, [connected, fetchOrders, subscribe]);
 
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 30000);
@@ -351,33 +478,51 @@ function FrontDeskContent() {
     };
   }, [fetchOrders]);
 
+  async function sendPatch(orderId, fields) {
+    return fetch(ORDERS_API, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ id: orderId, ...fields }),
+    });
+  }
+
   async function patchOrder(orderId, fields, actionLabel) {
     setActionError("");
     setActionIds((prev) => new Set([...prev, orderId]));
     try {
-      const res = await fetch(ORDERS_API, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...(await authHeader()) },
-        body: JSON.stringify({ id: orderId, ...fields }),
-      });
+      if ((await ensureSession()) === "lost") { onSessionLost(); return; }
+
+      let res = await sendPatch(orderId, fields);
+      if (res.status === 401) {
+        const recovered = await ensureSession(true);
+        if (recovered === "lost") { onSessionLost(); return; }
+        if (recovered === "offline") {
+          setActionError(`${actionLabel} failed. HTTP 401 and the sign-in could not be refreshed because the network is down. Try again.`);
+          return;
+        }
+        res = await sendPatch(orderId, fields);
+        if (res.status === 401) { onSessionLost(); return; }
+      }
+
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
         setActionError(`${actionLabel} failed. HTTP ${res.status}: ${json.error || res.statusText || "No message from the server."}`);
         return;
       }
+
       if (fields.order_status === "completed") {
-        const doneAt = new Date().toISOString();
         const moved = ordersRef.current.find((o) => o.id === orderId);
-        const nextMap = { ...completedMapRef.current, [orderId]: doneAt };
-        saveCompletedMap(nextMap);
-        setCompletedMap(nextMap);
+        completedIdsRef.current.add(orderId);
         setOrders((prev) => prev.filter((o) => o.id !== orderId));
         if (moved) {
-          setCompletedOrders((prev) => (prev.some((o) => o.id === orderId) ? prev : [{ ...moved, order_status: "completed" }, ...prev]));
+          const done = { ...moved, order_status: "completed", ...(hasColRef.current ? { completed_at: new Date().toISOString() } : {}) };
+          setCompletedOrders((prev) => (prev.some((o) => o.id === orderId) ? prev : [done, ...prev]));
         }
         setCompletedCount((c) => c + 1);
       } else {
-        setOrders((prev) => prev.map((o) => (o.id === orderId ? { ...o, ...fields } : o)));
+        const apply = (prev) => prev.map((o) => (o.id === orderId ? { ...o, ...fields } : o));
+        setOrders(apply);
+        setCompletedOrders(apply);
       }
     } catch (err) {
       setActionError(`${actionLabel} failed. Network error: ${err?.message || "could not reach the server."}`);
@@ -410,13 +555,13 @@ function FrontDeskContent() {
   const visible = useMemo(() => {
     if (isCompletedTab) {
       return completedOrders
-        .map((o) => ({ order: o, info: completionInfo(o, completedMap) }))
+        .map((o) => ({ order: o, info: completionInfo(o) }))
         .sort((a, b) => new Date(b.info.iso) - new Date(a.info.iso));
     }
     return orders
       .filter((o) => (tab === "table" ? isTableOrder(o) : tab === "online" ? !isTableOrder(o) : true))
       .map((o) => ({ order: o, info: null }));
-  }, [isCompletedTab, completedOrders, completedMap, orders, tab]);
+  }, [isCompletedTab, completedOrders, orders, tab]);
 
   const pill = {
     background: t.card, border: `1px solid ${t.border}`, borderRadius: 10, padding: "10px 16px",
@@ -461,7 +606,7 @@ function FrontDeskContent() {
               <Volume2 size={18} /> Enable sound
             </button>
           ) : (
-            <button onClick={() => setMuted((m) => !m)} style={{ ...pill, color: muted ? t.accent : t.text }}>
+            <button onClick={toggleMuted} style={{ ...pill, color: muted ? t.accent : t.text }}>
               {muted ? <VolumeX size={18} /> : <Volume2 size={18} />} {muted ? "Sound muted" : "Sound on"}
             </button>
           )}
@@ -588,14 +733,14 @@ function OrderCard({ order, t, now, completion, flashing, busy, onConfirm, onCom
   const statusCfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
   const payCfg = PAYMENT_CFG[order.payment_status] ?? { label: order.payment_status || "Unknown", color: "#6b7280" };
   const items = order.order_items || [];
-  const readOnly = !!completion;
+  const inCompletedTab = !!completion;
   const cancelled = order.order_status === "cancelled";
-  const canConfirm = !readOnly && order.order_status === "new";
-  const canComplete = !readOnly && order.order_status === "ready";
+  const canConfirm = !inCompletedTab && order.order_status === "new";
+  const canComplete = !inCompletedTab && order.order_status === "ready";
   const isPaid = order.payment_status === "paid";
-  const canMarkPaid = !readOnly && !isPaid && !cancelled && order.payment_status !== "failed";
-  const canProof = !readOnly && order.payment_status === "awaiting_proof" && !cancelled;
-  const timeLine = readOnly
+  const canMarkPaid = !isPaid && !cancelled && (inCompletedTab || order.payment_status !== "failed");
+  const canProof = !inCompletedTab && order.payment_status === "awaiting_proof" && !cancelled;
+  const timeLine = inCompletedTab
     ? (completion.known ? `Completed ${fmtLagosTime(completion.iso)}` : `Placed ${fmtLagosTime(order.created_at)}`)
     : timeSince(order.created_at, now);
 

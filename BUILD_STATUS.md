@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-21 (front desk completed today tab)_
+_Last updated: 2026-09-21 (front desk completed_at and session handling)_
 
 ---
 
@@ -36,6 +36,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Front Desk order monitor | _pending commit_ `frontend/src/pages/FrontDeskDisplay.jsx` at `/front-desk-display` (StaffLoginGate for front_desk, manager, super_admin; tabs, stat cards, Realtime with 15s polling fallback, sound alert, wake lock, light/dark); confirm, complete and payment actions (see next row) |
 | Front Desk actions on website endpoint | _pending commit_ `frontend/api/front-desk-orders.js` replaces the cross-origin console PATCH (which returned 401); `FrontDeskDisplay` calls `/api/front-desk-orders`; persistent fixed error banner with HTTP status; console origin removed from website CSP |
 | Front Desk Completed Today | _pending commit_ `FrontDeskDisplay.jsx`: fourth tab and clickable Completed card, Lagos-time day boundary, completed orders removed from All/Table/Online and moved instantly on Mark Completed, count from a head query, list fetched only when the tab is open |
+| Front Desk completed_at, Mark Paid on completed, stay signed in | _pending commit_ `front-desk-orders.js` sets `completed_at` on complete (retries without it if the column is missing); Mark Paid button on Completed Today; session refresh every 2 min, checked before each action and on tab visible, wake and online; one silent refresh and retry on 401; red "Signed out. Tap to sign in" screen with repeating alert; `StaffLoginGate` gets an optional `renderSignedOut` prop and no longer drops a signed-in screen when a profile refresh fails |
 | Console operations screen | _pending commit_ kitchen/bar/waiter/front_desk accounts get `OperationsScreen` (link to their website screen + sign out) instead of the console Layout; guard in `ProtectedRoute` and `AnalyticsRoute`; sidebar role labels for Kitchen, Bar, Front Desk; front_desk links to `/front-desk-display` |
 
 ---
@@ -80,7 +81,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `initiate-payment.js` | POST | Paystack/Flutterwave payment init (inactive) |
 | `payment-webhook.js` | POST | Payment gateway webhook (inactive) |
 | `kitchen-status.js` | PATCH | Update order status; sends waiter FCM push when status → ready |
-| `front-desk-orders.js` | PATCH | Front desk / manager only: confirm (new only), complete (any active status), mark paid or proof received; whitelisted transitions, sets `confirmed_by` from the verified profile, Telegram notice on status changes |
+| `front-desk-orders.js` | PATCH | Front desk / manager only: confirm (new only), complete (any active status), mark paid (also on completed orders) or proof received; sets `completed_at` on complete; whitelisted transitions, sets `confirmed_by` from the verified profile, Telegram notice on status changes |
 | `register-device.js` | POST | Upsert FCM token into push_tokens table |
 | `send-confirmation.js` | POST | Zoho SMTP order confirmation email |
 | `send-enquiry-reply.js` | POST | Zoho SMTP reply to enquiries |
@@ -193,7 +194,7 @@ Key tables (inferred from code and API usage):
 7. **Waiter name on orders.** `waiter_name` is stored on orders but the waiter app currently sets it from the authenticated staff profile. No explicit assignment of waiter-to-table in the database (only in UI state).
 8. **Netlify legacy files.** `frontend/netlify.toml` and root-level `netlify.toml` artifacts remain. The site deploys on Vercel; these files do nothing but add noise.
 9. **Console operations access not enforced by database policies.** Keeping kitchen/bar/waiter/front_desk accounts out of the console is a UI gate only (`OperationsScreen`). Console pages read and write Supabase tables directly with the anon client, so those accounts could still reach data through the API unless RLS policies restrict them. Live RLS policies are not in the repo (only `staff_profiles` in `supabase/migrations/003`) and need reviewing in Supabase.
-10. **Order completion time is not stored.** The `orders` table has no `completed_at` or `updated_at` column. The Front Desk "Completed Today" tab uses orders created today (Lagos time) plus any completed from that screen, and shows the completion time only for orders completed from that browser (kept in localStorage); other completed orders show the placed time. A completed-but-unpaid order can no longer be marked paid from the Front Desk screen because that tab is read only. A `completed_at` column set by `front-desk-orders.js` and the console would fix both.
+10. **`orders.completed_at` column not created yet.** The Front Desk screen and `front-desk-orders.js` are written to use `orders.completed_at` (set server-side when front desk completes an order) but fall back to the placed date until the SQL (add column, backfill with `created_at`, rollback) is run in Supabase. Orders completed from the console do not set it, so the Completed Today tab falls back to the placed date for those and labels them "Placed". Reload the Front Desk screen after running the SQL (it re-checks for the column every 10 minutes).
 
 ---
 
