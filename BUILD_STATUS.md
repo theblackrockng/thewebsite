@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-23 (Home Kitchen section: heading changed to Farm Fresh to your Table; burgundy replaced with gold on heading and all three stat items)_
+_Last updated: 2026-09-23 (Home Kitchen section: body copy updated to "Nigeria's national dishes, served with pride and prepared with elegance")_
 
 ---
 

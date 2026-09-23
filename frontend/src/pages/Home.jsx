@@ -297,9 +297,7 @@ export default function Home() {
               <span className="font-serif-italic text-[#C8A96E]">your Table.</span>
             </h2>
             <p className="text-[var(--muted)] text-base md:text-lg leading-relaxed mt-8 max-w-xl font-light">
-              Jollof smoked over open fire. Pepper soup that clears the head.
-              Goat that falls off the bone. Suya the way Sabo intended.
-              Our menu is a tour of Nigeria, cooked with respect, plated with pride.
+              Nigeria's national dishes, served with pride and prepared with elegance.
             </p>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
