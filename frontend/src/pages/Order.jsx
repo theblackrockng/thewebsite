@@ -227,6 +227,12 @@ export default function Order() {
 
   return (
     <div style={{ minHeight: "100vh", background: "var(--charcoal, #0f0d0a)" }}>
+      <style>{`
+        .cw-bar { top: 80px; }
+        @media (min-width: 768px)  { .cw-bar { top: 112px; } }
+        @media (min-width: 1024px) { .cw-bar { top: 144px; } }
+      `}</style>
+      <CallWaiterBar tableNumber={tableNumber} tableValid={tableValid} />
       {/* Hero */}
       <section
         style={{
@@ -584,6 +590,126 @@ export default function Order() {
             Order More
           </button>
         </div>
+      )}
+    </div>
+  );
+}
+
+function CallWaiterBar({ tableNumber, tableValid }) {
+  const [phase, setPhase] = useState("idle"); // idle | confirm | sending | sent | disabled
+  const [countdown, setCountdown] = useState(5);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (!tableValid || !tableNumber) return;
+    try {
+      const ts = localStorage.getItem(`waiter_call_table_${tableNumber}`);
+      if (!ts) return;
+      const remaining = Math.ceil((parseInt(ts, 10) + 120000 - Date.now()) / 1000);
+      if (remaining > 0) { setCooldown(remaining); setPhase("disabled"); }
+      else localStorage.removeItem(`waiter_call_table_${tableNumber}`);
+    } catch {}
+  }, [tableNumber, tableValid]);
+
+  useEffect(() => {
+    if (phase !== "disabled") return;
+    if (cooldown <= 0) { setPhase("idle"); return; }
+    const id = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [phase, cooldown]);
+
+  useEffect(() => {
+    if (phase !== "confirm") return;
+    if (countdown <= 0) { setPhase("sending"); return; }
+    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [phase, countdown]);
+
+  useEffect(() => {
+    if (phase !== "sending") return;
+    let cancelled = false;
+    fetch("/api/call-waiter", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ table_number: tableNumber }),
+    }).then(async (res) => {
+      if (cancelled) return;
+      if (res.ok) {
+        try { localStorage.setItem(`waiter_call_table_${tableNumber}`, String(Date.now())); } catch {}
+        setPhase("sent");
+        setTimeout(() => { if (!cancelled) { setCooldown(120); setPhase("disabled"); } }, 2500);
+      } else {
+        try { localStorage.setItem(`waiter_call_table_${tableNumber}`, String(Date.now())); } catch {}
+        setCooldown(120);
+        setPhase("disabled");
+      }
+    }).catch(() => { if (!cancelled) setPhase("idle"); });
+    return () => { cancelled = true; };
+  }, [phase, tableNumber]);
+
+  if (!tableValid) return null;
+
+  const fmtCd = () => {
+    const m = Math.floor(cooldown / 60);
+    const s = cooldown % 60;
+    return m > 0 ? `${m}:${String(s).padStart(2, "0")}` : `${s}s`;
+  };
+
+  const barStyle = {
+    position: "fixed",
+    left: 0, right: 0,
+    zIndex: 60,
+    background: "rgba(20,16,12,0.97)",
+    borderBottom: "1px solid rgba(200,169,110,0.2)",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "8px 16px",
+    gap: 10,
+    minHeight: 44,
+  };
+
+  const btnBase = {
+    border: "none",
+    borderRadius: 99,
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+    cursor: "pointer",
+    fontFamily: "'Montserrat', sans-serif",
+    padding: "7px 24px",
+  };
+
+  return (
+    <div className="cw-bar" style={barStyle}>
+      {phase === "idle" && (
+        <button onClick={() => { setCountdown(5); setPhase("confirm"); }} style={{ ...btnBase, background: "#c8a96e", color: "#0f0d0a" }}>
+          Call Waiter
+        </button>
+      )}
+      {phase === "confirm" && (
+        <>
+          <span style={{ fontSize: 13, color: "#F5F0E8", fontWeight: 600 }}>
+            Calling in {countdown}s...
+          </span>
+          <button onClick={() => { setPhase("idle"); setCountdown(5); }} style={{ ...btnBase, background: "transparent", color: "#c8a96e", border: "1px solid rgba(200,169,110,0.45)" }}>
+            Cancel
+          </button>
+        </>
+      )}
+      {phase === "sending" && (
+        <span style={{ fontSize: 13, color: "#9C8E7A", fontWeight: 600 }}>Calling waiter...</span>
+      )}
+      {phase === "sent" && (
+        <span style={{ fontSize: 13, color: "#22c55e", fontWeight: 700 }}>Waiter notified</span>
+      )}
+      {phase === "disabled" && (
+        <span style={{ fontSize: 13, color: "#9C8E7A", fontWeight: 600 }}>
+          Call Waiter (available in {fmtCd()})
+        </span>
       )}
     </div>
   );

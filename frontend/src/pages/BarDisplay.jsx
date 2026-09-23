@@ -58,11 +58,18 @@ export default function BarDisplay() {
   );
 }
 
+const CALL_WAITER_API = "/api/front-desk?resource=waiter-calls";
+const CALL_ALERT_REPEAT_MS = 15000;
+
 function BarContent() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionIds, setActionIds] = useState(new Set());
+  const [waiterCalls, setWaiterCalls] = useState([]);
+  const [callActionIds, setCallActionIds] = useState(new Set());
   const knownIdsRef = useRef(new Set());
+  const knownCallIdsRef = useRef(new Set());
+  const lastCallAlertRef = useRef(0);
   const mountedRef = useRef(true);
 
   const fetchOrders = useCallback(async () => {
@@ -92,6 +99,51 @@ function BarContent() {
     }
     knownIdsRef.current = newIds;
   }, []);
+
+  const fetchWaiterCalls = useCallback(async () => {
+    try {
+      const res = await fetch(CALL_WAITER_API, {
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      });
+      if (!mountedRef.current) return;
+      if (!res.ok) return;
+      const json = await res.json();
+      const calls = json.calls || [];
+      setWaiterCalls(calls);
+      if (calls.length > 0) {
+        if (Date.now() - lastCallAlertRef.current >= CALL_ALERT_REPEAT_MS) {
+          playAlert();
+          lastCallAlertRef.current = Date.now();
+        }
+      } else {
+        lastCallAlertRef.current = 0;
+      }
+      knownCallIdsRef.current = new Set(calls.map((c) => c.id));
+    } catch {}
+  }, []);
+
+  async function ackCall(id) {
+    setCallActionIds((prev) => new Set([...prev, id]));
+    try {
+      const res = await fetch(CALL_WAITER_API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        setWaiterCalls((prev) => prev.filter((c) => c.id !== id));
+        knownCallIdsRef.current.delete(id);
+        if (waiterCalls.length <= 1) lastCallAlertRef.current = 0;
+      }
+    } catch {}
+    setCallActionIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+  }
+
+  useEffect(() => {
+    fetchWaiterCalls();
+    const id = setInterval(fetchWaiterCalls, CALL_ALERT_REPEAT_MS);
+    return () => clearInterval(id);
+  }, [fetchWaiterCalls]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -181,9 +233,33 @@ function BarContent() {
         </div>
       </div>
 
-      <div style={{ fontSize: 12, color: "#9C8E7A", marginBottom: 16, textAlign: "center" }}>
+      <div style={{ fontSize: 12, color: "#9C8E7A", marginBottom: waiterCalls.length > 0 ? 0 : 16, textAlign: "center" }}>
         {orders.length > 0 ? `${orders.length} order${orders.length !== 1 ? "s" : ""} with drinks` : "No drink orders"}
       </div>
+
+      {/* Waiter calls */}
+      {waiterCalls.length > 0 && (
+        <div style={{ background: "rgba(200,169,110,0.08)", border: "1px solid rgba(200,169,110,0.3)", borderRadius: 10, padding: "10px 14px", marginBottom: 16, marginTop: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: "#c8a96e", marginBottom: 8 }}>
+            Waiter Calls
+          </div>
+          {waiterCalls.map((call) => (
+            <div key={call.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 0", borderTop: "1px solid rgba(200,169,110,0.15)" }}>
+              <div>
+                <span style={{ fontSize: 15, fontWeight: 700, color: "#F5F0E8" }}>Table {call.table_number}</span>
+                <span style={{ fontSize: 11, color: "#9C8E7A", marginLeft: 8 }}>{timeAgo(call.created_at)}</span>
+              </div>
+              <button
+                onClick={() => ackCall(call.id)}
+                disabled={callActionIds.has(call.id)}
+                style={{ background: "#c8a96e", color: "#0f0d0a", border: "none", borderRadius: 6, padding: "5px 14px", fontSize: 11, fontWeight: 700, cursor: callActionIds.has(call.id) ? "default" : "pointer", opacity: callActionIds.has(call.id) ? 0.6 : 1, letterSpacing: "0.06em", textTransform: "uppercase", fontFamily: "inherit" }}
+              >
+                Acknowledge
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Content */}
       {loading ? (

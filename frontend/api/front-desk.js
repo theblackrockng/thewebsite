@@ -15,8 +15,9 @@ const {
 } = require('./_lib/security');
 const { requireStaff } = require('./_lib/auth');
 
-const ORDER_ROLES = ['front_desk', 'manager'];
-const RESERVATION_ROLES = ['front_desk', 'manager', 'super_admin'];
+const ORDER_ROLES        = ['front_desk', 'manager'];
+const RESERVATION_ROLES  = ['front_desk', 'manager', 'super_admin'];
+const WAITER_CALL_ROLES  = ['bar', 'front_desk', 'manager', 'super_admin'];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -409,10 +410,90 @@ async function reservationsHandler(req, res) {
   }
 }
 
+// ── Waiter calls ────────────────────────────────────────────────────────
+
+async function waiterCallsHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'GET' && req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, WAITER_CALL_ROLES);
+  if (!staff) return;
+
+  const ip = getIP(req);
+  const { blocked } = checkUserAgent(req);
+  if (blocked) return res.status(400).json({ error: 'Bad request.' });
+  const { allowed } = checkCors(req);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden.' });
+
+  const isRead = req.method === 'GET';
+  const { limited } = isRead
+    ? checkInMemoryRateLimit(ip, 'waiter-calls-read',  1500, 60 * 60 * 1000)
+    : checkInMemoryRateLimit(ip, 'waiter-calls-write',  200, 60 * 60 * 1000);
+  if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  try {
+    if (isRead) {
+      const { data, error } = await db
+        .from('waiter_calls')
+        .select('id, table_number, status, created_at')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('[waiter-calls] list error:', error);
+        return res.status(500).json({ error: 'Could not load waiter calls.' });
+      }
+      return res.status(200).json({ calls: data || [] });
+    }
+
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return res.status(400).json({ error: 'Invalid request body.' });
+    }
+    const { id } = body;
+    if (typeof id !== 'string' || !UUID_RE.test(id)) {
+      return res.status(400).json({ error: 'Missing or invalid call id.' });
+    }
+
+    const { data: changed, error: updateErr } = await db
+      .from('waiter_calls')
+      .update({
+        status: 'acknowledged',
+        acknowledged_at: new Date().toISOString(),
+        acknowledged_by: staff.profile.id,
+      })
+      .eq('id', id)
+      .eq('status', 'pending')
+      .select('id');
+
+    if (updateErr) {
+      console.error('[waiter-calls] acknowledge error:', updateErr);
+      return res.status(500).json({ error: 'Could not acknowledge call.' });
+    }
+    if (!changed || changed.length === 0) {
+      return res.status(409).json({ error: 'Call already acknowledged or not found.' });
+    }
+    return res.status(200).json({ ok: true });
+  } catch (err) {
+    console.error('[waiter-calls] unexpected error:', err);
+    return res.status(500).json({ error: 'An unexpected error occurred.' });
+  }
+}
+
 module.exports = function handler(req, res) {
   const resource = req.query && req.query.resource;
   if (resource === 'orders') return ordersHandler(req, res);
   if (resource === 'reservations') return reservationsHandler(req, res);
+  if (resource === 'waiter-calls') return waiterCallsHandler(req, res);
   applySecurityHeaders(res);
   return res.status(400).json({ error: 'Unknown resource.' });
 };

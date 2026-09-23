@@ -6,8 +6,9 @@ import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2,
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
 
-const ORDERS_API = "/api/front-desk?resource=orders";
+const ORDERS_API       = "/api/front-desk?resource=orders";
 const RESERVATIONS_API = "/api/front-desk?resource=reservations";
+const WAITER_CALLS_API = "/api/front-desk?resource=waiter-calls";
 
 const POLL_MS = 15000;
 const FLASH_MS = 45000;
@@ -329,10 +330,14 @@ function FrontDeskMain({ onSessionLost }) {
   const [resPollError, setResPollError] = useState("");
   const [cancelTarget, setCancelTarget] = useState(null);
 
+  const [waiterCalls, setWaiterCalls] = useState([]);
+  const [callActionIds, setCallActionIds] = useState(() => new Set());
+
   const knownResIdsRef = useRef(null);
   const resInFlightRef = useRef(false);
   const resPendingRef = useRef(false);
   const knownIdsRef = useRef(null);
+  const lastCallAlertRef = useRef(0);
   const mountedRef = useRef(true);
   const inFlightRef = useRef(false);
   const pendingRef = useRef(false);
@@ -514,6 +519,26 @@ function FrontDeskMain({ onSessionLost }) {
     }
   }, []);
 
+  const fetchWaiterCalls = useCallback(async () => {
+    try {
+      const res = await apiRequest(WAITER_CALLS_API, "GET");
+      if (!mountedRef.current) return;
+      if (res === "lost") { lostRef.current(); return; }
+      if (res === "offline" || !res.ok) return;
+      const json = await res.json();
+      const calls = json.calls || [];
+      setWaiterCalls(calls);
+      if (calls.length > 0) {
+        if (Date.now() - lastCallAlertRef.current >= ALERT_REPEAT_MS) {
+          playAlert();
+          lastCallAlertRef.current = Date.now();
+        }
+      } else {
+        lastCallAlertRef.current = 0;
+      }
+    } catch {}
+  }, []);
+
   const subscribe = useCallback(() => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     const channel = supabase
@@ -560,11 +585,11 @@ function FrontDeskMain({ onSessionLost }) {
     let last = Date.now();
     const driftId = setInterval(() => {
       const n = Date.now();
-      if (n - last > WAKE_GAP_MS) { checkSession(); fetchOrders(); fetchReservations(); }
+      if (n - last > WAKE_GAP_MS) { checkSession(); fetchOrders(); fetchReservations(); fetchWaiterCalls(); }
       last = n;
     }, 5000);
     const onVisible = () => { if (document.visibilityState === "visible") checkSession(); };
-    const onOnline = () => { checkSession(); fetchOrders(); fetchReservations(); };
+    const onOnline = () => { checkSession(); fetchOrders(); fetchReservations(); fetchWaiterCalls(); };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onOnline);
     return () => {
@@ -573,13 +598,19 @@ function FrontDeskMain({ onSessionLost }) {
       document.removeEventListener("visibilitychange", onVisible);
       window.removeEventListener("online", onOnline);
     };
-  }, [checkSession, fetchOrders, fetchReservations]);
+  }, [checkSession, fetchOrders, fetchReservations, fetchWaiterCalls]);
 
   useEffect(() => {
     fetchReservations();
     const id = setInterval(fetchReservations, POLL_MS);
     return () => clearInterval(id);
   }, [fetchReservations]);
+
+  useEffect(() => {
+    fetchWaiterCalls();
+    const id = setInterval(fetchWaiterCalls, POLL_MS);
+    return () => clearInterval(id);
+  }, [fetchWaiterCalls]);
 
   useEffect(() => {
     if (tab === "completed") fetchOrders();
@@ -618,6 +649,7 @@ function FrontDeskMain({ onSessionLost }) {
       if (document.visibilityState === "visible") {
         fetchOrders();
         fetchReservations();
+        fetchWaiterCalls();
         acquire();
       }
     }
@@ -629,7 +661,7 @@ function FrontDeskMain({ onSessionLost }) {
       document.removeEventListener("visibilitychange", onVisible);
       if (sentinel) sentinel.release().catch(() => {});
     };
-  }, [fetchOrders, fetchReservations]);
+  }, [fetchOrders, fetchReservations, fetchWaiterCalls]);
 
   async function sendPatch(orderId, fields) {
     return fetch(ORDERS_API, {
@@ -715,6 +747,22 @@ function FrontDeskMain({ onSessionLost }) {
 
   const confirmReservation = (id) => patchReservation(id, "confirmed", "Confirm");
   const cancelReservation = (id) => patchReservation(id, "cancelled", "Cancel Booking");
+
+  async function ackCall(id) {
+    setCallActionIds((prev) => new Set([...prev, id]));
+    try {
+      const res = await apiRequest(WAITER_CALLS_API, "PATCH", { id });
+      if (res === "lost") { onSessionLost(); return; }
+      if (res !== "offline" && res.ok) {
+        setWaiterCalls((prev) => {
+          const next = prev.filter((c) => c.id !== id);
+          if (next.length === 0) lastCallAlertRef.current = 0;
+          return next;
+        });
+      }
+    } catch {}
+    setCallActionIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+  }
 
   const resLists = useMemo(() => {
     const live = reservations.filter((r) => r.status !== "cancelled");
@@ -869,6 +917,30 @@ function FrontDeskMain({ onSessionLost }) {
           >
             <X size={18} /> Dismiss
           </button>
+        </div>
+      )}
+
+      {/* Waiter calls — shown in both orders and reservations views */}
+      {waiterCalls.length > 0 && (
+        <div style={{ background: "rgba(200,169,110,0.08)", border: `1px solid rgba(200,169,110,0.35)`, borderRadius: 12, padding: "14px 20px", margin: "20px 0 4px" }}>
+          <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", color: t.gold, marginBottom: 10 }}>
+            Waiter Calls
+          </div>
+          {waiterCalls.map((call) => (
+            <div key={call.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 0", borderTop: "1px solid rgba(200,169,110,0.15)" }}>
+              <div>
+                <span style={{ fontSize: 20, fontWeight: 700, color: t.text }}>Table {call.table_number}</span>
+                <span style={{ fontSize: 14, color: t.muted, marginLeft: 12 }}>{timeSince(call.created_at, now)}</span>
+              </div>
+              <button
+                onClick={() => ackCall(call.id)}
+                disabled={callActionIds.has(call.id)}
+                style={{ background: t.gold, color: t.onGold, border: "none", borderRadius: 8, padding: "10px 22px", fontSize: 15, fontWeight: 700, cursor: callActionIds.has(call.id) ? "default" : "pointer", opacity: callActionIds.has(call.id) ? 0.6 : 1, fontFamily: "inherit" }}
+              >
+                Acknowledge
+              </button>
+            </div>
+          ))}
         </div>
       )}
 

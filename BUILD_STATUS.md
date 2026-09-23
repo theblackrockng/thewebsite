@@ -1,6 +1,32 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-21 (native apps: Chrome redirect fix for Bar and Waiter; shared config base; build:all)_
+_Last updated: 2026-09-23 (Call Waiter feature: guest bar, call-waiter.js endpoint, waiter_calls table, Bar and Front Desk strips)_
+
+---
+
+## Pending SQL (run in Supabase before Call Waiter goes live)
+
+```sql
+CREATE TABLE waiter_calls (
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  table_number     integer     NOT NULL,
+  status           text        NOT NULL DEFAULT 'pending'
+                               CHECK (status IN ('pending', 'acknowledged')),
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  acknowledged_at  timestamptz,
+  acknowledged_by  uuid        REFERENCES staff_profiles(id)
+);
+CREATE INDEX waiter_calls_status_idx ON waiter_calls (status, created_at DESC);
+CREATE INDEX waiter_calls_table_idx  ON waiter_calls (table_number, created_at DESC);
+ALTER TABLE waiter_calls ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "waiter_calls_guest_insert" ON waiter_calls FOR INSERT TO anon
+  WITH CHECK (table_number BETWEEN 1 AND 999);
+CREATE POLICY "waiter_calls_staff_select" ON waiter_calls FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM staff_profiles sp WHERE sp.id = auth.uid() AND sp.role IN ('bar','front_desk','manager','super_admin') AND sp.active = true));
+CREATE POLICY "waiter_calls_staff_update" ON waiter_calls FOR UPDATE TO authenticated
+  USING (status = 'pending' AND EXISTS (SELECT 1 FROM staff_profiles sp WHERE sp.id = auth.uid() AND sp.role IN ('bar','front_desk','manager','super_admin') AND sp.active = true))
+  WITH CHECK (status = 'acknowledged');
+```
 
 ---
 
@@ -41,6 +67,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Front Desk completed_at, Mark Paid on completed, stay signed in | _pending commit_ `front-desk-orders.js` sets `completed_at` on complete (retries without it if the column is missing); Mark Paid button on Completed Today; session refresh every 2 min, checked before each action and on tab visible, wake and online; one silent refresh and retry on 401; red "Signed out. Tap to sign in" screen with repeating alert; `StaffLoginGate` gets an optional `renderSignedOut` prop and no longer drops a signed-in screen when a profile refresh fails |
 | Front Desk reservations view | _pending commit_ `frontend/api/front-desk-reservations.js` (GET list with `range` filter, PATCH confirm or cancel; roles front_desk, manager, super_admin; whitelisted transitions; Telegram notice on confirm and cancel, same content as the console) and `FrontDeskDisplay.jsx`: header now reads "Front Desk" with one large switch button (Reservations with pending badge, or Orders with new-orders badge); reservations view with stat cards, Today/Upcoming/Pending/Past 7 Days tabs, tap-to-call on touch devices, cancel confirmation dialog; both data sets poll in the background so badges and chimes work from either view |
 | Merge endpoints under the Vercel Hobby function limit | _pending commit_ d176a00 deployed 13 functions and failed (limit 12). `api/front-desk.js` now serves both Front Desk endpoints (`?resource=orders` or `reservations`, each with its own roles, keys, rate-limit buckets and Telegram text); `telegram-setup` moved into `telegram-webhook.js` behind `?action=setup` (still Bearer `CRON_SECRET`, checked before update handling); `vercel.json` routes keep `/api/front-desk-orders`, `/api/front-desk-reservations` and `/api/telegram-setup` working; `FrontDeskDisplay` calls `/api/front-desk?resource=...`; 11 functions, one spare |
+| Call Waiter feature | `frontend/api/call-waiter.js` (uses the last spare function slot; now at 12/12). Guest posts table number; validated against `tables` table; 2-min per-table server-side cooldown checked in `waiter_calls`; Telegram alert. `front-desk.js` extended with `?resource=waiter-calls` (GET pending calls, PATCH acknowledge; roles bar/front_desk/manager/super_admin). `Order.jsx` adds `CallWaiterBar`: fixed slim bar below Navbar, 5-second cancel-undo, 2-min localStorage cooldown with countdown, responsive top offset for navbar height. `BarDisplay.jsx` and `FrontDeskDisplay.jsx`: waiter calls strip with table number, time since called, Acknowledge button; 15-second poll; playAlert() on new calls, repeats every 15s while unacknowledged. SQL for `waiter_calls` table and RLS not yet run; see pending SQL below. |
 | Console operations screen | _pending commit_ kitchen/bar/waiter/front_desk accounts get `OperationsScreen` (link to their website screen + sign out) instead of the console Layout; guard in `ProtectedRoute` and `AnalyticsRoute`; sidebar role labels for Kitchen, Bar, Front Desk; front_desk links to `/front-desk-display` |
 
 ---
@@ -81,11 +108,12 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 
 | File | Method | Purpose |
 |------|--------|---------|
+| `call-waiter.js` | POST | Public; guest calls waiter for their table. Validates table, 10/hr/IP rate limit, 2-min per-table server-side cooldown, inserts into `waiter_calls`, sends Telegram. Uses the 12th (last) Vercel Hobby function slot. |
 | `orders.js` | GET/POST | List orders / place new order; sends bar FCM push when order has drinks |
 | `initiate-payment.js` | POST | Paystack/Flutterwave payment init (inactive) |
 | `payment-webhook.js` | POST | Payment gateway webhook (inactive) |
 | `kitchen-status.js` | PATCH | Update order status; sends waiter FCM push when status → ready |
-| `front-desk.js` | PATCH, GET | One function, dispatched on `?resource=`. `orders` (PATCH; front_desk / manager only): confirm (new only), complete (any active status), mark paid (also on completed orders) or proof received; sets `completed_at` on complete; whitelisted transitions, sets `confirmed_by` from the verified profile, Telegram notice on status changes. `reservations` (GET, PATCH; front_desk / manager / super_admin): GET lists reservations from 7 days ago onward (optional `range` = all, today, upcoming, pending, past; Lagos day boundary; only display fields returned, no email); PATCH `{id, status}` allows pending or rescheduled to confirmed, and pending, rescheduled or confirmed to cancelled, never backwards, never on past dates; Telegram notice on change; separate rate limit buckets for reads and writes. Old paths `/api/front-desk-orders` and `/api/front-desk-reservations` are aliased in `vercel.json` |
+| `front-desk.js` | PATCH, GET | One function, dispatched on `?resource=`. `waiter-calls` (GET pending calls; PATCH acknowledge by id; sets acknowledged_at and acknowledged_by; roles bar/front_desk/manager/super_admin; separate rate-limit buckets for reads and writes). `orders` (PATCH; front_desk / manager only): confirm (new only), complete (any active status), mark paid (also on completed orders) or proof received; sets `completed_at` on complete; whitelisted transitions, sets `confirmed_by` from the verified profile, Telegram notice on status changes. `reservations` (GET, PATCH; front_desk / manager / super_admin): GET lists reservations from 7 days ago onward (optional `range` = all, today, upcoming, pending, past; Lagos day boundary; only display fields returned, no email); PATCH `{id, status}` allows pending or rescheduled to confirmed, and pending, rescheduled or confirmed to cancelled, never backwards, never on past dates; Telegram notice on change; separate rate limit buckets for reads and writes. Old paths `/api/front-desk-orders` and `/api/front-desk-reservations` are aliased in `vercel.json` |
 | `register-device.js` | POST | Upsert FCM token into push_tokens table |
 | `send-confirmation.js` | POST | Zoho SMTP order confirmation email |
 | `send-enquiry-reply.js` | POST | Zoho SMTP reply to enquiries |
@@ -169,6 +197,7 @@ Key tables (inferred from code and API usage):
 | `content_hub_assets` | Social media asset library |
 | `gallery_items` | Gallery section image assignments |
 | `push_tokens` | FCM device tokens — role ('waiter'|'bar'), staff_id (nullable), fcm_token; used for native app push notifications |
+| `waiter_calls` | Guest waiter requests — id, table_number, status (pending/acknowledged), created_at, acknowledged_at, acknowledged_by. **Table does not exist yet** — SQL in the previous session's plan message must be run in Supabase before the feature is live. |
 
 ---
 
