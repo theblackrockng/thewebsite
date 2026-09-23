@@ -292,9 +292,9 @@ export default function Home() {
           >
             <span className="gold-line left mb-6">The Kitchen</span>
             <h2 className="font-serif-display text-4xl md:text-5xl lg:text-6xl leading-tight mt-6 text-[var(--warm-white)]">
-              From Mile 12 to
+              Farm Fresh to
               <br />
-              <span className="font-serif-italic text-[var(--burgundy)]">your table.</span>
+              <span className="font-serif-italic text-[#C8A96E]">your Table.</span>
             </h2>
             <p className="text-[var(--muted)] text-base md:text-lg leading-relaxed mt-8 max-w-xl font-light">
               Jollof smoked over open fire. Pepper soup that clears the head.
@@ -309,15 +309,15 @@ export default function Home() {
               className="mt-8 grid grid-cols-3 gap-4 md:gap-6 max-w-md"
             >
               <div>
-                <div className="font-serif-display text-4xl text-[var(--burgundy)]">85+</div>
+                <div className="font-serif-display text-4xl text-[#C8A96E]">85+</div>
                 <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Dishes On Menu</div>
               </div>
               <div>
-                <div className="font-serif-display text-4xl text-[var(--burgundy)]">100%</div>
+                <div className="font-serif-display text-4xl text-[#C8A96E]">100%</div>
                 <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Local Sourced</div>
               </div>
               <div>
-                <div className="font-serif-display text-xl leading-tight text-[var(--burgundy)]">Every Guest,<br />Remembered</div>
+                <div className="font-serif-display text-xl leading-tight text-[#C8A96E]">Every Guest,<br />Remembered</div>
                 <div className="text-xs uppercase tracking-[0.22em] text-[var(--muted)] mt-1">Our Promise</div>
               </div>
             </motion.div>

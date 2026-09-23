@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-23 (Home hero: "a great experience" accent color changed from burgundy to deep gold)_
+_Last updated: 2026-09-23 (Home Kitchen section: heading changed to Farm Fresh to your Table; burgundy replaced with gold on heading and all three stat items)_
 
 ---
 
