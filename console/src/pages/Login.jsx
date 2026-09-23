@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { motion, useReducedMotion, AnimatePresence } from "framer-motion";
 
@@ -61,12 +62,7 @@ function SignInView({ onForgot }) {
     const userId = data?.user?.id;
     if (userId) {
       try {
-        const { createClient } = await import("@supabase/supabase-js");
-        const sb = createClient(
-          import.meta.env.VITE_SUPABASE_URL,
-          import.meta.env.VITE_SUPABASE_ANON_KEY
-        );
-        const { data: prof } = await sb.from("staff_profiles").select("two_fa_enabled, full_name").eq("id", userId).maybeSingle();
+        const { data: prof } = await supabase.from("staff_profiles").select("two_fa_enabled, full_name").eq("id", userId).maybeSingle();
         if (prof?.two_fa_enabled) {
           // Send 2FA OTP and show the 2FA step
           setOtpSending(true); setPendingUserId(userId);
@@ -77,8 +73,7 @@ function SignInView({ onForgot }) {
           setOtpSending(false); setTwoFAStep(true);
           return;
         }
-        // Update last_login_at
-        await sb.from("staff_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", userId);
+        await supabase.from("staff_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", userId);
       } catch {}
     }
     navigate("/");
@@ -94,11 +89,8 @@ function SignInView({ onForgot }) {
       });
       const d = await r.json();
       if (!r.ok) { setOtpError(d.error || "Invalid code"); setLoading(false); return; }
-      // Update last_login_at
       try {
-        const { createClient } = await import("@supabase/supabase-js");
-        const sb = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY);
-        await sb.from("staff_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", pendingUserId);
+        await supabase.from("staff_profiles").update({ last_login_at: new Date().toISOString() }).eq("id", pendingUserId);
       } catch {}
     } catch { setOtpError("Network error. Please try again."); setLoading(false); return; }
     setLoading(false);
