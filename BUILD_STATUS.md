@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-23 (Fix duplicate Supabase client in console Login.jsx causing session collisions and forced sign-outs)_
+_Last updated: 2026-09-23 (Home hero: "a great experience" accent color changed from burgundy to deep gold)_
 
 ---
 

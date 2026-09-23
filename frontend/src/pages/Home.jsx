@@ -182,7 +182,7 @@ export default function Home() {
             className="font-serif-display text-2xl md:text-4xl text-[var(--warm-white)] mt-5 leading-snug"
           >
             Great food deserves
-            <span className="font-serif-italic text-[var(--burgundy)]"> a great experience.</span>
+            <span className="font-serif-italic text-[#C8A96E]"> a great experience.</span>
           </motion.p>
         </div>
 
