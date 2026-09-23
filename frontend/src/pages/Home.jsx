@@ -381,7 +381,7 @@ export default function Home() {
             transition={{ duration: 0.8 }}
             className="font-serif-display text-3xl md:text-5xl text-[var(--warm-white)] leading-snug"
           >
-            Hungry right now?
+            Ready to Dine?
           </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 16 }}
