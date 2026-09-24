@@ -120,9 +120,9 @@ export default function Home() {
             className="font-serif-display text-[var(--warm-white)] text-4xl sm:text-5xl md:text-7xl lg:text-8xl leading-[1.0] max-w-5xl drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
             style={{ fontWeight: 500 }}
           >
-            Where exceptional food<br />
-            meets beautiful ambience,<br />
-            <span className="font-serif-italic text-[var(--gold)]">and every meal feels like home.</span>
+            BLACKROCK is a fine dining restaurant<br />
+            serving continental and national dishes,<br />
+            <span className="font-serif-italic text-[var(--gold)]">crafted with care and served with elegance.</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
