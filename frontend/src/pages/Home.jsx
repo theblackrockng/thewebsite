@@ -130,7 +130,7 @@ export default function Home() {
             transition={{ duration: 0.9, delay: 1.05 }}
             className="text-white/85 text-base md:text-lg font-light max-w-xl mt-8 leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
           >
-            A restaurant and rooftop lounge in Ikeja. Quality ingredients, exceptional service, and a space where every guest feels valued.
+            Whether it's a quiet dinner or a celebration, our menu and our space are built for the moment.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 16 }}
