@@ -117,7 +117,7 @@ export default function Home() {
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.9 }}
-            className="font-serif-display text-[var(--warm-white)] text-4xl sm:text-5xl md:text-7xl lg:text-8xl leading-[1.0] max-w-5xl drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
+            className="font-serif-display text-[var(--warm-white)] text-3xl sm:text-4xl md:text-6xl lg:text-7xl leading-[1.0] max-w-5xl drop-shadow-[0_4px_24px_rgba(0,0,0,0.7)]"
             style={{ fontWeight: 500 }}
           >
             BLACKROCK is a fine dining restaurant<br />
@@ -130,7 +130,7 @@ export default function Home() {
             transition={{ duration: 0.9, delay: 1.05 }}
             className="text-white/85 text-base md:text-lg font-light max-w-xl mt-8 leading-relaxed drop-shadow-[0_2px_12px_rgba(0,0,0,0.6)]"
           >
-            Whether it's a quiet dinner or a celebration, our menu and our space are built for the moment.
+            Whether it's a private dinner or a celebration, our menu and space are built for the moment.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 16 }}
