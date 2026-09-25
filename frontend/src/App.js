@@ -29,6 +29,7 @@ import ContentHubAsset from "./pages/ContentHubAsset";
 import ContentHubGuide from "./pages/ContentHubGuide";
 import ContentHubLogin from "./pages/ContentHubLogin";
 import Order from "./pages/Order";
+import OrderPreview from "./pages/OrderPreview";
 import Checkout from "./pages/Checkout";
 import OrderConfirmation from "./pages/OrderConfirmation";
 import Waiter from "./pages/Waiter";
@@ -99,6 +100,7 @@ function MainLayout() {
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
           <Route path="/order" element={<OrderRoute><Order /></OrderRoute>} />
+          <Route path="/order-preview" element={<OrderPreview />} />
           <Route path="/checkout" element={<OrderRoute><Checkout /></OrderRoute>} />
           <Route path="/order-confirmation/:orderId" element={<OrderRoute><OrderConfirmation /></OrderRoute>} />
         </Routes>

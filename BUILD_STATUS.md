@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-24 (Home hero h1 font size reduced ~17%; sub-paragraph copy updated)_
+_Last updated: 2026-09-25 (New /order-preview page added; hero + category tabs + mockup layout)_
 
 ---
 
@@ -87,6 +87,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `/` | Home.jsx | Hero (Ken Burns image), marquee, food reel, Two Spaces section (soft-hidden) |
 | `/menu` | Menu.jsx | Food/Drinks tabs, soup+swallow picker, dynamic hero image |
 | `/order` | Order.jsx | QR dine-in ordering; feature-flagged except when `?table=N` present |
+| `/order-preview` | OrderPreview.jsx | New ordering page design preview; hero + category tabs + image-left/items-right layout + sticky cart bar; always accessible, shares CartContext with live site |
 | `/order/confirmation` | OrderConfirmation.jsx | Post-checkout confirmation |
 | `/checkout` | Checkout.jsx | Delivery/pickup checkout flow |
 | `/reservations` | Reservations.jsx | Supabase reservations form |
