@@ -1,12 +1,16 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   ShoppingBag, Clock, Package, MessageCircle,
-  Plus, Minus, ChevronUp, X, Check, ArrowRight,
+  Plus, Minus, ChevronUp, ChevronLeft, ChevronRight,
+  X, Check,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { MENU } from "../lib/data";
 import { useCart } from "../context/CartContext";
 import SEO from "../components/SEO";
+
+const PER_PAGE = 5;
+const LIST_H   = 440; // fixed px — both image col and list clip zone
 
 const FOOD_CATEGORY_ORDER = [
   "Starters", "Salads", "Rice", "Pasta",
@@ -103,7 +107,6 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
-// data.js uses legacy names — remap to match Supabase category names
 const STATIC_CAT_REMAP = { "Noodles": "Pasta", "Pepper Soup & Specials": "Bush Bar Kitchen" };
 
 function buildStaticFood() {
@@ -124,6 +127,7 @@ function buildStaticFood() {
 
 export default function OrderPreview() {
   const { items: cartItems, addItem, setQty, totalItems, subtotal, setDrawerOpen } = useCart();
+  const [menuType, setMenuType] = useState("food"); // "food" | "drink"
   const [foodData, setFoodData] = useState(null);
   const [activeTab, setActiveTab] = useState(FOOD_CATEGORY_ORDER[0]);
   const [soupModal, setSoupModal] = useState(null);
@@ -134,7 +138,6 @@ export default function OrderPreview() {
   const scrollingRef = useRef(false);
   const tabsRef = useRef(null);
 
-  // Fetch dynamic category image overrides from site_content (same source as Menu.jsx)
   useEffect(() => {
     supabase
       .from("site_content")
@@ -176,9 +179,23 @@ export default function OrderPreview() {
     loadMenu();
   }, []);
 
-  const categories = foodData
-    ? ALL_CATEGORY_ORDER.filter(c => foodData[c]?.length > 0)
-    : [];
+  // Active categories depend on current toggle state
+  const categories = useMemo(() => {
+    const order = menuType === "food" ? FOOD_CATEGORY_ORDER : DRINK_CATEGORY_ORDER;
+    return foodData ? order.filter(c => foodData[c]?.length > 0) : [];
+  }, [menuType, foodData]);
+
+  // When switching menu type, jump active tab to first available category
+  const switchMenuType = (type) => {
+    setMenuType(type);
+    const order = type === "food" ? FOOD_CATEGORY_ORDER : DRINK_CATEGORY_ORDER;
+    if (foodData) {
+      const first = order.find(c => foodData[c]?.length > 0);
+      if (first) setActiveTab(first);
+    }
+    const navH = window.innerWidth >= 1024 ? 144 : window.innerWidth >= 768 ? 112 : 80;
+    window.scrollTo({ top: tabsRef.current ? tabsRef.current.getBoundingClientRect().top + window.scrollY - navH : 0, behavior: "smooth" });
+  };
 
   useEffect(() => {
     if (!foodData) return;
@@ -199,15 +216,15 @@ export default function OrderPreview() {
     );
     els.forEach(el => observer.observe(el));
     return () => observer.disconnect();
-  }, [foodData]);
+  }, [foodData, categories]); // re-observe when categories list changes
 
   const scrollToCategory = useCallback((cat) => {
     const el = sectionRefs.current[cat];
     if (!el) return;
     scrollingRef.current = true;
     setActiveTab(cat);
-    const offset = 80 + 54 + 8;
-    const top = el.getBoundingClientRect().top + window.scrollY - offset;
+    const tabsBottom = tabsRef.current ? tabsRef.current.getBoundingClientRect().bottom : 142;
+    const top = el.getBoundingClientRect().top + window.scrollY - tabsBottom - 8;
     window.scrollTo({ top, behavior: "smooth" });
     setTimeout(() => { scrollingRef.current = false; }, 900);
   }, []);
@@ -219,11 +236,11 @@ export default function OrderPreview() {
     <div style={{ minHeight: "100vh", background: "#0f0d0a", color: "#F5F0E8" }}>
       <SEO title="Order Online | BLACKROCK" canonical="/order-preview" />
       <style>{`
-        /* Hero */
+        /* Hero: explicit height so image cannot push the section taller than the text column */
         .op-hero {
           display: grid;
           grid-template-columns: 55% 45%;
-          min-height: 500px;
+          height: 580px;
           background: #0f0d0a;
           overflow: hidden;
         }
@@ -231,11 +248,11 @@ export default function OrderPreview() {
           display: flex;
           flex-direction: column;
           justify-content: center;
-          padding: 130px 52px 80px 40px;
+          padding: 0 52px 0 40px;
+          overflow: hidden;
         }
         .op-hero-img { display: block; position: relative; overflow: hidden; }
 
-        /* Category body: image left | list right */
         .op-cat-body {
           display: grid;
           grid-template-columns: 300px 1fr;
@@ -243,35 +260,47 @@ export default function OrderPreview() {
           align-items: start;
         }
 
-        /* Mobile */
         @media (max-width: 860px) {
-          .op-hero { grid-template-columns: 1fr; }
+          .op-hero { grid-template-columns: 1fr; height: auto; min-height: 420px; }
           .op-hero-img { display: none; }
           .op-hero-content { padding: 110px 24px 56px; }
-          /* Category: image stacks above item list */
           .op-cat-body { grid-template-columns: 1fr; gap: 28px; }
         }
 
-        /* Tab bar: hide scrollbar */
         .op-tabs::-webkit-scrollbar { display: none; }
         .op-tabs { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Sits directly below the main navbar at every breakpoint.
+           Navbar heights: h-20 (80px) / md:h-28 (112px) / lg:h-36 (144px).
+           z-index 40 keeps it below the navbar's z-50. */
+        .op-tabs-sticky {
+          position: sticky;
+          top: 80px;
+          z-index: 40;
+        }
+        @media (min-width: 768px)  { .op-tabs-sticky { top: 112px; } }
+        @media (min-width: 1024px) { .op-tabs-sticky { top: 144px; } }
+
+        @keyframes op-out-fwd  { from { transform: translateX(0); }     to { transform: translateX(-100%); } }
+        @keyframes op-out-bwd  { from { transform: translateX(0); }     to { transform: translateX(100%);  } }
+        @keyframes op-in-fwd   { from { transform: translateX(100%); }  to { transform: translateX(0); }    }
+        @keyframes op-in-bwd   { from { transform: translateX(-100%); } to { transform: translateX(0); }    }
       `}</style>
 
-      {/* ── HERO ── */}
+      {/* HERO */}
       <section className="op-hero">
-        {/* Left: text */}
         <div className="op-hero-content">
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "#C9A84C", margin: "0 0 16px" }}>
             Online Ordering
           </p>
-          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: "clamp(26px, 3vw, 44px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.15, margin: "0 0 16px" }}>
-            Your favourite dishes.<br />Prepared fresh.
+          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: "clamp(26px, 3vw, 44px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.3, margin: "0 0 36px" }}>
+            Your favourite dishes.<br />
+            <span style={{ paddingLeft: "1.5em" }}>Prepared fresh.</span>
           </h1>
           <p style={{ fontSize: 15, color: "#9C8E7A", margin: "0 0 34px", lineHeight: 1.65 }}>
-            Pickup or delivery. Fresh from our kitchen to you.
+            Pickup or delivery. Fresh from our kitchen to you
           </p>
 
-          {/* Three info badges */}
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 36 }}>
             {[
               { Icon: Clock,         line1: "Ready in",  line2: "25 - 35 mins" },
@@ -290,23 +319,28 @@ export default function OrderPreview() {
             ))}
           </div>
 
-          {/* CTA button */}
-          <button
-            onClick={() => {
-              if (tabsRef.current) {
-                const top = tabsRef.current.getBoundingClientRect().top + window.scrollY - 80;
-                window.scrollTo({ top, behavior: "smooth" });
-              }
-            }}
-            style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "13px 26px", border: "1.5px solid #C9A84C", borderRadius: 6, background: "transparent", color: "#C9A84C", fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", cursor: "pointer", width: "fit-content", fontFamily: "'Montserrat', sans-serif", transition: "background 0.18s, color 0.18s" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#C9A84C"; e.currentTarget.style.color = "#0f0d0a"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#C9A84C"; }}
-          >
-            Start Ordering <ArrowRight size={14} />
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            {["food", "drink"].map(type => (
+              <button
+                key={type}
+                onClick={() => switchMenuType(type)}
+                style={{
+                  padding: "10px 24px", borderRadius: 99, fontSize: 12,
+                  fontWeight: menuType === type ? 700 : 500,
+                  border: `1.5px solid ${menuType === type ? "#C9A84C" : "rgba(255,255,255,0.22)"}`,
+                  background: menuType === type ? "#C9A84C" : "transparent",
+                  color: menuType === type ? "#0f0d0a" : "rgba(245,240,232,0.6)",
+                  cursor: "pointer", transition: "all 0.15s",
+                  fontFamily: "'Montserrat', sans-serif",
+                  letterSpacing: "0.12em", textTransform: "uppercase",
+                }}
+              >
+                {type === "food" ? "Food" : "Drinks"}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Right: hero food image — hidden on mobile */}
         <div className="op-hero-img">
           <img
             src="/food/creamy-herb-soup.png"
@@ -314,47 +348,38 @@ export default function OrderPreview() {
             style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
             fetchpriority="high"
           />
-          {/* Gradient at left edge to bleed into the text column */}
           <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #0f0d0a 0%, rgba(15,13,10,0.55) 40%, rgba(15,13,10,0.08) 100%)", pointerEvents: "none" }} />
         </div>
       </section>
 
-      {/* ── CATEGORY TABS ── */}
+      {/* FOOD / DRINKS TOGGLE + CATEGORY TABS */}
       <div
         ref={tabsRef}
-        className="op-tabs"
-        style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,13,10,0.97)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid rgba(255,255,255,0.07)", overflowX: "auto" }}
+        className="op-tabs op-tabs-sticky"
+        style={{ background: "rgba(15,13,10,0.97)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid rgba(255,255,255,0.07)", overflowX: "auto" }}
       >
         <div style={{ display: "flex", gap: 6, padding: "10px 24px", maxWidth: 1200, margin: "0 auto", whiteSpace: "nowrap", alignItems: "center" }}>
-          {categories.map((cat, i) => {
-            const isDrink = DRINK_CATEGORY_ORDER.includes(cat);
-            const prevIsDrink = i > 0 && DRINK_CATEGORY_ORDER.includes(categories[i - 1]);
-            const showDivider = isDrink && !prevIsDrink;
-            return (
-              <div key={cat} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-                {showDivider && (
-                  <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px", flexShrink: 0 }} />
-                )}
-                <button
-                  onClick={() => scrollToCategory(cat)}
-                  style={{
-                    flexShrink: 0, padding: "8px 18px", borderRadius: 99, fontSize: 13,
-                    fontWeight: activeTab === cat ? 700 : 500,
-                    border: `1px solid ${activeTab === cat ? "#C9A84C" : "rgba(255,255,255,0.12)"}`,
-                    background: activeTab === cat ? "#C9A84C" : "transparent",
-                    color: activeTab === cat ? "#0f0d0a" : "rgba(245,240,232,0.65)",
-                    cursor: "pointer", transition: "all 0.15s", fontFamily: "'Montserrat', sans-serif",
-                  }}
-                >
-                  {cat}
-                </button>
-              </div>
-            );
-          })}
+          {/* Category tabs — filtered by hero toggle */}
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => scrollToCategory(cat)}
+              style={{
+                flexShrink: 0, padding: "8px 18px", borderRadius: 99, fontSize: 13,
+                fontWeight: activeTab === cat ? 700 : 500,
+                border: `1px solid ${activeTab === cat ? "#C9A84C" : "rgba(255,255,255,0.12)"}`,
+                background: activeTab === cat ? "#C9A84C" : "transparent",
+                color: activeTab === cat ? "#0f0d0a" : "rgba(245,240,232,0.65)",
+                cursor: "pointer", transition: "all 0.15s", fontFamily: "'Montserrat', sans-serif",
+              }}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ── MENU SECTIONS ── */}
+      {/* MENU SECTIONS */}
       {foodData === null ? (
         <div style={{ textAlign: "center", color: "#9C8E7A", padding: "80px 24px" }}>Loading menu...</div>
       ) : (
@@ -363,12 +388,12 @@ export default function OrderPreview() {
             const dishes = foodData[cat] || [];
             return (
               <section
-                key={cat}
+                key={`${menuType}-${cat}`}
                 ref={el => { sectionRefs.current[cat] = el; }}
                 data-category={cat}
                 style={{ padding: "60px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
               >
-                {/* Section header row */}
+                {/* Section header */}
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: 36 }}>
                   <div>
                     <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "#C9A84C", margin: "0 0 8px" }}>
@@ -384,12 +409,12 @@ export default function OrderPreview() {
                   </p>
                 </div>
 
-                {/* Image left | item list right */}
+                {/* Image left | paginated list right */}
                 <div className="op-cat-body">
 
-                  {/* LEFT: single large category image + tagline */}
+                  {/* LEFT: fixed-height category image */}
                   <div>
-                    <div style={{ width: "100%", aspectRatio: "4 / 5", overflow: "hidden", borderRadius: 3, background: "#1a1612" }}>
+                    <div style={{ width: "100%", height: LIST_H, overflow: "hidden", borderRadius: 3, background: "#1a1612" }}>
                       <img
                         src={dbCategoryImages[cat] || CATEGORY_IMAGES[cat] || "/images/menu/starters.jpg"}
                         alt={cat}
@@ -397,7 +422,6 @@ export default function OrderPreview() {
                         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                       />
                     </div>
-                    {/* Gold rule + tagline below image */}
                     <div style={{ marginTop: 16 }}>
                       <div style={{ width: 28, height: 1.5, background: "#C9A84C", marginBottom: 10 }} />
                       <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "#C9A84C", margin: 0, lineHeight: 1.9, whiteSpace: "pre-line" }}>
@@ -406,15 +430,16 @@ export default function OrderPreview() {
                     </div>
                   </div>
 
-                  {/* RIGHT: vertical list of dish rows — no cards, no grid */}
-                  <div>
-                    {dishes.map((dish, idx) => {
-                      const isNational   = cat === "National Dishes";
+                  {/* RIGHT: paginated dish list */}
+                  <PaginatedDishList
+                    dishes={dishes}
+                    renderDish={(dish, idx, chunk) => {
+                      const isNational    = cat === "National Dishes";
                       const isTraditional = cat === "Traditional Specials";
-                      const needsPicker  = isNational || isTraditional;
-                      const cartItem     = needsPicker ? null : getCartItem(dish.id);
-                      const natItems     = needsPicker ? getNationalCartItems(dish.id) : null;
-                      const natQty       = natItems ? natItems.reduce((s, i) => s + i.qty, 0) : 0;
+                      const needsPicker   = isNational || isTraditional;
+                      const cartItem      = needsPicker ? null : getCartItem(dish.id);
+                      const natItems      = needsPicker ? getNationalCartItems(dish.id) : null;
+                      const natQty        = natItems ? natItems.reduce((s, i) => s + i.qty, 0) : 0;
 
                       return (
                         <div
@@ -426,10 +451,9 @@ export default function OrderPreview() {
                             gap: 20,
                             padding: "20px 0",
                             borderTop: "1px solid rgba(255,255,255,0.08)",
-                            borderBottom: idx === dishes.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
+                            borderBottom: idx === chunk.length - 1 ? "1px solid rgba(255,255,255,0.08)" : "none",
                           }}
                         >
-                          {/* Dish name + description */}
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <h3 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 17, fontWeight: 600, color: "#F5F0E8", margin: "0 0 5px", lineHeight: 1.3 }}>
                               {dish.name}
@@ -441,7 +465,6 @@ export default function OrderPreview() {
                             )}
                           </div>
 
-                          {/* Price + add control */}
                           <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
                             <span style={{ fontSize: 15, fontWeight: 700, color: "#C9A84C", whiteSpace: "nowrap" }}>
                               {fmtPrice(dish.price)}
@@ -461,13 +484,13 @@ export default function OrderPreview() {
                                 onInc={() => setQty(dish.id, cartItem.qty + 1)}
                               />
                             ) : (
-                              <CircleAddBtn onClick={() => addItem({ id: dish.id, name: dish.name, price: dish.price, category: dish.category, menuType: "food", description: dish.description })} />
+                              <CircleAddBtn onClick={() => addItem({ id: dish.id, name: dish.name, price: dish.price, category: dish.category, menuType: menuType === "drink" ? "drink" : "food", description: dish.description })} />
                             )}
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
+                    }}
+                  />
 
                 </div>
               </section>
@@ -476,7 +499,7 @@ export default function OrderPreview() {
         </div>
       )}
 
-      {/* ── SOUP + SWALLOW MODALS ── */}
+      {/* MODALS */}
       {soupModal && (
         <PickerModal
           dish={soupModal}
@@ -500,10 +523,9 @@ export default function OrderPreview() {
         />
       )}
 
-      {/* ── STICKY CART BAR ── */}
+      {/* STICKY CART BAR */}
       {totalItems > 0 && (
         <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 100, background: "#181410", borderTop: "1px solid rgba(201,168,76,0.18)", padding: "14px 24px", display: "flex", alignItems: "center", gap: 16 }}>
-          {/* Cart icon with badge */}
           <div style={{ position: "relative", flexShrink: 0 }}>
             <ShoppingBag size={26} style={{ color: "#C9A84C" }} />
             <span style={{ position: "absolute", top: -8, right: -8, background: "#C9A84C", color: "#0f0d0a", fontSize: 10, fontWeight: 700, borderRadius: "50%", width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -511,7 +533,6 @@ export default function OrderPreview() {
             </span>
           </div>
 
-          {/* Count + total */}
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, color: "#9C8E7A", lineHeight: 1.2 }}>
               {totalItems} item{totalItems !== 1 ? "s" : ""}
@@ -532,6 +553,104 @@ export default function OrderPreview() {
         </div>
       )}
     </div>
+  );
+}
+
+function PaginatedDishList({ dishes, renderDish }) {
+  const [page, setPage] = useState(0);
+  const [slide, setSlide] = useState(null); // { from, to, dir: 1|-1 }
+  const totalPages = Math.ceil(dishes.length / PER_PAGE);
+
+  const chunk = (p) => dishes.slice(p * PER_PAGE, (p + 1) * PER_PAGE);
+
+  // Reset to page 0 whenever the dishes list changes (category switch)
+  useEffect(() => {
+    setPage(0);
+    setSlide(null);
+  }, [dishes]);
+
+  if (totalPages <= 1) {
+    return (
+      <div style={{ overflow: "hidden", height: LIST_H }}>
+        {chunk(0).map((dish, idx, arr) => renderDish(dish, idx, arr))}
+      </div>
+    );
+  }
+
+  const displayPage = slide ? slide.to : page;
+
+  const go = (newPage) => {
+    if (slide !== null || newPage === displayPage || newPage < 0 || newPage >= totalPages) return;
+    const dir = newPage > displayPage ? 1 : -1;
+    setSlide({ from: page, to: newPage, dir });
+    setTimeout(() => {
+      setPage(newPage);
+      setSlide(null);
+    }, 380);
+  };
+
+  const outAnim = slide ? (slide.dir === 1 ? "op-out-fwd" : "op-out-bwd") : undefined;
+  const inAnim  = slide ? (slide.dir === 1 ? "op-in-fwd"  : "op-in-bwd")  : undefined;
+  const DUR = "0.36s cubic-bezier(0.4,0,0.2,1) forwards";
+
+  const outChunk = chunk(page);
+  const inChunk  = slide ? chunk(slide.to) : null;
+
+  return (
+    <div>
+      <div style={{ position: "relative", overflow: "hidden", height: LIST_H }}>
+        <div
+          style={{
+            position: "absolute", inset: 0,
+            animation: outAnim ? `${outAnim} ${DUR}` : "none",
+          }}
+        >
+          {outChunk.map((dish, idx) => renderDish(dish, idx, outChunk))}
+        </div>
+
+        {slide && inChunk && (
+          <div style={{ position: "absolute", inset: 0, animation: `${inAnim} ${DUR}` }}>
+            {inChunk.map((dish, idx) => renderDish(dish, idx, inChunk))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+        <PageArrow dir="back" disabled={displayPage === 0} onClick={() => go(displayPage - 1)} />
+        <span style={{ fontSize: 11, color: "#9C8E7A", fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.12em", minWidth: 36, textAlign: "center" }}>
+          {displayPage + 1} / {totalPages}
+        </span>
+        <PageArrow dir="fwd" disabled={displayPage === totalPages - 1} onClick={() => go(displayPage + 1)} />
+      </div>
+    </div>
+  );
+}
+
+function PageArrow({ dir, disabled, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        width: 34, height: 34, borderRadius: "50%",
+        border: `1.5px solid ${disabled ? "rgba(201,168,76,0.18)" : "rgba(201,168,76,0.65)"}`,
+        background: "transparent",
+        color: disabled ? "rgba(201,168,76,0.25)" : "#C9A84C",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: disabled ? "default" : "pointer",
+        transition: "background 0.15s, color 0.15s",
+        flexShrink: 0,
+      }}
+      onMouseEnter={e => {
+        if (!disabled) { e.currentTarget.style.background = "#C9A84C"; e.currentTarget.style.color = "#0f0d0a"; }
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.background = "transparent";
+        e.currentTarget.style.color = disabled ? "rgba(201,168,76,0.25)" : "#C9A84C";
+      }}
+    >
+      {dir === "back" ? <ChevronLeft size={15} /> : <ChevronRight size={15} />}
+    </button>
   );
 }
 
