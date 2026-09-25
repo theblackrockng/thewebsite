@@ -15,6 +15,13 @@ const FOOD_CATEGORY_ORDER = [
   "BLACKROCK EXPERIENCE",
 ];
 
+const DRINK_CATEGORY_ORDER = [
+  "Wines", "Spirits", "Beer & Cider", "Cocktails",
+  "Mocktails", "Soft Drinks & Water", "Hot Drinks", "Fresh Juice",
+];
+
+const ALL_CATEGORY_ORDER = [...FOOD_CATEGORY_ORDER, ...DRINK_CATEGORY_ORDER];
+
 const SOUPS = [
   "Efo Riro", "Edika-Ikong", "Egusi", "Mixed Okro",
   "Fisherman Soup", "Seafood", "Banga", "Ofe Nsala", "Miyan Kuka", "Ewedu",
@@ -34,6 +41,14 @@ const CATEGORY_IMAGES = {
   "National Dishes":      "/images/menu/national.jpg",
   "Traditional Specials":  "/images/menu/traditional.jpg",
   "BLACKROCK EXPERIENCE":  "/images/menu/continental.jpg",
+  "Wines":                "/images/menu/wines.jpg",
+  "Spirits":              "/images/menu/spirits.jpg",
+  "Beer & Cider":         "/images/menu/beer.jpg",
+  "Cocktails":            "/images/menu/cocktails.jpg",
+  "Mocktails":            "/images/menu/mocktails.jpg",
+  "Soft Drinks & Water":  "/images/menu/soft-drinks.jpg",
+  "Hot Drinks":           "/images/menu/hot-drinks.jpg",
+  "Fresh Juice":          "/images/menu/juice.jpg",
 };
 
 const CATEGORY_TAGLINES = {
@@ -48,6 +63,14 @@ const CATEGORY_TAGLINES = {
   "National Dishes":      "Roots. Culture.\nFlavour.",
   "Traditional Specials":  "The taste of home.\nThe pride of origin.",
   "BLACKROCK EXPERIENCE": "The finest.\nOnly at BLACKROCK.",
+  "Wines":                "For the\ndiscerning palate.",
+  "Spirits":              "Neat. On ice.\nYour call.",
+  "Beer & Cider":         "Cold, crisp\nand refreshing.",
+  "Cocktails":            "Crafted with\nprecision.",
+  "Mocktails":            "All the flavour.\nNone of the alcohol.",
+  "Soft Drinks & Water":  "Simple sips.\nAlways cold.",
+  "Hot Drinks":           "Warm up.\nSlow down.",
+  "Fresh Juice":          "Pressed fresh.\nEvery time.",
 };
 
 const CATEGORY_DESCRIPTIONS = {
@@ -62,6 +85,14 @@ const CATEGORY_DESCRIPTIONS = {
   "National Dishes":      "Classic Nigerian plates,\nprepared with pride.",
   "Traditional Specials":  "Heritage dishes from\nacross Nigeria.",
   "BLACKROCK EXPERIENCE": "Signature dishes exclusive\nto BLACKROCK.",
+  "Wines":                "Reds, whites and rosés\ncurated for BLACKROCK.",
+  "Spirits":              "Premium bottles from\naround the world.",
+  "Beer & Cider":         "Local and imported\nbrews on ice.",
+  "Cocktails":            "Bar-crafted cocktails\nmixed to order.",
+  "Mocktails":            "Flavourful blends,\nperfectly balanced.",
+  "Soft Drinks & Water":  "Chilled drinks and\nstill or sparkling water.",
+  "Hot Drinks":           "Coffee, tea and\nwarm evening drinks.",
+  "Fresh Juice":          "Cold-pressed juices,\nno added sugar.",
 };
 
 function fmtPrice(n) {
@@ -125,8 +156,6 @@ export default function OrderPreview() {
         const food = {};
         if (!error && data?.length > 0) {
           for (const item of data) {
-            const type = item.menu_type ?? "food";
-            if (type !== "food") continue;
             const cat = item.category || "Other";
             if (!food[cat]) food[cat] = [];
             food[cat].push(item);
@@ -138,7 +167,7 @@ export default function OrderPreview() {
         }
 
         setFoodData(food);
-        const available = FOOD_CATEGORY_ORDER.filter(c => food[c]?.length > 0);
+        const available = ALL_CATEGORY_ORDER.filter(c => food[c]?.length > 0);
         if (available[0]) setActiveTab(available[0]);
       } catch {
         setFoodData(buildStaticFood());
@@ -148,7 +177,7 @@ export default function OrderPreview() {
   }, []);
 
   const categories = foodData
-    ? FOOD_CATEGORY_ORDER.filter(c => foodData[c]?.length > 0)
+    ? ALL_CATEGORY_ORDER.filter(c => foodData[c]?.length > 0)
     : [];
 
   useEffect(() => {
@@ -296,23 +325,32 @@ export default function OrderPreview() {
         className="op-tabs"
         style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,13,10,0.97)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid rgba(255,255,255,0.07)", overflowX: "auto" }}
       >
-        <div style={{ display: "flex", gap: 6, padding: "10px 24px", maxWidth: 1200, margin: "0 auto", whiteSpace: "nowrap" }}>
-          {categories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => scrollToCategory(cat)}
-              style={{
-                flexShrink: 0, padding: "8px 18px", borderRadius: 99, fontSize: 13,
-                fontWeight: activeTab === cat ? 700 : 500,
-                border: `1px solid ${activeTab === cat ? "#C9A84C" : "rgba(255,255,255,0.12)"}`,
-                background: activeTab === cat ? "#C9A84C" : "transparent",
-                color: activeTab === cat ? "#0f0d0a" : "rgba(245,240,232,0.65)",
-                cursor: "pointer", transition: "all 0.15s", fontFamily: "'Montserrat', sans-serif",
-              }}
-            >
-              {cat}
-            </button>
-          ))}
+        <div style={{ display: "flex", gap: 6, padding: "10px 24px", maxWidth: 1200, margin: "0 auto", whiteSpace: "nowrap", alignItems: "center" }}>
+          {categories.map((cat, i) => {
+            const isDrink = DRINK_CATEGORY_ORDER.includes(cat);
+            const prevIsDrink = i > 0 && DRINK_CATEGORY_ORDER.includes(categories[i - 1]);
+            const showDivider = isDrink && !prevIsDrink;
+            return (
+              <div key={cat} style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+                {showDivider && (
+                  <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.15)", margin: "0 6px", flexShrink: 0 }} />
+                )}
+                <button
+                  onClick={() => scrollToCategory(cat)}
+                  style={{
+                    flexShrink: 0, padding: "8px 18px", borderRadius: 99, fontSize: 13,
+                    fontWeight: activeTab === cat ? 700 : 500,
+                    border: `1px solid ${activeTab === cat ? "#C9A84C" : "rgba(255,255,255,0.12)"}`,
+                    background: activeTab === cat ? "#C9A84C" : "transparent",
+                    color: activeTab === cat ? "#0f0d0a" : "rgba(245,240,232,0.65)",
+                    cursor: "pointer", transition: "all 0.15s", fontFamily: "'Montserrat', sans-serif",
+                  }}
+                >
+                  {cat}
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
 

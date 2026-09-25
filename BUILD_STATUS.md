@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-24 (OrderPreview: added BLACKROCK EXPERIENCE category to match live menu)_
+_Last updated: 2026-09-25 (OrderPreview: added drink categories; navbar hides on scroll on order page)_
 
 ---
 

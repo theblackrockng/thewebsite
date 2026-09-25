@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, ShoppingBag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -10,16 +10,28 @@ export default function Navbar({ onReserveClick }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [scrolled, setScrolled] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const [open, setOpen] = useState(false);
   const { totalItems, setDrawerOpen } = useCart();
   const { orderingEnabled } = useFeatureFlags();
+  const lastY = useRef(0);
+  const isOrderPage = location.pathname === "/order" || location.pathname === "/order-preview";
 
   useEffect(() => {
-    const handler = () => setScrolled(window.scrollY > 24);
+    const handler = () => {
+      const y = window.scrollY;
+      setScrolled(y > 24);
+      if (isOrderPage) {
+        setHidden(y > 300 && y > lastY.current);
+      } else {
+        setHidden(false);
+      }
+      lastY.current = y;
+    };
     handler();
-    window.addEventListener("scroll", handler);
+    window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
-  }, []);
+  }, [isOrderPage]);
 
   useEffect(() => {
     setOpen(false);
@@ -34,6 +46,7 @@ export default function Navbar({ onReserveClick }) {
         style={{
           backgroundColor: scrolled ? "rgba(15,13,10,0.96)" : "transparent",
           backdropFilter: scrolled ? "blur(12px)" : "none",
+          transform: hidden ? "translateY(-100%)" : "translateY(0)",
         }}
         data-testid="navbar"
       >
