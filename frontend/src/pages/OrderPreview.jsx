@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   ShoppingBag, Clock, Package, MessageCircle,
   Plus, Minus, ChevronUp, ChevronLeft, ChevronRight,
@@ -176,10 +176,10 @@ export default function OrderPreview() {
   }, []);
 
   // Active categories depend on current toggle state
-  const activeOrder = menuType === "food" ? FOOD_CATEGORY_ORDER : DRINK_CATEGORY_ORDER;
-  const categories = foodData
-    ? activeOrder.filter(c => foodData[c]?.length > 0)
-    : [];
+  const categories = useMemo(() => {
+    const order = menuType === "food" ? FOOD_CATEGORY_ORDER : DRINK_CATEGORY_ORDER;
+    return foodData ? order.filter(c => foodData[c]?.length > 0) : [];
+  }, [menuType, foodData]);
 
   // When switching menu type, jump active tab to first available category
   const switchMenuType = (type) => {
