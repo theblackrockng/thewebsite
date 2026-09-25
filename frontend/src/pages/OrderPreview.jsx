@@ -289,11 +289,12 @@ export default function OrderPreview() {
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "#C9A84C", margin: "0 0 16px" }}>
             Online Ordering
           </p>
-          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: "clamp(26px, 3vw, 44px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.15, margin: "0 0 16px" }}>
-            Your favourite dishes.<br />Prepared fresh.
+          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: "clamp(26px, 3vw, 44px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.3, margin: "0 0 36px" }}>
+            ❯ Your favourite dishes.<br />
+            <span style={{ paddingLeft: "1.5em" }}>Prepared fresh.</span>
           </h1>
           <p style={{ fontSize: 15, color: "#9C8E7A", margin: "0 0 34px", lineHeight: 1.65 }}>
-            Pickup or delivery. Fresh from our kitchen to you.
+            Pickup or delivery. Fresh from our kitchen to you
           </p>
 
           <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginBottom: 36 }}>
