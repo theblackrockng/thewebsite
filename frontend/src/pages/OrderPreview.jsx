@@ -221,8 +221,8 @@ export default function OrderPreview() {
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "#C9A84C", margin: "0 0 16px" }}>
             Online Ordering
           </p>
-          <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(34px, 4vw, 58px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.08, margin: "0 0 16px" }}>
-            Your favourite<br />dishes, prepared<br />fresh.
+          <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(26px, 3vw, 44px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.08, margin: "0 0 16px" }}>
+            Your favourite dishes, prepared fresh.
           </h1>
           <p style={{ fontSize: 15, color: "#9C8E7A", margin: "0 0 34px", lineHeight: 1.65 }}>
             Pickup or delivery. Fresh from our kitchen to you.
