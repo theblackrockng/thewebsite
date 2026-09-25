@@ -266,13 +266,13 @@ export default function OrderPreview() {
         {/* Right: hero food image — hidden on mobile */}
         <div className="op-hero-img">
           <img
-            src="/images/menu/grills.jpg"
+            src="/food/creamy-herb-soup.png"
             alt="BLACKROCK kitchen"
             style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
             fetchpriority="high"
           />
           {/* Gradient at left edge to bleed into the text column */}
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #0f0d0a 0%, rgba(15,13,10,0.1) 35%, transparent 65%)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #0f0d0a 0%, rgba(15,13,10,0.55) 40%, rgba(15,13,10,0.08) 100%)", pointerEvents: "none" }} />
         </div>
       </section>
 
