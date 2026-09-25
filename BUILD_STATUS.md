@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-25 (OrderPreview rebuilt: hero with info icons, image-left/list-right per category, sticky cart bar)_
+_Last updated: 2026-09-24 (OrderPreview: added BLACKROCK EXPERIENCE category to match live menu)_
 
 ---
 

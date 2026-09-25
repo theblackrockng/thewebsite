@@ -12,6 +12,7 @@ const FOOD_CATEGORY_ORDER = [
   "Starters", "Salads", "Rice", "Pasta",
   "Bush Bar Kitchen", "Continental", "Sauces",
   "Charcoal Grills", "National Dishes", "Traditional Specials",
+  "BLACKROCK EXPERIENCE",
 ];
 
 const SOUPS = [
@@ -31,7 +32,8 @@ const CATEGORY_IMAGES = {
   "Sauces":               "/images/menu/sauces.jpg",
   "Charcoal Grills":      "/images/menu/grills.jpg",
   "National Dishes":      "/images/menu/national.jpg",
-  "Traditional Specials": "/images/menu/traditional.jpg",
+  "Traditional Specials":  "/images/menu/traditional.jpg",
+  "BLACKROCK EXPERIENCE":  "/images/menu/continental.jpg",
 };
 
 const CATEGORY_TAGLINES = {
@@ -44,7 +46,8 @@ const CATEGORY_TAGLINES = {
   "Sauces":               "Rich sauces.\nEndless satisfaction.",
   "Charcoal Grills":      "Low and slow.\nBold and smoky.",
   "National Dishes":      "Roots. Culture.\nFlavour.",
-  "Traditional Specials": "The taste of home.\nThe pride of origin.",
+  "Traditional Specials":  "The taste of home.\nThe pride of origin.",
+  "BLACKROCK EXPERIENCE": "The finest.\nOnly at BLACKROCK.",
 };
 
 const CATEGORY_DESCRIPTIONS = {
@@ -57,7 +60,8 @@ const CATEGORY_DESCRIPTIONS = {
   "Sauces":               "Bold sauces to pair\nwith every plate.",
   "Charcoal Grills":      "Open flame, patient\nhands, serious flavour.",
   "National Dishes":      "Classic Nigerian plates,\nprepared with pride.",
-  "Traditional Specials": "Heritage dishes from\nacross Nigeria.",
+  "Traditional Specials":  "Heritage dishes from\nacross Nigeria.",
+  "BLACKROCK EXPERIENCE": "Signature dishes exclusive\nto BLACKROCK.",
 };
 
 function fmtPrice(n) {
