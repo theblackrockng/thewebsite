@@ -290,7 +290,7 @@ export default function OrderPreview() {
             Online Ordering
           </p>
           <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: "clamp(26px, 3vw, 44px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.3, margin: "0 0 36px" }}>
-            ❯ Your favourite dishes.<br />
+            Your favourite dishes.<br />
             <span style={{ paddingLeft: "1.5em" }}>Prepared fresh.</span>
           </h1>
           <p style={{ fontSize: 15, color: "#9C8E7A", margin: "0 0 34px", lineHeight: 1.65 }}>
