@@ -68,16 +68,46 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
+// data.js uses legacy names — remap to match Supabase category names
+const STATIC_CAT_REMAP = { "Noodles": "Pasta", "Pepper Soup & Specials": "Bush Bar Kitchen" };
+
+function buildStaticFood() {
+  const food = {};
+  for (const [rawCat, dishes] of Object.entries(MENU)) {
+    const cat = STATIC_CAT_REMAP[rawCat] || rawCat;
+    food[cat] = dishes.map((d, idx) => ({
+      id: `static-${slugify(cat)}-${idx}`,
+      name: d.name,
+      description: d.desc,
+      price: parseInt((d.price || "0").replace(/[^\d]/g, ""), 10) || 0,
+      category: cat,
+      available: true,
+    }));
+  }
+  return food;
+}
+
 export default function OrderPreview() {
   const { items: cartItems, addItem, setQty, totalItems, subtotal, setDrawerOpen } = useCart();
   const [foodData, setFoodData] = useState(null);
   const [activeTab, setActiveTab] = useState(FOOD_CATEGORY_ORDER[0]);
   const [soupModal, setSoupModal] = useState(null);
   const [traditionalModal, setTraditionalModal] = useState(null);
+  const [dbCategoryImages, setDbCategoryImages] = useState({});
 
   const sectionRefs = useRef({});
   const scrollingRef = useRef(false);
   const tabsRef = useRef(null);
+
+  // Fetch dynamic category image overrides from site_content (same source as Menu.jsx)
+  useEffect(() => {
+    supabase
+      .from("site_content")
+      .select("data")
+      .eq("section", "menu-category-images")
+      .maybeSingle()
+      .then(({ data }) => { if (data?.data) setDbCategoryImages(data.data); });
+  }, []);
 
   useEffect(() => {
     async function loadMenu() {
@@ -100,34 +130,14 @@ export default function OrderPreview() {
         }
 
         if (Object.keys(food).length === 0) {
-          for (const [cat, dishes] of Object.entries(MENU)) {
-            food[cat] = dishes.map((d, idx) => ({
-              id: `static-${slugify(cat)}-${idx}`,
-              name: d.name,
-              description: d.desc,
-              price: parseInt((d.price || "0").replace(/[^\d]/g, ""), 10) || 0,
-              category: cat,
-              available: true,
-            }));
-          }
+          Object.assign(food, buildStaticFood());
         }
 
         setFoodData(food);
         const available = FOOD_CATEGORY_ORDER.filter(c => food[c]?.length > 0);
         if (available[0]) setActiveTab(available[0]);
       } catch {
-        const food = {};
-        for (const [cat, dishes] of Object.entries(MENU)) {
-          food[cat] = dishes.map((d, idx) => ({
-            id: `static-${slugify(cat)}-${idx}`,
-            name: d.name,
-            description: d.desc,
-            price: parseInt((d.price || "0").replace(/[^\d]/g, ""), 10) || 0,
-            category: cat,
-            available: true,
-          }));
-        }
-        setFoodData(food);
+        setFoodData(buildStaticFood());
       }
     }
     loadMenu();
@@ -221,7 +231,7 @@ export default function OrderPreview() {
           <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "#C9A84C", margin: "0 0 16px" }}>
             Online Ordering
           </p>
-          <h1 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(26px, 3vw, 44px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.08, margin: "0 0 16px" }}>
+          <h1 style={{ fontFamily: "'Poppins', sans-serif", fontSize: "clamp(26px, 3vw, 44px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.15, margin: "0 0 16px" }}>
             Your favourite dishes.<br />Prepared fresh.
           </h1>
           <p style={{ fontSize: 15, color: "#9C8E7A", margin: "0 0 34px", lineHeight: 1.65 }}>
@@ -339,7 +349,7 @@ export default function OrderPreview() {
                   <div>
                     <div style={{ width: "100%", aspectRatio: "4 / 5", overflow: "hidden", borderRadius: 3, background: "#1a1612" }}>
                       <img
-                        src={CATEGORY_IMAGES[cat] || "/images/menu/starters.jpg"}
+                        src={dbCategoryImages[cat] || CATEGORY_IMAGES[cat] || "/images/menu/starters.jpg"}
                         alt={cat}
                         loading="lazy"
                         style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
