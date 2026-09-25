@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-25 (New /order-preview page added; hero + category tabs + mockup layout)_
+_Last updated: 2026-09-25 (OrderPreview rebuilt: hero with info icons, image-left/list-right per category, sticky cart bar)_
 
 ---
 
