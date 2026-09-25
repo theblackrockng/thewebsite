@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-25 (OrderPreview: added drink categories; navbar hides on scroll on order page)_
+_Last updated: 2026-09-25 (/order hero redesign: Cormorant Garamond headline, framer-motion stagger, floating food card)_
 
 ---
 
@@ -71,6 +71,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Call Waiter feature | `frontend/api/call-waiter.js` (uses the last spare function slot; now at 12/12). Guest posts table number; validated against `tables` table; 2-min per-table server-side cooldown checked in `waiter_calls`; Telegram alert. `front-desk.js` extended with `?resource=waiter-calls` (GET pending calls, PATCH acknowledge; roles bar/front_desk/manager/super_admin). `Order.jsx` adds `CallWaiterBar`: fixed slim bar below Navbar, 5-second cancel-undo, 2-min localStorage cooldown with countdown, responsive top offset for navbar height. `BarDisplay.jsx` and `FrontDeskDisplay.jsx`: waiter calls strip with table number, time since called, Acknowledge button; 15-second poll; playAlert() on new calls, repeats every 15s while unacknowledged. SQL for `waiter_calls` table and RLS not yet run; see pending SQL below. |
 | Console operations screen | _pending commit_ kitchen/bar/waiter/front_desk accounts get `OperationsScreen` (link to their website screen + sign out) instead of the console Layout; guard in `ProtectedRoute` and `AnalyticsRoute`; sidebar role labels for Kitchen, Bar, Front Desk; front_desk links to `/front-desk-display` |
 | Hero tagline + sub-paragraph update | Hero `<h1>` changed to fine dining brand statement; sub-paragraph updated; h1 font sizes reduced further to text-2xl/3xl/5xl/6xl; hardcoded br tags removed for natural wrapping |
+| /order hero redesign | Editorial hero: Cormorant Garamond display headline (`clamp(38px,5vw,72px)`), italic gold "fresh." accent, staggered framer-motion entrance, text-only stats row (no icon chips), floating food card in image column, grilled-fish hero image. Fixed dangling `ArrowRight` import (replaced with `ChevronRight`). |
 
 ---
 
