@@ -189,7 +189,8 @@ export default function OrderPreview() {
       const first = order.find(c => foodData[c]?.length > 0);
       if (first) setActiveTab(first);
     }
-    window.scrollTo({ top: tabsRef.current ? tabsRef.current.getBoundingClientRect().top + window.scrollY - 80 : 0, behavior: "smooth" });
+    const navH = window.innerWidth >= 1024 ? 144 : window.innerWidth >= 768 ? 112 : 80;
+    window.scrollTo({ top: tabsRef.current ? tabsRef.current.getBoundingClientRect().top + window.scrollY - navH : 0, behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -218,8 +219,8 @@ export default function OrderPreview() {
     if (!el) return;
     scrollingRef.current = true;
     setActiveTab(cat);
-    const offset = 80 + 54 + 8;
-    const top = el.getBoundingClientRect().top + window.scrollY - offset;
+    const tabsBottom = tabsRef.current ? tabsRef.current.getBoundingClientRect().bottom : 142;
+    const top = el.getBoundingClientRect().top + window.scrollY - tabsBottom - 8;
     window.scrollTo({ top, behavior: "smooth" });
     setTimeout(() => { scrollingRef.current = false; }, 900);
   }, []);
@@ -264,6 +265,17 @@ export default function OrderPreview() {
 
         .op-tabs::-webkit-scrollbar { display: none; }
         .op-tabs { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Sits directly below the main navbar at every breakpoint.
+           Navbar heights: h-20 (80px) / md:h-28 (112px) / lg:h-36 (144px).
+           z-index 40 keeps it below the navbar's z-50. */
+        .op-tabs-sticky {
+          position: sticky;
+          top: 80px;
+          z-index: 40;
+        }
+        @media (min-width: 768px)  { .op-tabs-sticky { top: 112px; } }
+        @media (min-width: 1024px) { .op-tabs-sticky { top: 144px; } }
 
         @keyframes op-out-fwd  { from { transform: translateX(0); }     to { transform: translateX(-100%); } }
         @keyframes op-out-bwd  { from { transform: translateX(0); }     to { transform: translateX(100%);  } }
@@ -331,8 +343,8 @@ export default function OrderPreview() {
       {/* FOOD / DRINKS TOGGLE + CATEGORY TABS */}
       <div
         ref={tabsRef}
-        className="op-tabs"
-        style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,13,10,0.97)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid rgba(255,255,255,0.07)", overflowX: "auto" }}
+        className="op-tabs op-tabs-sticky"
+        style={{ background: "rgba(15,13,10,0.97)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid rgba(255,255,255,0.07)", overflowX: "auto" }}
       >
         <div style={{ display: "flex", gap: 6, padding: "10px 24px", maxWidth: 1200, margin: "0 auto", whiteSpace: "nowrap", alignItems: "center" }}>
           {/* Toggle pills */}
