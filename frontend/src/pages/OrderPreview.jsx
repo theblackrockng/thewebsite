@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   ShoppingBag, Clock, Package, MessageCircle,
   Plus, Minus, ChevronUp, ChevronLeft, ChevronRight,
-  X, Check, ArrowRight,
+  X, Check,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { MENU } from "../lib/data";
@@ -314,19 +314,26 @@ export default function OrderPreview() {
             ))}
           </div>
 
-          <button
-            onClick={() => {
-              if (tabsRef.current) {
-                const top = tabsRef.current.getBoundingClientRect().top + window.scrollY - 80;
-                window.scrollTo({ top, behavior: "smooth" });
-              }
-            }}
-            style={{ display: "inline-flex", alignItems: "center", gap: 10, padding: "13px 26px", border: "1.5px solid #C9A84C", borderRadius: 6, background: "transparent", color: "#C9A84C", fontSize: 11, fontWeight: 700, letterSpacing: "0.15em", textTransform: "uppercase", cursor: "pointer", width: "fit-content", fontFamily: "'Montserrat', sans-serif", transition: "background 0.18s, color 0.18s" }}
-            onMouseEnter={e => { e.currentTarget.style.background = "#C9A84C"; e.currentTarget.style.color = "#0f0d0a"; }}
-            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#C9A84C"; }}
-          >
-            Start Ordering <ArrowRight size={14} />
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            {["food", "drink"].map(type => (
+              <button
+                key={type}
+                onClick={() => switchMenuType(type)}
+                style={{
+                  padding: "10px 24px", borderRadius: 99, fontSize: 12,
+                  fontWeight: menuType === type ? 700 : 500,
+                  border: `1.5px solid ${menuType === type ? "#C9A84C" : "rgba(255,255,255,0.22)"}`,
+                  background: menuType === type ? "#C9A84C" : "transparent",
+                  color: menuType === type ? "#0f0d0a" : "rgba(245,240,232,0.6)",
+                  cursor: "pointer", transition: "all 0.15s",
+                  fontFamily: "'Montserrat', sans-serif",
+                  letterSpacing: "0.12em", textTransform: "uppercase",
+                }}
+              >
+                {type === "food" ? "Food" : "Drinks"}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="op-hero-img">
@@ -347,30 +354,7 @@ export default function OrderPreview() {
         style={{ background: "rgba(15,13,10,0.97)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid rgba(255,255,255,0.07)", overflowX: "auto" }}
       >
         <div style={{ display: "flex", gap: 6, padding: "10px 24px", maxWidth: 1200, margin: "0 auto", whiteSpace: "nowrap", alignItems: "center" }}>
-          {/* Toggle pills */}
-          {["food", "drink"].map(type => (
-            <button
-              key={type}
-              onClick={() => switchMenuType(type)}
-              style={{
-                flexShrink: 0, padding: "8px 20px", borderRadius: 99, fontSize: 12,
-                fontWeight: menuType === type ? 700 : 500,
-                border: `1.5px solid ${menuType === type ? "#C9A84C" : "rgba(255,255,255,0.18)"}`,
-                background: menuType === type ? "#C9A84C" : "rgba(255,255,255,0.05)",
-                color: menuType === type ? "#0f0d0a" : "rgba(245,240,232,0.55)",
-                cursor: "pointer", transition: "all 0.15s",
-                fontFamily: "'Montserrat', sans-serif",
-                letterSpacing: "0.1em", textTransform: "uppercase",
-              }}
-            >
-              {type === "food" ? "Food" : "Drinks"}
-            </button>
-          ))}
-
-          {/* Divider */}
-          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.12)", margin: "0 4px", flexShrink: 0 }} />
-
-          {/* Category tabs — filtered by current toggle */}
+          {/* Category tabs — filtered by hero toggle */}
           {categories.map(cat => (
             <button
               key={cat}
