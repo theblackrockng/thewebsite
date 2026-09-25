@@ -99,7 +99,7 @@ function MainLayout() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/blog" element={<Blog />} />
           <Route path="/blog/:slug" element={<BlogPost />} />
-          <Route path="/order" element={<OrderRoute><Order /></OrderRoute>} />
+          <Route path="/order" element={<OrderRoute><OrderPreview /></OrderRoute>} />
           <Route path="/order-preview" element={<OrderPreview />} />
           <Route path="/checkout" element={<OrderRoute><Checkout /></OrderRoute>} />
           <Route path="/order-confirmation/:orderId" element={<OrderRoute><OrderConfirmation /></OrderRoute>} />
