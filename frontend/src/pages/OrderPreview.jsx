@@ -10,13 +10,20 @@ import { useCart } from "../context/CartContext";
 import SEO from "../components/SEO";
 
 const PER_PAGE = 5;
-const LIST_H   = 440; // fixed px height for both image col and list col
+const LIST_H   = 440; // fixed px — both image col and list clip zone
 
 const FOOD_CATEGORY_ORDER = [
   "Starters", "Salads", "Rice", "Pasta",
   "Bush Bar Kitchen", "Continental", "Sauces",
   "Charcoal Grills", "National Dishes", "Traditional Specials",
 ];
+
+const DRINK_CATEGORY_ORDER = [
+  "Wines", "Spirits", "Beer & Cider", "Cocktails",
+  "Mocktails", "Soft Drinks & Water", "Hot Drinks", "Fresh Juice",
+];
+
+const ALL_CATEGORY_ORDER = [...FOOD_CATEGORY_ORDER, ...DRINK_CATEGORY_ORDER];
 
 const SOUPS = [
   "Efo Riro", "Edika-Ikong", "Egusi", "Mixed Okro",
@@ -36,6 +43,14 @@ const CATEGORY_IMAGES = {
   "Charcoal Grills":      "/images/menu/grills.jpg",
   "National Dishes":      "/images/menu/national.jpg",
   "Traditional Specials": "/images/menu/traditional.jpg",
+  "Wines":                "/images/menu/wines.jpg",
+  "Spirits":              "/images/menu/spirits.jpg",
+  "Beer & Cider":         "/images/menu/beer.jpg",
+  "Cocktails":            "/images/menu/cocktails.jpg",
+  "Mocktails":            "/images/menu/mocktails.jpg",
+  "Soft Drinks & Water":  "/images/menu/soft-drinks.jpg",
+  "Hot Drinks":           "/images/menu/hot-drinks.jpg",
+  "Fresh Juice":          "/images/menu/juice.jpg",
 };
 
 const CATEGORY_TAGLINES = {
@@ -49,6 +64,14 @@ const CATEGORY_TAGLINES = {
   "Charcoal Grills":      "Low and slow.\nBold and smoky.",
   "National Dishes":      "Roots. Culture.\nFlavour.",
   "Traditional Specials": "The taste of home.\nThe pride of origin.",
+  "Wines":                "For the\ndiscerning palate.",
+  "Spirits":              "Neat. On ice.\nYour call.",
+  "Beer & Cider":         "Cold, crisp\nand refreshing.",
+  "Cocktails":            "Crafted with\nprecision.",
+  "Mocktails":            "All the flavour.\nNone of the alcohol.",
+  "Soft Drinks & Water":  "Simple sips.\nAlways cold.",
+  "Hot Drinks":           "Warm up.\nSlow down.",
+  "Fresh Juice":          "Pressed fresh.\nEvery time.",
 };
 
 const CATEGORY_DESCRIPTIONS = {
@@ -62,6 +85,14 @@ const CATEGORY_DESCRIPTIONS = {
   "Charcoal Grills":      "Open flame, patient\nhands, serious flavour.",
   "National Dishes":      "Classic Nigerian plates,\nprepared with pride.",
   "Traditional Specials": "Heritage dishes from\nacross Nigeria.",
+  "Wines":                "Reds, whites and rosés\ncurated for BLACKROCK.",
+  "Spirits":              "Premium bottles from\naround the world.",
+  "Beer & Cider":         "Local and imported\nbrews on ice.",
+  "Cocktails":            "Bar-crafted cocktails\nmixed to order.",
+  "Mocktails":            "Flavourful blends,\nperfectly balanced.",
+  "Soft Drinks & Water":  "Chilled drinks and\nstill or sparkling water.",
+  "Hot Drinks":           "Coffee, tea and\nwarm evening drinks.",
+  "Fresh Juice":          "Cold-pressed juices,\nno added sugar.",
 };
 
 function fmtPrice(n) {
@@ -72,7 +103,6 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
-// data.js uses legacy names — remap to match Supabase category names
 const STATIC_CAT_REMAP = { "Noodles": "Pasta", "Pepper Soup & Specials": "Bush Bar Kitchen" };
 
 function buildStaticFood() {
@@ -93,6 +123,7 @@ function buildStaticFood() {
 
 export default function OrderPreview() {
   const { items: cartItems, addItem, setQty, totalItems, subtotal, setDrawerOpen } = useCart();
+  const [menuType, setMenuType] = useState("food"); // "food" | "drink"
   const [foodData, setFoodData] = useState(null);
   const [activeTab, setActiveTab] = useState(FOOD_CATEGORY_ORDER[0]);
   const [soupModal, setSoupModal] = useState(null);
@@ -124,8 +155,6 @@ export default function OrderPreview() {
         const food = {};
         if (!error && data?.length > 0) {
           for (const item of data) {
-            const type = item.menu_type ?? "food";
-            if (type !== "food") continue;
             const cat = item.category || "Other";
             if (!food[cat]) food[cat] = [];
             food[cat].push(item);
@@ -146,9 +175,22 @@ export default function OrderPreview() {
     loadMenu();
   }, []);
 
+  // Active categories depend on current toggle state
+  const activeOrder = menuType === "food" ? FOOD_CATEGORY_ORDER : DRINK_CATEGORY_ORDER;
   const categories = foodData
-    ? FOOD_CATEGORY_ORDER.filter(c => foodData[c]?.length > 0)
+    ? activeOrder.filter(c => foodData[c]?.length > 0)
     : [];
+
+  // When switching menu type, jump active tab to first available category
+  const switchMenuType = (type) => {
+    setMenuType(type);
+    const order = type === "food" ? FOOD_CATEGORY_ORDER : DRINK_CATEGORY_ORDER;
+    if (foodData) {
+      const first = order.find(c => foodData[c]?.length > 0);
+      if (first) setActiveTab(first);
+    }
+    window.scrollTo({ top: tabsRef.current ? tabsRef.current.getBoundingClientRect().top + window.scrollY - 80 : 0, behavior: "smooth" });
+  };
 
   useEffect(() => {
     if (!foodData) return;
@@ -169,7 +211,7 @@ export default function OrderPreview() {
     );
     els.forEach(el => observer.observe(el));
     return () => observer.disconnect();
-  }, [foodData]);
+  }, [foodData, categories]); // re-observe when categories list changes
 
   const scrollToCategory = useCallback((cat) => {
     const el = sectionRefs.current[cat];
@@ -189,10 +231,11 @@ export default function OrderPreview() {
     <div style={{ minHeight: "100vh", background: "#0f0d0a", color: "#F5F0E8" }}>
       <SEO title="Order Online | BLACKROCK" canonical="/order-preview" />
       <style>{`
+        /* Hero: explicit height so image cannot push the section taller than the text column */
         .op-hero {
           display: grid;
           grid-template-columns: 55% 45%;
-          min-height: 500px;
+          height: 580px;
           background: #0f0d0a;
           overflow: hidden;
         }
@@ -200,7 +243,8 @@ export default function OrderPreview() {
           display: flex;
           flex-direction: column;
           justify-content: center;
-          padding: 130px 52px 80px 40px;
+          padding: 0 52px 0 40px;
+          overflow: hidden;
         }
         .op-hero-img { display: block; position: relative; overflow: hidden; }
 
@@ -212,7 +256,7 @@ export default function OrderPreview() {
         }
 
         @media (max-width: 860px) {
-          .op-hero { grid-template-columns: 1fr; }
+          .op-hero { grid-template-columns: 1fr; height: auto; min-height: 420px; }
           .op-hero-img { display: none; }
           .op-hero-content { padding: 110px 24px 56px; }
           .op-cat-body { grid-template-columns: 1fr; gap: 28px; }
@@ -284,13 +328,37 @@ export default function OrderPreview() {
         </div>
       </section>
 
-      {/* CATEGORY TABS */}
+      {/* FOOD / DRINKS TOGGLE + CATEGORY TABS */}
       <div
         ref={tabsRef}
         className="op-tabs"
         style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(15,13,10,0.97)", backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", borderBottom: "1px solid rgba(255,255,255,0.07)", overflowX: "auto" }}
       >
-        <div style={{ display: "flex", gap: 6, padding: "10px 24px", maxWidth: 1200, margin: "0 auto", whiteSpace: "nowrap" }}>
+        <div style={{ display: "flex", gap: 6, padding: "10px 24px", maxWidth: 1200, margin: "0 auto", whiteSpace: "nowrap", alignItems: "center" }}>
+          {/* Toggle pills */}
+          {["food", "drink"].map(type => (
+            <button
+              key={type}
+              onClick={() => switchMenuType(type)}
+              style={{
+                flexShrink: 0, padding: "8px 20px", borderRadius: 99, fontSize: 12,
+                fontWeight: menuType === type ? 700 : 500,
+                border: `1.5px solid ${menuType === type ? "#C9A84C" : "rgba(255,255,255,0.18)"}`,
+                background: menuType === type ? "#C9A84C" : "rgba(255,255,255,0.05)",
+                color: menuType === type ? "#0f0d0a" : "rgba(245,240,232,0.55)",
+                cursor: "pointer", transition: "all 0.15s",
+                fontFamily: "'Montserrat', sans-serif",
+                letterSpacing: "0.1em", textTransform: "uppercase",
+              }}
+            >
+              {type === "food" ? "Food" : "Drinks"}
+            </button>
+          ))}
+
+          {/* Divider */}
+          <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.12)", margin: "0 4px", flexShrink: 0 }} />
+
+          {/* Category tabs — filtered by current toggle */}
           {categories.map(cat => (
             <button
               key={cat}
@@ -319,7 +387,7 @@ export default function OrderPreview() {
             const dishes = foodData[cat] || [];
             return (
               <section
-                key={cat}
+                key={`${menuType}-${cat}`}
                 ref={el => { sectionRefs.current[cat] = el; }}
                 data-category={cat}
                 style={{ padding: "60px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
@@ -343,7 +411,7 @@ export default function OrderPreview() {
                 {/* Image left | paginated list right */}
                 <div className="op-cat-body">
 
-                  {/* LEFT: category image — fixed height, never moves */}
+                  {/* LEFT: fixed-height category image */}
                   <div>
                     <div style={{ width: "100%", height: LIST_H, overflow: "hidden", borderRadius: 3, background: "#1a1612" }}>
                       <img
@@ -415,7 +483,7 @@ export default function OrderPreview() {
                                 onInc={() => setQty(dish.id, cartItem.qty + 1)}
                               />
                             ) : (
-                              <CircleAddBtn onClick={() => addItem({ id: dish.id, name: dish.name, price: dish.price, category: dish.category, menuType: "food", description: dish.description })} />
+                              <CircleAddBtn onClick={() => addItem({ id: dish.id, name: dish.name, price: dish.price, category: dish.category, menuType: menuType === "drink" ? "drink" : "food", description: dish.description })} />
                             )}
                           </div>
                         </div>
@@ -430,7 +498,7 @@ export default function OrderPreview() {
         </div>
       )}
 
-      {/* SOUP + SWALLOW MODALS */}
+      {/* MODALS */}
       {soupModal && (
         <PickerModal
           dish={soupModal}
@@ -494,7 +562,12 @@ function PaginatedDishList({ dishes, renderDish }) {
 
   const chunk = (p) => dishes.slice(p * PER_PAGE, (p + 1) * PER_PAGE);
 
-  // Categories with 5 or fewer items: no animation, no arrows, just static list
+  // Reset to page 0 whenever the dishes list changes (category switch)
+  useEffect(() => {
+    setPage(0);
+    setSlide(null);
+  }, [dishes]);
+
   if (totalPages <= 1) {
     return (
       <div style={{ overflow: "hidden", height: LIST_H }}>
@@ -524,9 +597,7 @@ function PaginatedDishList({ dishes, renderDish }) {
 
   return (
     <div>
-      {/* Fixed-height clip zone — never resizes */}
       <div style={{ position: "relative", overflow: "hidden", height: LIST_H }}>
-        {/* Outgoing page */}
         <div
           style={{
             position: "absolute", inset: 0,
@@ -536,20 +607,13 @@ function PaginatedDishList({ dishes, renderDish }) {
           {outChunk.map((dish, idx) => renderDish(dish, idx, outChunk))}
         </div>
 
-        {/* Incoming page — only mounted during animation */}
         {slide && inChunk && (
-          <div
-            style={{
-              position: "absolute", inset: 0,
-              animation: `${inAnim} ${DUR}`,
-            }}
-          >
+          <div style={{ position: "absolute", inset: 0, animation: `${inAnim} ${DUR}` }}>
             {inChunk.map((dish, idx) => renderDish(dish, idx, inChunk))}
           </div>
         )}
       </div>
 
-      {/* Navigation arrows + page counter */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
         <PageArrow dir="back" disabled={displayPage === 0} onClick={() => go(displayPage - 1)} />
         <span style={{ fontSize: 11, color: "#9C8E7A", fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.12em", minWidth: 36, textAlign: "center" }}>
