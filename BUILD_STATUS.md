@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-25 (/order page: reduce LIST_H 440→360 so image card height matches items list height across all category cards)_
+_Last updated: 2026-09-26 (KitchenDisplay + BarDisplay: fix silent Realtime disconnect — add channel status tracking, 15 s polling fallback, visibility/online/wake recovery, token-refresh resubscription, Wifi/WifiOff connection indicator)_
 
 ---
 

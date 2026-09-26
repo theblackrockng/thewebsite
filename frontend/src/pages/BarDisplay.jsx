@@ -2,11 +2,15 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { Wine, UtensilsCrossed, Package, Truck, RefreshCw, LogOut } from "lucide-react";
+import { Wine, UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Wifi, WifiOff } from "lucide-react";
 
 const BAR_ROLES = ["bar"];
 
 const ACTIVE_STATUSES = ["new", "confirmed", "preparing"];
+
+const POLL_MS             = 15_000;
+const WAKE_GAP_MS         = 30_000;
+const CALL_ALERT_REPEAT_MS = 15000;
 
 const STATUS_CFG = {
   new:       { label: "New",       bg: "rgba(245,158,11,0.15)", color: "#d97706", border: "rgba(245,158,11,0.3)" },
@@ -59,18 +63,19 @@ export default function BarDisplay() {
 }
 
 const CALL_WAITER_API = "/api/front-desk?resource=waiter-calls";
-const CALL_ALERT_REPEAT_MS = 15000;
 
 function BarContent() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionIds, setActionIds] = useState(new Set());
+  const [connected, setConnected] = useState(false);
   const [waiterCalls, setWaiterCalls] = useState([]);
   const [callActionIds, setCallActionIds] = useState(new Set());
-  const knownIdsRef = useRef(new Set());
-  const knownCallIdsRef = useRef(new Set());
+  const knownIdsRef      = useRef(new Set());
+  const knownCallIdsRef  = useRef(new Set());
   const lastCallAlertRef = useRef(0);
-  const mountedRef = useRef(true);
+  const mountedRef       = useRef(true);
+  const channelRef       = useRef(null);
 
   const fetchOrders = useCallback(async () => {
     const { data, error } = await supabase
@@ -139,29 +144,93 @@ function BarContent() {
     setCallActionIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
   }
 
+  const subscribe = useCallback(() => {
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    const ch = supabase
+      .channel(`bar-orders-watch-${Date.now()}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+        fetchOrders();
+      })
+      .subscribe((status) => {
+        if (!mountedRef.current) return;
+        setConnected(status === "SUBSCRIBED");
+      });
+    channelRef.current = ch;
+  }, [fetchOrders]);
+
+  // Waiter calls — REST polling (no Realtime needed for this)
   useEffect(() => {
     fetchWaiterCalls();
     const id = setInterval(fetchWaiterCalls, CALL_ALERT_REPEAT_MS);
     return () => clearInterval(id);
   }, [fetchWaiterCalls]);
 
+  // Mount: initial fetch + subscribe
   useEffect(() => {
     mountedRef.current = true;
     fetchOrders();
-
-    const channel = supabase
-      .channel("bar-orders-watch")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
-        fetchOrders();
-      })
-      .subscribe();
-
+    subscribe();
     return () => {
       mountedRef.current = false;
-      supabase.removeChannel(channel);
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, subscribe]);
 
+  // Polling fallback when Realtime is disconnected
+  useEffect(() => {
+    if (connected) return;
+    let misses = 0;
+    const id = setInterval(() => {
+      fetchOrders();
+      misses++;
+      if (misses % 4 === 0) subscribe();
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [connected, fetchOrders, subscribe]);
+
+  // Visibility, online, and wake-from-sleep recovery
+  useEffect(() => {
+    let last = Date.now();
+    const driftId = setInterval(() => {
+      const now = Date.now();
+      if (now - last > WAKE_GAP_MS) {
+        fetchOrders();
+        if (channelRef.current?.state !== "joined") subscribe();
+      }
+      last = now;
+    }, 5_000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchOrders();
+        if (channelRef.current?.state !== "joined") subscribe();
+      }
+    };
+    const onOnline = () => { fetchOrders(); subscribe(); };
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      clearInterval(driftId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [fetchOrders, subscribe]);
+
+  // Resubscribe after JWT token refresh
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "TOKEN_REFRESHED") return;
+      setTimeout(() => {
+        if (!mountedRef.current) return;
+        if (channelRef.current?.state !== "joined") subscribe();
+        fetchOrders();
+      }, 2_000);
+    });
+    return () => subscription.unsubscribe();
+  }, [subscribe, fetchOrders]);
+
+  // Capacitor push notification token registration
   useEffect(() => {
     if (!window.Capacitor?.isNativePlatform()) return;
     (async () => {
@@ -223,6 +292,13 @@ function BarContent() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div
+            title={connected ? "Live updates connected" : "Live updates lost — polling every 15 s"}
+            style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: connected ? "#22c55e" : "#d97706" }}
+          >
+            {connected ? <Wifi size={13} /> : <WifiOff size={13} />}
+            <span>{connected ? "Live" : "Reconnecting"}</span>
+          </div>
           <button
             onClick={fetchOrders}
             style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 7, padding: "6px 10px", color: "#9C8E7A", cursor: "pointer", display: "flex", alignItems: "center", gap: 5, fontSize: 12 }}

@@ -2,11 +2,14 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Wifi, WifiOff } from "lucide-react";
 
 const KITCHEN_ROLES = ["kitchen"];
 
 const ACTIVE_STATUSES = ["new", "confirmed", "preparing"];
+
+const POLL_MS     = 15_000;
+const WAKE_GAP_MS = 30_000;
 
 const STATUS_CFG = {
   new:       { label: "New",       bg: "rgba(245,158,11,0.15)", color: "#d97706", border: "rgba(245,158,11,0.3)" },
@@ -38,7 +41,6 @@ function orderIcon(order) {
   return <Package size={16} style={{ color: "#c8a96e" }} />;
 }
 
-// Generate a short beep via Web Audio API
 function playAlert() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -67,8 +69,10 @@ function KitchenContent() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionIds, setActionIds] = useState(new Set());
+  const [connected, setConnected] = useState(false);
   const knownIdsRef = useRef(new Set());
-  const mountedRef = useRef(true);
+  const mountedRef  = useRef(true);
+  const channelRef  = useRef(null);
 
   const fetchOrders = useCallback(async () => {
     const { data, error } = await supabase
@@ -98,22 +102,84 @@ function KitchenContent() {
     knownIdsRef.current = newIds;
   }, []);
 
-  useEffect(() => {
-    mountedRef.current = true;
-    fetchOrders();
-
-    const channel = supabase
-      .channel("kitchen-orders-watch")
+  const subscribe = useCallback(() => {
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    const ch = supabase
+      .channel(`kitchen-orders-watch-${Date.now()}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
         fetchOrders();
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (!mountedRef.current) return;
+        setConnected(status === "SUBSCRIBED");
+      });
+    channelRef.current = ch;
+  }, [fetchOrders]);
 
+  // Mount: initial fetch + subscribe
+  useEffect(() => {
+    mountedRef.current = true;
+    fetchOrders();
+    subscribe();
     return () => {
       mountedRef.current = false;
-      supabase.removeChannel(channel);
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
     };
-  }, [fetchOrders]);
+  }, [fetchOrders, subscribe]);
+
+  // Polling fallback when Realtime is disconnected
+  useEffect(() => {
+    if (connected) return;
+    let misses = 0;
+    const id = setInterval(() => {
+      fetchOrders();
+      misses++;
+      if (misses % 4 === 0) subscribe();
+    }, POLL_MS);
+    return () => clearInterval(id);
+  }, [connected, fetchOrders, subscribe]);
+
+  // Visibility, online, and wake-from-sleep recovery
+  useEffect(() => {
+    let last = Date.now();
+    const driftId = setInterval(() => {
+      const now = Date.now();
+      if (now - last > WAKE_GAP_MS) {
+        fetchOrders();
+        if (channelRef.current?.state !== "joined") subscribe();
+      }
+      last = now;
+    }, 5_000);
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchOrders();
+        if (channelRef.current?.state !== "joined") subscribe();
+      }
+    };
+    const onOnline = () => { fetchOrders(); subscribe(); };
+
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      clearInterval(driftId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+    };
+  }, [fetchOrders, subscribe]);
+
+  // Resubscribe after JWT token refresh
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "TOKEN_REFRESHED") return;
+      setTimeout(() => {
+        if (!mountedRef.current) return;
+        if (channelRef.current?.state !== "joined") subscribe();
+        fetchOrders();
+      }, 2_000);
+    });
+    return () => subscription.unsubscribe();
+  }, [subscribe, fetchOrders]);
 
   async function updateStatus(orderId, newStatus) {
     setActionIds((prev) => new Set([...prev, orderId]));
@@ -150,6 +216,13 @@ function KitchenContent() {
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div
+            title={connected ? "Live updates connected" : "Live updates lost — polling every 15 s"}
+            style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: connected ? "#22c55e" : "#d97706" }}
+          >
+            {connected ? <Wifi size={14} /> : <WifiOff size={14} />}
+            <span>{connected ? "Live" : "Reconnecting"}</span>
+          </div>
           <span style={{ fontSize: 13, color: "#9C8E7A" }}>
             {orders.length > 0 ? `${orders.length} active order${orders.length !== 1 ? "s" : ""}` : "No active orders"}
           </span>
