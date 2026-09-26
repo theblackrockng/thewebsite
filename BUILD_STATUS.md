@@ -1,10 +1,26 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-26 (KitchenDisplay + BarDisplay: fix silent Realtime disconnect — add channel status tracking, 15 s polling fallback, visibility/online/wake recovery, token-refresh resubscription, Wifi/WifiOff connection indicator)_
+_Last updated: 2026-09-26 (Waiter shift-login + table-ordering feature: WaiterShiftPicker PIN flow, WaiterOrder ordering page matching OrderPreview layout, Waiter.jsx wired with WaiterInner, UserManagement Waiter Profiles tab, 4 new API endpoints, SQL migration)_
 
 ---
 
-## Pending SQL (run in Supabase before Call Waiter goes live)
+## Pending SQL
+
+### Run in Supabase before Waiter Shift-Login goes live (`004_waiter_profiles.sql`)
+
+```sql
+CREATE TABLE IF NOT EXISTS waiter_profiles (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       text        NOT NULL,
+  pin_hash   text        NOT NULL,
+  pin_salt   text        NOT NULL,
+  active     boolean     NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE waiter_profiles ENABLE ROW LEVEL SECURITY;
+```
+
+### Run in Supabase before Call Waiter goes live
 
 ```sql
 CREATE TABLE waiter_calls (
@@ -73,6 +89,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Hero tagline + sub-paragraph update | Hero `<h1>` changed to fine dining brand statement; sub-paragraph updated; h1 font sizes reduced further to text-2xl/3xl/5xl/6xl; hardcoded br tags removed for natural wrapping |
 | /order hero redesign | Editorial hero: Cormorant Garamond display headline (`clamp(38px,5vw,72px)`), italic gold "fresh." accent, staggered framer-motion entrance, text-only stats row (no icon chips), floating food card in image column, grilled-fish hero image. Fixed dangling `ArrowRight` import (replaced with `ChevronRight`). |
 | /order page refinement (premium editorial) | Fonts: Playfair Display (Canela substitute) + Manrope added via Google Fonts. Playfair on h1/h2/h3; Manrope on all UI. Hero: float card removed, grid `52/48`, right padding tightened, gradient `28%→65%`, "fresh." italic weight 400, sub-headline added. Stats pared to 2 (Ready in, Method). WhatsApp becomes real `<a>` button via `BRAND.whatsapp` phone extraction. Toggle flat borderRadius 3. |
+| Waiter shift-login + table-ordering | `WaiterShiftPicker.jsx`: name picker + 4-dot PIN entry with tappable number pad, auto-submits on 4th digit, rate-limited verify-waiter-pin call. `WaiterOrder.jsx`: full ordering page matching OrderPreview layout (category tabs, image-left + paginated-list-right, soup/swallow picker, own cart state), sticky header with logo/waiter name/Food+Drinks toggle/table dropdown/Switch Waiter/cart badge, confirm overlay (table required at Place Order, flash border if missing), done overlay with "Take Another Order" + "Switch Waiter". `Waiter.jsx` slimmed to WaiterAuth + WaiterInner (dispatches between WaiterShiftPicker and WaiterOrder). `UserManagement.jsx` gains Waiter Profiles tab (super_admin only): CRUD list with toggle active + edit name/PIN modal. `console/api/waiter-profiles.js`: ES-module CRUD. `frontend/api/waiter-profiles.js` + `verify-waiter-pin.js`: CommonJS serverless. `supabase/migrations/004_waiter_profiles.sql`: table + RLS (service-role only). **Pending: run 004 migration in Supabase SQL Editor.** |
 
 ---
 
@@ -105,7 +122,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | `/kitchen-display` | KitchenDisplay.jsx | Live kitchen order display (Supabase Realtime) |
 | `/bar-display` | BarDisplay.jsx | Live bar order display (Supabase Realtime) |
 | `/front-desk-display` | FrontDeskDisplay.jsx | Front desk screen with Orders and Reservations views (one switch button in the header); roles front_desk, manager, super_admin; orders via Realtime + 15s polling fallback and `/api/front-desk?resource=orders`; reservations via 15s polling and `/api/front-desk?resource=reservations` |
-| `/waiter` | Waiter.jsx | Waiter app — Supabase Auth login, table select, place orders |
+| `/waiter` | Waiter.jsx | Waiter app — Supabase Auth login → WaiterShiftPicker (name + PIN) → WaiterOrder (full menu browse + cart + confirm overlay) |
 
 **Frontend Contexts:** `AuthContext`, `CartContext`, `FeatureFlagContext`, `TableContext`
 
@@ -114,6 +131,8 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | File | Method | Purpose |
 |------|--------|---------|
 | `call-waiter.js` | POST | Public; guest calls waiter for their table. Validates table, 10/hr/IP rate limit, 2-min per-table server-side cooldown, inserts into `waiter_calls`, sends Telegram. Uses the 12th (last) Vercel Hobby function slot. |
+| `waiter-profiles.js` | GET/POST/PATCH/DELETE | CRUD for `waiter_profiles` table. GET: any authenticated staff (returns active only). POST/PATCH/DELETE: super_admin only. PINs stored as SHA-256(salt+pin); salt is random 16-byte hex. |
+| `verify-waiter-pin.js` | POST | Verifies a waiter's 4-digit PIN by ID. Rate-limited: 5 attempts per IP per 60s. Returns `{ok: true/false}`. Never exposes hash. |
 | `orders.js` | GET/POST | List orders / place new order; sends bar FCM push when order has drinks |
 | `initiate-payment.js` | POST | Paystack/Flutterwave payment init (inactive) |
 | `payment-webhook.js` | POST | Payment gateway webhook (inactive) |

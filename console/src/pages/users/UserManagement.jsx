@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { authHeader } from "../../lib/authHeader";
 import { useAuth } from "../../context/AuthContext";
-import { UserPlus, Shield, Users, Edit2, ToggleLeft, ToggleRight, X, Check, Loader, Mail, Send, Copy, ExternalLink, Trash2, AlertTriangle, UserCircle } from "lucide-react";
+import { UserPlus, Shield, Users, Edit2, ToggleLeft, ToggleRight, X, Check, Loader, Mail, Send, Copy, ExternalLink, Trash2, AlertTriangle, UserCircle, Key, Plus } from "lucide-react";
 
 const PERMISSIONS = [
   { key: "dashboard",    label: "Dashboard" },
@@ -742,6 +742,7 @@ export default function UserManagement() {
   const [deleteTarget, setDeleteTarget]   = useState(null);
   const [deleting, setDeleting]           = useState(false);
   const [toast, setToast]                 = useState("");
+  const [activeManagementTab, setActiveManagementTab] = useState("staff");
 
   const showToast = (msg) => {
     setToast(msg);
@@ -864,7 +865,32 @@ export default function UserManagement() {
         </button>
       </div>
 
-      {loading ? (
+      {/* Tab switcher — super admin only */}
+      {isSuperAdmin && (
+        <div style={{ display: "flex", gap: 4, marginBottom: 28, borderBottom: "1px solid var(--ds-border)", paddingBottom: 0 }}>
+          {[{ id: "staff", label: "Staff", icon: <Users size={13} /> }, { id: "waiters", label: "Waiter Profiles", icon: <Key size={13} /> }].map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveManagementTab(tab.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                padding: "9px 16px", fontSize: 13, fontWeight: activeManagementTab === tab.id ? 600 : 400,
+                background: "none", border: "none",
+                borderBottom: `2px solid ${activeManagementTab === tab.id ? "var(--ds-gold)" : "transparent"}`,
+                color: activeManagementTab === tab.id ? "var(--ds-gold)" : "var(--ds-muted)",
+                cursor: "pointer", fontFamily: "'DM Sans', sans-serif",
+                marginBottom: -1,
+              }}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activeManagementTab === "waiters" && isSuperAdmin ? (
+        <WaiterProfilesPanel showToast={showToast} />
+      ) : loading ? (
         <div style={{ textAlign: "center", padding: 60, color: "var(--ds-muted)", fontSize: 13 }}>
           <Loader size={20} className="spin" style={{ marginBottom: 12 }} />
           <div>Loading team…</div>
@@ -1032,6 +1058,236 @@ export default function UserManagement() {
         .spin { animation: spin 0.8s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
+    </div>
+  );
+}
+
+/* ─── WaiterProfilesPanel ─── */
+function WaiterProfilesPanel({ showToast }) {
+  const [waiters, setWaiters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [modal, setModal] = useState(null);
+  const [saving, setSaving] = useState(false);
+
+  const fetchWaiters = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/waiter-profiles", { headers: await authHeader() });
+      const data = await res.json();
+      setWaiters(data.waiters || []);
+    } catch {
+      setWaiters([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchWaiters(); }, []);
+
+  const toggleActive = async (w) => {
+    try {
+      const res = await fetch("/api/waiter-profiles", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ id: w.id, active: !w.active }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      setWaiters(prev => prev.map(p => p.id === w.id ? { ...p, active: !w.active } : p));
+      showToast(`${w.name} ${!w.active ? "activated" : "deactivated"}`);
+    } catch (e) {
+      showToast(`Error: ${e.message}`);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ds-text)" }}>Waiter Profiles</div>
+          <div style={{ fontSize: 12, color: "var(--ds-muted)", marginTop: 2 }}>
+            Each waiter has a name and 4-digit PIN for shift login. PINs are hashed — never stored in plain text.
+          </div>
+        </div>
+        <button
+          onClick={() => setModal({ mode: "add" })}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", borderRadius: 7, border: "none", background: "var(--ds-gold)", color: "#000", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+        >
+          <Plus size={13} /> Add Waiter
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: 40, color: "var(--ds-muted)", fontSize: 13 }}>
+          <Loader size={18} className="spin" style={{ marginBottom: 10 }} />
+          <div>Loading profiles…</div>
+        </div>
+      ) : waiters.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px 20px", border: "1px dashed var(--ds-border)", borderRadius: 10 }}>
+          <Key size={28} style={{ color: "var(--ds-muted)", marginBottom: 10 }} />
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ds-text)", marginBottom: 4 }}>No waiter profiles yet</div>
+          <div style={{ fontSize: 13, color: "var(--ds-muted)", marginBottom: 16 }}>Add a profile for each waiter who takes orders on the tablet.</div>
+          <button
+            onClick={() => setModal({ mode: "add" })}
+            style={{ padding: "8px 18px", borderRadius: 7, border: "1px solid var(--ds-gold)", background: "transparent", color: "var(--ds-gold)", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}
+          >
+            Add first waiter
+          </button>
+        </div>
+      ) : (
+        <div style={{ border: "1px solid var(--ds-border)", borderRadius: 10, overflow: "hidden", background: "var(--ds-surface)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 110px 90px", gap: 16, padding: "10px 20px", borderBottom: "1px solid var(--ds-border)", fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ds-muted)" }}>
+            <div>Name</div>
+            <div>Status</div>
+            <div>Actions</div>
+          </div>
+          {waiters.map(w => (
+            <div
+              key={w.id}
+              style={{ display: "grid", gridTemplateColumns: "1fr 110px 90px", gap: 16, alignItems: "center", padding: "13px 20px", borderBottom: "1px solid var(--ds-border)", transition: "background 0.15s" }}
+              onMouseEnter={e => e.currentTarget.style.background = "var(--ds-input-bg)"}
+              onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 32, height: 32, borderRadius: "50%", background: w.active ? "rgba(200,169,110,0.12)" : "var(--ds-input-bg)", border: `1.5px solid ${w.active ? "var(--ds-gold)" : "var(--ds-border)"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: w.active ? "var(--ds-gold)" : "var(--ds-muted)", flexShrink: 0 }}>
+                  {w.name.slice(0, 2).toUpperCase()}
+                </div>
+                <span style={{ fontSize: 13.5, fontWeight: 500, color: "var(--ds-text)" }}>{w.name}</span>
+              </div>
+              <button
+                onClick={() => toggleActive(w)}
+                style={{ display: "flex", alignItems: "center", gap: 5, background: "none", border: "none", cursor: "pointer", color: w.active ? "#4ade80" : "var(--ds-muted)", fontSize: 11.5, fontWeight: 500, padding: 4 }}
+              >
+                {w.active ? <><ToggleRight size={17} /> Active</> : <><ToggleLeft size={17} /> Inactive</>}
+              </button>
+              <div>
+                <button
+                  onClick={() => setModal({ mode: "edit", waiter: w })}
+                  title="Edit name or PIN"
+                  style={{ width: 30, height: 30, borderRadius: 6, border: "1px solid var(--ds-border)", background: "var(--ds-input-bg)", cursor: "pointer", color: "var(--ds-muted)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.15s" }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--ds-gold)"; e.currentTarget.style.color = "var(--ds-gold)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--ds-border)"; e.currentTarget.style.color = "var(--ds-muted)"; }}
+                >
+                  <Edit2 size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {modal && (
+        <WaiterModal
+          mode={modal.mode}
+          waiter={modal.waiter}
+          saving={saving}
+          onClose={() => setModal(null)}
+          onSave={async (name, pin) => {
+            setSaving(true);
+            try {
+              const isEdit = modal.mode === "edit";
+              const body = isEdit
+                ? { id: modal.waiter.id, ...(name ? { name } : {}), ...(pin ? { pin } : {}) }
+                : { name, pin };
+              const res = await fetch("/api/waiter-profiles", {
+                method: isEdit ? "PATCH" : "POST",
+                headers: { "Content-Type": "application/json", ...(await authHeader()) },
+                body: JSON.stringify(body),
+              });
+              const data = await res.json();
+              if (!res.ok) throw new Error(data.error || "Failed");
+              await fetchWaiters();
+              setModal(null);
+              showToast(isEdit ? `${data.waiter?.name || name} updated.` : `${data.waiter?.name || name} added.`);
+            } catch (e) {
+              showToast(`Error: ${e.message}`);
+            } finally {
+              setSaving(false);
+            }
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─── WaiterModal ─── */
+function WaiterModal({ mode, waiter, saving, onClose, onSave }) {
+  const isEdit = mode === "edit";
+  const [name, setName] = useState(waiter?.name || "");
+  const [pin, setPin] = useState("");
+  const [err, setErr] = useState("");
+
+  const validPin = (p) => /^\d{4}$/.test(p);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setErr("");
+    if (!isEdit && !name.trim()) { setErr("Name is required."); return; }
+    if (!isEdit && !validPin(pin)) { setErr("PIN must be exactly 4 digits."); return; }
+    if (pin && !validPin(pin)) { setErr("PIN must be exactly 4 digits."); return; }
+    await onSave(name.trim() || undefined, pin || undefined);
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }} onClick={onClose} />
+      <div style={{ position: "relative", width: "100%", maxWidth: 420, background: "var(--ds-surface)", border: "1px solid var(--ds-border)", borderRadius: 12, padding: 28, boxShadow: "0 24px 64px rgba(0,0,0,0.4)" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <div>
+            <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 700, color: "var(--ds-text)" }}>
+              {isEdit ? `Edit — ${waiter.name}` : "Add Waiter"}
+            </div>
+            <div style={{ fontSize: 12, color: "var(--ds-muted)", marginTop: 3 }}>
+              {isEdit ? "Leave PIN blank to keep the current one." : "Set a name and 4-digit PIN for shift login."}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)", display: "flex" }}><X size={17} /></button>
+        </div>
+
+        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ds-muted)", display: "block", marginBottom: 6 }}>
+              Name {!isEdit && <span style={{ color: "#ef4444" }}>*</span>}
+            </label>
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="e.g. Chidi"
+              required={!isEdit}
+              style={{ width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "var(--ds-text)", outline: "none", boxSizing: "border-box", fontFamily: "inherit" }}
+            />
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ds-muted)", display: "block", marginBottom: 6 }}>
+              PIN (4 digits) {!isEdit && <span style={{ color: "#ef4444" }}>*</span>}
+            </label>
+            <input
+              value={pin}
+              onChange={e => setPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 4))}
+              placeholder={isEdit ? "Leave blank to keep current" : "e.g. 1234"}
+              maxLength={4}
+              inputMode="numeric"
+              style={{ width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "var(--ds-text)", outline: "none", boxSizing: "border-box", fontFamily: "'Courier New', monospace", letterSpacing: "0.3em" }}
+            />
+          </div>
+
+          {err && (
+            <div style={{ fontSize: 12, color: "#ef4444", padding: "8px 12px", borderRadius: 7, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)" }}>
+              {err}
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 10, marginTop: 4 }}>
+            <button type="button" onClick={onClose} disabled={saving} style={{ flex: 1, padding: "10px", borderRadius: 7, border: "1px solid var(--ds-border)", background: "none", color: "var(--ds-muted)", fontSize: 13, cursor: "pointer", fontFamily: "'DM Sans', sans-serif" }}>
+              Cancel
+            </button>
+            <button type="submit" disabled={saving} style={{ flex: 2, padding: "10px", borderRadius: 7, border: "none", background: saving ? "rgba(200,169,110,0.4)" : "var(--ds-gold)", color: saving ? "var(--ds-muted)" : "#000", fontSize: 13, fontWeight: 600, cursor: saving ? "default" : "pointer", fontFamily: "'DM Sans', sans-serif", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+              {saving ? <><Loader size={13} className="spin" /> Saving…</> : <><Check size={13} /> {isEdit ? "Save Changes" : "Add Waiter"}</>}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
