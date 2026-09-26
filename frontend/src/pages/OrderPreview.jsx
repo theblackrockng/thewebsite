@@ -160,7 +160,9 @@ export default function OrderPreview() {
         const food = {};
         if (!error && data?.length > 0) {
           for (const item of data) {
-            const cat = item.category || "Other";
+            const rawCat = item.category || "Other";
+            // Normalise casing to match our known category order arrays
+            const cat = ALL_CATEGORY_ORDER.find(c => c.toLowerCase() === rawCat.toLowerCase()) || rawCat;
             if (!food[cat]) food[cat] = [];
             food[cat].push(item);
           }
