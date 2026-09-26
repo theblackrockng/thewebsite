@@ -237,25 +237,18 @@ export default function OrderPreview() {
     <div style={{ minHeight: "100vh", background: "#0f0d0a", color: "#F5F0E8" }}>
       <SEO title="Order Online | BLACKROCK" canonical="/order-preview" />
       <style>{`
-        /* Hero — refined editorial */
-        .op-hero {
-          display: grid;
-          grid-template-columns: 52% 48%;
-          min-height: 600px;
-          background: #0f0d0a;
-        }
+        /* Hero — full-width, menu-page style */
+        .op-hero { position: relative; overflow: hidden; }
         .op-hero-content {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          padding: 0 32px 0 40px;
+          position: relative;
+          z-index: 10;
+          max-width: 1440px;
+          margin: 0 auto;
+          padding: 128px 24px 96px;
+          text-align: center;
         }
-        .op-hero-img { display: block; position: relative; overflow: hidden; }
-        .op-hero-stats {
-          display: flex;
-          align-items: center;
-          gap: 20px;
-          margin: 0 0 20px;
+        @media (min-width: 768px) {
+          .op-hero-content { padding: 176px 48px 128px; }
         }
 
         .op-cat-body {
@@ -266,11 +259,7 @@ export default function OrderPreview() {
         }
 
         @media (max-width: 860px) {
-          .op-hero { grid-template-columns: 1fr; height: auto; min-height: 480px; }
-          .op-hero-img { display: none; }
-          .op-hero-content { padding: 110px 24px 56px; }
           .op-cat-body { grid-template-columns: 1fr; gap: 28px; }
-          .op-hero-stats { gap: 14px; flex-wrap: wrap; }
         }
 
         .op-tabs::-webkit-scrollbar { display: none; }
@@ -295,117 +284,95 @@ export default function OrderPreview() {
 
       {/* HERO */}
       <section className="op-hero">
+        {/* Full-width background — switches with menu type */}
+        <div style={{ position: "absolute", inset: 0 }}>
+          <img
+            src={menuType === "drink" ? "/drink-menu-hero.png" : "/food-menu-hero.png"}
+            alt="BLACKROCK"
+            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block", transition: "opacity 0.4s ease" }}
+            fetchpriority="high"
+          />
+          <div style={{ position: "absolute", inset: 0, background: "rgba(20,20,20,0.72)" }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(20,20,20,0.4) 0%, rgba(20,20,20,0.5) 60%, rgba(20,20,20,1) 100%)" }} />
+        </div>
+
         <div className="op-hero-content">
-          <motion.p
-            initial={{ opacity: 0, y: 10 }}
+          <motion.span
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-            style={{ fontFamily: "'Manrope', sans-serif", fontSize: 10, fontWeight: 600, letterSpacing: "0.26em", textTransform: "uppercase", color: "#C9A84C", margin: "0 0 20px" }}
+            transition={{ duration: 0.7, delay: 0.3 }}
+            className="gold-line"
           >
             Online Ordering
-          </motion.p>
+          </motion.span>
 
           <motion.h1
-            initial={{ opacity: 0, y: 16 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
-            style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(40px, 5.2vw, 70px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.1, margin: "0 0 16px", letterSpacing: "-0.01em" }}
+            transition={{ duration: 0.9, delay: 0.5 }}
+            className="font-serif-display text-3xl md:text-5xl lg:text-8xl leading-[0.95] text-[var(--warm-white)]"
+            style={{ marginTop: 24, textShadow: "0 4px 24px rgba(0,0,0,0.6)" }}
           >
-            Your favourite<br />
-            dishes, prepared<br />
-            <em style={{ fontStyle: "italic", fontWeight: 400 }}>fresh.</em>
+            Your favourite dishes, prepared{" "}
+            <em className="font-serif-italic" style={{ color: "var(--burgundy)" }}>fresh.</em>
           </motion.h1>
 
           <motion.p
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
-            style={{ fontFamily: "'Manrope', sans-serif", fontSize: 14, color: "#9C8E7A", margin: "0 0 28px", lineHeight: 1.6 }}
+            transition={{ duration: 0.8, delay: 0.7 }}
+            style={{ color: "rgba(255,255,255,0.75)", marginTop: 28, maxWidth: 560, marginLeft: "auto", marginRight: "auto", fontWeight: 300, fontSize: "clamp(15px, 1.1vw, 18px)", lineHeight: 1.65, fontFamily: "'Manrope', sans-serif" }}
           >
             Pickup or delivery — from our kitchen to you.
           </motion.p>
 
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.32, ease: [0.16, 1, 0.3, 1] }}
-            className="op-hero-stats"
-          >
-            <div>
-              <div style={{ fontFamily: "'Manrope', sans-serif", fontSize: 10, color: "#6B5E4E", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>Ready in</div>
-              <div style={{ fontFamily: "'Manrope', sans-serif", fontSize: 12, fontWeight: 700, color: "#F5F0E8" }}>25–35 min</div>
-            </div>
-            <span style={{ display: "block", width: 1, height: 26, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
-            <div>
-              <div style={{ fontFamily: "'Manrope', sans-serif", fontSize: 10, color: "#6B5E4E", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>Method</div>
-              <div style={{ fontFamily: "'Manrope', sans-serif", fontSize: 12, fontWeight: 700, color: "#F5F0E8" }}>Pickup · Delivery</div>
-            </div>
-          </motion.div>
-
-          <motion.a
-            href={`https://wa.me/${BRAND.whatsapp.match(/wa\.me\/(\d+)/)?.[1]}?text=Hello%20BLACKROCK%2C%20I%27d%20like%20to%20place%20an%20order.`}
-            target="_blank"
-            rel="noopener noreferrer"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.40, ease: [0.16, 1, 0.3, 1] }}
-            style={{
-              display: "inline-flex", alignItems: "center",
-              padding: "9px 18px", marginBottom: 22,
-              border: "1px solid rgba(201,168,76,0.4)",
-              borderRadius: 3,
-              fontFamily: "'Manrope', sans-serif",
-              fontSize: 12, fontWeight: 600,
-              color: "#C9A84C",
-              textDecoration: "none",
-              letterSpacing: "0.04em",
-              width: "fit-content",
-            }}
-          >
-            WhatsApp Us →
-          </motion.a>
-
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.48, ease: [0.16, 1, 0.3, 1] }}
-            style={{ display: "flex", gap: 6 }}
+            transition={{ duration: 0.7, delay: 0.9 }}
+            style={{ display: "flex", gap: 16, marginTop: 32, justifyContent: "center" }}
           >
             {["food", "drink"].map(type => (
               <button
                 key={type}
                 onClick={() => switchMenuType(type)}
                 style={{
-                  padding: "9px 22px", borderRadius: 3, fontSize: 11,
-                  fontWeight: menuType === type ? 700 : 500,
-                  border: `1px solid ${menuType === type ? "#C9A84C" : "rgba(255,255,255,0.15)"}`,
-                  background: menuType === type ? "#C9A84C" : "transparent",
-                  color: menuType === type ? "#0f0d0a" : "rgba(245,240,232,0.45)",
-                  cursor: "pointer", transition: "all 0.15s",
+                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  padding: "14px 40px",
+                  background: menuType === type ? "#c8a96e" : "transparent",
+                  color: menuType === type ? "#1a1a1a" : "rgba(245,240,232,0.9)",
+                  border: menuType === type ? "1px solid #c8a96e" : "1px solid rgba(245,240,232,0.5)",
                   fontFamily: "'Manrope', sans-serif",
-                  letterSpacing: "0.12em", textTransform: "uppercase",
+                  fontSize: 13, fontWeight: menuType === type ? 700 : 500,
+                  textTransform: "uppercase", letterSpacing: "0.1em",
+                  cursor: "pointer", transition: "background 0.2s ease, color 0.2s ease, border-color 0.2s ease",
                 }}
               >
                 {type === "food" ? "Food" : "Drinks"}
               </button>
             ))}
           </motion.div>
-        </div>
 
-        <motion.div
-          className="op-hero-img"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.9, delay: 0.08 }}
-        >
-          <img
-            src="/food/grilled-fish.png"
-            alt="BLACKROCK kitchen"
-            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
-            fetchpriority="high"
-          />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #0f0d0a 0%, rgba(15,13,10,0.5) 28%, rgba(15,13,10,0) 65%)", pointerEvents: "none" }} />
-        </motion.div>
+          <motion.a
+            href={`https://wa.me/${BRAND.whatsapp.match(/wa\.me\/(\d+)/)?.[1]}?text=Hello%20BLACKROCK%2C%20I%27d%20like%20to%20place%20an%20order.`}
+            target="_blank"
+            rel="noopener noreferrer"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 1.1 }}
+            style={{
+              display: "inline-flex", alignItems: "center",
+              marginTop: 20,
+              fontFamily: "'Manrope', sans-serif",
+              fontSize: 12, fontWeight: 500,
+              color: "rgba(201,168,76,0.65)",
+              textDecoration: "none",
+              letterSpacing: "0.06em",
+            }}
+          >
+            WhatsApp Us →
+          </motion.a>
+        </div>
       </section>
 
       {/* FOOD / DRINKS TOGGLE + CATEGORY TABS */}
