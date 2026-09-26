@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-26 (Waiter shift-login + table-ordering feature: WaiterShiftPicker PIN flow, WaiterOrder ordering page matching OrderPreview layout, Waiter.jsx wired with WaiterInner, UserManagement Waiter Profiles tab, 4 new API endpoints, SQL migration)_
+_Last updated: 2026-09-26 (Function merge: verify-waiter-pin merged into waiter-profiles?action=verify, register-device merged into staff-login?action=register-device; vercel.json rewrites added; function count restored to 12/12)_
 
 ---
 
@@ -90,6 +90,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | /order hero redesign | Editorial hero: Cormorant Garamond display headline (`clamp(38px,5vw,72px)`), italic gold "fresh." accent, staggered framer-motion entrance, text-only stats row (no icon chips), floating food card in image column, grilled-fish hero image. Fixed dangling `ArrowRight` import (replaced with `ChevronRight`). |
 | /order page refinement (premium editorial) | Fonts: Playfair Display (Canela substitute) + Manrope added via Google Fonts. Playfair on h1/h2/h3; Manrope on all UI. Hero: float card removed, grid `52/48`, right padding tightened, gradient `28%→65%`, "fresh." italic weight 400, sub-headline added. Stats pared to 2 (Ready in, Method). WhatsApp becomes real `<a>` button via `BRAND.whatsapp` phone extraction. Toggle flat borderRadius 3. |
 | Waiter shift-login + table-ordering | `WaiterShiftPicker.jsx`: name picker + 4-dot PIN entry with tappable number pad, auto-submits on 4th digit, rate-limited verify-waiter-pin call. `WaiterOrder.jsx`: full ordering page matching OrderPreview layout (category tabs, image-left + paginated-list-right, soup/swallow picker, own cart state), sticky header with logo/waiter name/Food+Drinks toggle/table dropdown/Switch Waiter/cart badge, confirm overlay (table required at Place Order, flash border if missing), done overlay with "Take Another Order" + "Switch Waiter". `Waiter.jsx` slimmed to WaiterAuth + WaiterInner (dispatches between WaiterShiftPicker and WaiterOrder). `UserManagement.jsx` gains Waiter Profiles tab (super_admin only): CRUD list with toggle active + edit name/PIN modal. `console/api/waiter-profiles.js`: ES-module CRUD. `frontend/api/waiter-profiles.js` + `verify-waiter-pin.js`: CommonJS serverless. `supabase/migrations/004_waiter_profiles.sql`: table + RLS (service-role only). **Pending: run 004 migration in Supabase SQL Editor.** |
+| Restore Vercel 12-function limit | `verify-waiter-pin.js` merged into `waiter-profiles.js` as `POST ?action=verify` with in-memory rate limiter. `register-device.js` merged into `staff-login.js` as `POST ?action=register-device`. `vercel.json` rewrites added so callers (`WaiterShiftPicker`, `Waiter.jsx`, `BarDisplay.jsx`) required no changes. Both files deleted. Count: 12/12. Commit `41d3e30`. |
 
 ---
 
