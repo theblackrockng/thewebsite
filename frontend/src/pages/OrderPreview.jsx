@@ -237,20 +237,19 @@ export default function OrderPreview() {
     <div style={{ minHeight: "100vh", background: "#0f0d0a", color: "#F5F0E8" }}>
       <SEO title="Order Online | BLACKROCK" canonical="/order-preview" />
       <style>{`
-        /* Hero — minimalist editorial */
+        /* Hero */
         .op-hero {
           display: grid;
           grid-template-columns: 55% 45%;
           height: 600px;
-          background: #F7F6F3;
+          background: #0f0d0a;
           overflow: hidden;
-          border-bottom: 1px solid #EAEAEA;
         }
         .op-hero-content {
           display: flex;
           flex-direction: column;
           justify-content: center;
-          padding: 0 64px 0 40px;
+          padding: 0 56px 0 40px;
           overflow: hidden;
         }
         .op-hero-img { display: block; position: relative; overflow: hidden; }
@@ -260,16 +259,16 @@ export default function OrderPreview() {
           right: 24px;
           width: 116px;
           height: 148px;
-          border-radius: 8px;
+          border-radius: 3px;
           overflow: hidden;
-          border: 1px solid #EAEAEA;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+          border: 1.5px solid rgba(201,168,76,0.5);
+          box-shadow: 0 6px 28px rgba(0,0,0,0.7);
         }
         .op-hero-stats {
           display: flex;
           align-items: center;
           gap: 20px;
-          margin: 0 0 28px;
+          margin: 0 0 32px;
         }
 
         .op-cat-body {
@@ -280,7 +279,7 @@ export default function OrderPreview() {
         }
 
         @media (max-width: 860px) {
-          .op-hero { grid-template-columns: 1fr; height: auto; min-height: 460px; background: #F7F6F3; }
+          .op-hero { grid-template-columns: 1fr; height: auto; min-height: 460px; }
           .op-hero-img { display: none; }
           .op-hero-img-float { display: none; }
           .op-hero-content { padding: 110px 24px 56px; }
@@ -312,73 +311,74 @@ export default function OrderPreview() {
       <section className="op-hero">
         <div className="op-hero-content">
           <motion.p
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
-            style={{ fontFamily: "monospace", fontSize: 10, fontWeight: 500, letterSpacing: "0.12em", textTransform: "uppercase", color: "#787774", margin: "0 0 28px" }}
+            initial={{ opacity: 0, x: -14 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.05 }}
+            style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 24px" }}
           >
-            BLACKROCK — Online Ordering
+            <span style={{ display: "block", width: 28, height: 1, background: "#C9A84C", flexShrink: 0 }} />
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.3em", textTransform: "uppercase", color: "#C9A84C" }}>Online Ordering</span>
           </motion.p>
 
           <motion.h1
-            initial={{ opacity: 0, y: 12 }}
+            initial={{ opacity: 0, y: 22 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(48px, 6.5vw, 88px)", fontWeight: 500, color: "#111111", lineHeight: 1.08, margin: "0 0 28px", letterSpacing: "-0.02em" }}
+            transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
+            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(38px, 5vw, 72px)", fontWeight: 600, color: "#F5F0E8", lineHeight: 1.05, margin: "0 0 26px", letterSpacing: "-0.01em" }}
           >
             Your favourite<br />
             dishes, prepared<br />
-            <em style={{ fontStyle: "italic" }}>fresh.</em>
+            <em style={{ fontStyle: "italic", color: "#C9A84C" }}>fresh.</em>
           </motion.h1>
 
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, delay: 0.3 }}
-            style={{ width: "100%", height: 1, background: "#EAEAEA", margin: "0 0 28px" }}
+            initial={{ opacity: 0, scaleX: 0 }}
+            animate={{ opacity: 1, scaleX: 1 }}
+            transition={{ duration: 0.45, delay: 0.38 }}
+            style={{ width: 40, height: 1.5, background: "#C9A84C", borderRadius: 2, transformOrigin: "left", margin: "0 0 28px" }}
           />
 
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.38, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.5, delay: 0.48 }}
             className="op-hero-stats"
           >
             <div>
-              <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 10, color: "#787774", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Ready in</div>
-              <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 13, fontWeight: 600, color: "#111111" }}>25–35 min</div>
+              <div style={{ fontSize: 10, color: "#6B5E4E", lineHeight: 1.3, marginBottom: 3, letterSpacing: "0.04em" }}>Ready in</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#F5F0E8", lineHeight: 1.3 }}>25–35 min</div>
             </div>
-            <span style={{ display: "block", width: 1, height: 28, background: "#EAEAEA", flexShrink: 0 }} />
+            <span style={{ display: "block", width: 1, height: 30, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
             <div>
-              <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 10, color: "#787774", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Method</div>
-              <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 13, fontWeight: 600, color: "#111111" }}>Pickup · Delivery</div>
+              <div style={{ fontSize: 10, color: "#6B5E4E", lineHeight: 1.3, marginBottom: 3, letterSpacing: "0.04em" }}>Pickup or</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#F5F0E8", lineHeight: 1.3 }}>Delivery</div>
             </div>
-            <span style={{ display: "block", width: 1, height: 28, background: "#EAEAEA", flexShrink: 0 }} />
+            <span style={{ display: "block", width: 1, height: 30, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
             <div>
-              <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 10, color: "#787774", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 3 }}>Order via</div>
-              <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 13, fontWeight: 600, color: "#111111" }}>WhatsApp</div>
+              <div style={{ fontSize: 10, color: "#6B5E4E", lineHeight: 1.3, marginBottom: 3, letterSpacing: "0.04em" }}>Order via</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#F5F0E8", lineHeight: 1.3 }}>WhatsApp</div>
             </div>
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-            style={{ display: "flex", gap: 6 }}
+            transition={{ duration: 0.5, delay: 0.6 }}
+            style={{ display: "flex", gap: 8 }}
           >
             {["food", "drink"].map(type => (
               <button
                 key={type}
                 onClick={() => switchMenuType(type)}
                 style={{
-                  padding: "9px 20px", borderRadius: 4, fontSize: 11,
-                  fontWeight: menuType === type ? 600 : 400,
-                  border: `1px solid ${menuType === type ? "#111111" : "#EAEAEA"}`,
-                  background: menuType === type ? "#111111" : "transparent",
-                  color: menuType === type ? "#FFFFFF" : "#787774",
+                  padding: "10px 28px", borderRadius: 99, fontSize: 11,
+                  fontWeight: menuType === type ? 700 : 500,
+                  border: `1.5px solid ${menuType === type ? "#C9A84C" : "rgba(255,255,255,0.18)"}`,
+                  background: menuType === type ? "#C9A84C" : "transparent",
+                  color: menuType === type ? "#0f0d0a" : "rgba(245,240,232,0.55)",
                   cursor: "pointer", transition: "all 0.15s",
                   fontFamily: "'Montserrat', sans-serif",
-                  letterSpacing: "0.1em", textTransform: "uppercase",
+                  letterSpacing: "0.14em", textTransform: "uppercase",
                 }}
               >
                 {type === "food" ? "Food" : "Drinks"}
@@ -389,27 +389,27 @@ export default function OrderPreview() {
 
         <motion.div
           className="op-hero-img"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.1 }}
+          initial={{ opacity: 0, scale: 1.04 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.85, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
         >
           <img
             src="/food/grilled-fish.png"
             alt="BLACKROCK kitchen"
-            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block", filter: "saturate(0.72) brightness(0.96)" }}
+            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
             fetchpriority="high"
           />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #F7F6F3 0%, rgba(247,246,243,0.25) 28%, rgba(247,246,243,0) 100%)", pointerEvents: "none" }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #0f0d0a 0%, rgba(15,13,10,0.38) 35%, rgba(15,13,10,0.0) 100%)", pointerEvents: "none" }} />
           <motion.div
             className="op-hero-img-float"
-            initial={{ opacity: 0, y: 10 }}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.55 }}
+            transition={{ duration: 0.6, delay: 0.55 }}
           >
             <img
               src="/food/seafood-okro.png"
               alt=""
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", filter: "saturate(0.72)" }}
+              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
             />
           </motion.div>
         </motion.div>

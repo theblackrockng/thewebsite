@@ -72,7 +72,6 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Console operations screen | _pending commit_ kitchen/bar/waiter/front_desk accounts get `OperationsScreen` (link to their website screen + sign out) instead of the console Layout; guard in `ProtectedRoute` and `AnalyticsRoute`; sidebar role labels for Kitchen, Bar, Front Desk; front_desk links to `/front-desk-display` |
 | Hero tagline + sub-paragraph update | Hero `<h1>` changed to fine dining brand statement; sub-paragraph updated; h1 font sizes reduced further to text-2xl/3xl/5xl/6xl; hardcoded br tags removed for natural wrapping |
 | /order hero redesign | Editorial hero: Cormorant Garamond display headline (`clamp(38px,5vw,72px)`), italic gold "fresh." accent, staggered framer-motion entrance, text-only stats row (no icon chips), floating food card in image column, grilled-fish hero image. Fixed dangling `ArrowRight` import (replaced with `ChevronRight`). |
-| /order hero — minimalist-ui pass | Warm bone canvas (`#F7F6F3`), monospace meta-label eyebrow, Cormorant Garamond 88px tight-tracked headline, full-width `#EAEAEA` rule, Montserrat stats row, charcoal/flat toggle (border-radius 4px, no pill), desaturated food photography, ultra-diffuse float-card shadow. |
 
 ---
 
