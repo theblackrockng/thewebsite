@@ -15,12 +15,47 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+// register-device logic (merged from register-device.js)
+let _db = null;
+function getDb() {
+  if (_db) return _db;
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  _db = createClient(url, key);
+  return _db;
+}
+
+const { requireStaff } = require('./_lib/auth');
+
 module.exports = async function handler(req, res) {
   applySecurityHeaders(res);
   const corsHeaders = getCorsHeaders(req);
   Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // POST ?action=register-device — FCM token upsert (merged from register-device.js)
+  if (req.method === 'POST' && req.query?.action === 'register-device') {
+    const { role, staff_id, fcm_token } = req.body || {};
+    if (!role || !['waiter', 'bar'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role.' });
+    }
+    if (!fcm_token || typeof fcm_token !== 'string') {
+      return res.status(400).json({ error: 'Missing fcm_token.' });
+    }
+    const staff = await requireStaff(req, res, [role]);
+    if (!staff) return;
+    const db = getDb();
+    if (!db) return res.status(500).json({ error: 'Database not configured.' });
+    const conflictCol = staff_id ? 'role,staff_id' : 'fcm_token';
+    const { error } = await db
+      .from('push_tokens')
+      .upsert({ role, staff_id: staff_id || null, fcm_token }, { onConflict: conflictCol });
+    if (error) return res.status(500).json({ error: 'Failed to register device.' });
+    return res.status(200).json({ ok: true });
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const ip = getIP(req);
