@@ -6,7 +6,7 @@ import {
   X, Check,
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { MENU } from "../lib/data";
+import { MENU, BRAND } from "../lib/data";
 import { useCart } from "../context/CartContext";
 import SEO from "../components/SEO";
 
@@ -237,38 +237,25 @@ export default function OrderPreview() {
     <div style={{ minHeight: "100vh", background: "#0f0d0a", color: "#F5F0E8" }}>
       <SEO title="Order Online | BLACKROCK" canonical="/order-preview" />
       <style>{`
-        /* Hero */
+        /* Hero — refined editorial */
         .op-hero {
           display: grid;
-          grid-template-columns: 55% 45%;
-          height: 600px;
+          grid-template-columns: 52% 48%;
+          min-height: 600px;
           background: #0f0d0a;
-          overflow: hidden;
         }
         .op-hero-content {
           display: flex;
           flex-direction: column;
           justify-content: center;
-          padding: 0 56px 0 40px;
-          overflow: hidden;
+          padding: 0 32px 0 40px;
         }
         .op-hero-img { display: block; position: relative; overflow: hidden; }
-        .op-hero-img-float {
-          position: absolute;
-          bottom: 32px;
-          right: 24px;
-          width: 116px;
-          height: 148px;
-          border-radius: 3px;
-          overflow: hidden;
-          border: 1.5px solid rgba(201,168,76,0.5);
-          box-shadow: 0 6px 28px rgba(0,0,0,0.7);
-        }
         .op-hero-stats {
           display: flex;
           align-items: center;
           gap: 20px;
-          margin: 0 0 32px;
+          margin: 0 0 20px;
         }
 
         .op-cat-body {
@@ -279,9 +266,8 @@ export default function OrderPreview() {
         }
 
         @media (max-width: 860px) {
-          .op-hero { grid-template-columns: 1fr; height: auto; min-height: 460px; }
+          .op-hero { grid-template-columns: 1fr; height: auto; min-height: 480px; }
           .op-hero-img { display: none; }
-          .op-hero-img-float { display: none; }
           .op-hero-content { padding: 110px 24px 56px; }
           .op-cat-body { grid-template-columns: 1fr; gap: 28px; }
           .op-hero-stats { gap: 14px; flex-wrap: wrap; }
@@ -311,74 +297,93 @@ export default function OrderPreview() {
       <section className="op-hero">
         <div className="op-hero-content">
           <motion.p
-            initial={{ opacity: 0, x: -14 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, delay: 0.05 }}
-            style={{ display: "flex", alignItems: "center", gap: 12, margin: "0 0 24px" }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+            style={{ fontFamily: "'Manrope', sans-serif", fontSize: 10, fontWeight: 600, letterSpacing: "0.26em", textTransform: "uppercase", color: "#C9A84C", margin: "0 0 20px" }}
           >
-            <span style={{ display: "block", width: 28, height: 1, background: "#C9A84C", flexShrink: 0 }} />
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.3em", textTransform: "uppercase", color: "#C9A84C" }}>Online Ordering</span>
+            Online Ordering
           </motion.p>
 
           <motion.h1
-            initial={{ opacity: 0, y: 22 }}
+            initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.15, ease: [0.25, 0.1, 0.25, 1] }}
-            style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(38px, 5vw, 72px)", fontWeight: 600, color: "#F5F0E8", lineHeight: 1.05, margin: "0 0 26px", letterSpacing: "-0.01em" }}
+            transition={{ duration: 0.65, delay: 0.14, ease: [0.16, 1, 0.3, 1] }}
+            style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(40px, 5.2vw, 70px)", fontWeight: 700, color: "#F5F0E8", lineHeight: 1.1, margin: "0 0 16px", letterSpacing: "-0.01em" }}
           >
             Your favourite<br />
             dishes, prepared<br />
-            <em style={{ fontStyle: "italic", color: "#C9A84C" }}>fresh.</em>
+            <em style={{ fontStyle: "italic", fontWeight: 400 }}>fresh.</em>
           </motion.h1>
 
-          <motion.div
-            initial={{ opacity: 0, scaleX: 0 }}
-            animate={{ opacity: 1, scaleX: 1 }}
-            transition={{ duration: 0.45, delay: 0.38 }}
-            style={{ width: 40, height: 1.5, background: "#C9A84C", borderRadius: 2, transformOrigin: "left", margin: "0 0 28px" }}
-          />
-
-          <motion.div
+          <motion.p
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.48 }}
+            transition={{ duration: 0.5, delay: 0.24, ease: [0.16, 1, 0.3, 1] }}
+            style={{ fontFamily: "'Manrope', sans-serif", fontSize: 14, color: "#9C8E7A", margin: "0 0 28px", lineHeight: 1.6 }}
+          >
+            Pickup or delivery — from our kitchen to you.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.32, ease: [0.16, 1, 0.3, 1] }}
             className="op-hero-stats"
           >
             <div>
-              <div style={{ fontSize: 10, color: "#6B5E4E", lineHeight: 1.3, marginBottom: 3, letterSpacing: "0.04em" }}>Ready in</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#F5F0E8", lineHeight: 1.3 }}>25–35 min</div>
+              <div style={{ fontFamily: "'Manrope', sans-serif", fontSize: 10, color: "#6B5E4E", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>Ready in</div>
+              <div style={{ fontFamily: "'Manrope', sans-serif", fontSize: 12, fontWeight: 700, color: "#F5F0E8" }}>25–35 min</div>
             </div>
-            <span style={{ display: "block", width: 1, height: 30, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
+            <span style={{ display: "block", width: 1, height: 26, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
             <div>
-              <div style={{ fontSize: 10, color: "#6B5E4E", lineHeight: 1.3, marginBottom: 3, letterSpacing: "0.04em" }}>Pickup or</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#F5F0E8", lineHeight: 1.3 }}>Delivery</div>
-            </div>
-            <span style={{ display: "block", width: 1, height: 30, background: "rgba(255,255,255,0.1)", flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: 10, color: "#6B5E4E", lineHeight: 1.3, marginBottom: 3, letterSpacing: "0.04em" }}>Order via</div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#F5F0E8", lineHeight: 1.3 }}>WhatsApp</div>
+              <div style={{ fontFamily: "'Manrope', sans-serif", fontSize: 10, color: "#6B5E4E", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: 2 }}>Method</div>
+              <div style={{ fontFamily: "'Manrope', sans-serif", fontSize: 12, fontWeight: 700, color: "#F5F0E8" }}>Pickup · Delivery</div>
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
+          <motion.a
+            href={`https://wa.me/${BRAND.whatsapp.match(/wa\.me\/(\d+)/)?.[1]}?text=Hello%20BLACKROCK%2C%20I%27d%20like%20to%20place%20an%20order.`}
+            target="_blank"
+            rel="noopener noreferrer"
+            initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.6 }}
-            style={{ display: "flex", gap: 8 }}
+            transition={{ duration: 0.5, delay: 0.40, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              display: "inline-flex", alignItems: "center",
+              padding: "9px 18px", marginBottom: 22,
+              border: "1px solid rgba(201,168,76,0.4)",
+              borderRadius: 3,
+              fontFamily: "'Manrope', sans-serif",
+              fontSize: 12, fontWeight: 600,
+              color: "#C9A84C",
+              textDecoration: "none",
+              letterSpacing: "0.04em",
+              width: "fit-content",
+            }}
+          >
+            WhatsApp Us →
+          </motion.a>
+
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.48, ease: [0.16, 1, 0.3, 1] }}
+            style={{ display: "flex", gap: 6 }}
           >
             {["food", "drink"].map(type => (
               <button
                 key={type}
                 onClick={() => switchMenuType(type)}
                 style={{
-                  padding: "10px 28px", borderRadius: 99, fontSize: 11,
+                  padding: "9px 22px", borderRadius: 3, fontSize: 11,
                   fontWeight: menuType === type ? 700 : 500,
-                  border: `1.5px solid ${menuType === type ? "#C9A84C" : "rgba(255,255,255,0.18)"}`,
+                  border: `1px solid ${menuType === type ? "#C9A84C" : "rgba(255,255,255,0.15)"}`,
                   background: menuType === type ? "#C9A84C" : "transparent",
-                  color: menuType === type ? "#0f0d0a" : "rgba(245,240,232,0.55)",
+                  color: menuType === type ? "#0f0d0a" : "rgba(245,240,232,0.45)",
                   cursor: "pointer", transition: "all 0.15s",
-                  fontFamily: "'Montserrat', sans-serif",
-                  letterSpacing: "0.14em", textTransform: "uppercase",
+                  fontFamily: "'Manrope', sans-serif",
+                  letterSpacing: "0.12em", textTransform: "uppercase",
                 }}
               >
                 {type === "food" ? "Food" : "Drinks"}
@@ -389,9 +394,9 @@ export default function OrderPreview() {
 
         <motion.div
           className="op-hero-img"
-          initial={{ opacity: 0, scale: 1.04 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.85, delay: 0.1, ease: [0.25, 0.1, 0.25, 1] }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.9, delay: 0.08 }}
         >
           <img
             src="/food/grilled-fish.png"
@@ -399,19 +404,7 @@ export default function OrderPreview() {
             style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
             fetchpriority="high"
           />
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #0f0d0a 0%, rgba(15,13,10,0.38) 35%, rgba(15,13,10,0.0) 100%)", pointerEvents: "none" }} />
-          <motion.div
-            className="op-hero-img-float"
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.55 }}
-          >
-            <img
-              src="/food/seafood-okro.png"
-              alt=""
-              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-            />
-          </motion.div>
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to right, #0f0d0a 0%, rgba(15,13,10,0.5) 28%, rgba(15,13,10,0) 65%)", pointerEvents: "none" }} />
         </motion.div>
       </section>
 
@@ -433,7 +426,7 @@ export default function OrderPreview() {
                 border: `1px solid ${activeTab === cat ? "#C9A84C" : "rgba(255,255,255,0.12)"}`,
                 background: activeTab === cat ? "#C9A84C" : "transparent",
                 color: activeTab === cat ? "#0f0d0a" : "rgba(245,240,232,0.65)",
-                cursor: "pointer", transition: "all 0.15s", fontFamily: "'Montserrat', sans-serif",
+                cursor: "pointer", transition: "all 0.15s", fontFamily: "'Manrope', sans-serif",
               }}
             >
               {cat}
@@ -462,7 +455,7 @@ export default function OrderPreview() {
                     <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.22em", textTransform: "uppercase", color: "#C9A84C", margin: "0 0 8px" }}>
                       {cat}
                     </p>
-                    <h2 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: "clamp(32px, 3.8vw, 52px)", fontWeight: 600, color: "#F5F0E8", margin: "0 0 14px", lineHeight: 1 }}>
+                    <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: "clamp(32px, 3.8vw, 52px)", fontWeight: 600, color: "#F5F0E8", margin: "0 0 14px", lineHeight: 1 }}>
                       {cat}
                     </h2>
                     <div style={{ width: 44, height: 2, background: "#C9A84C", borderRadius: 2 }} />
@@ -487,7 +480,7 @@ export default function OrderPreview() {
                     </div>
                     <div style={{ marginTop: 16 }}>
                       <div style={{ width: 28, height: 1.5, background: "#C9A84C", marginBottom: 10 }} />
-                      <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "#C9A84C", margin: 0, lineHeight: 1.9, whiteSpace: "pre-line" }}>
+                      <p style={{ fontFamily: "'Manrope', sans-serif", fontSize: 10, fontWeight: 700, letterSpacing: "0.2em", textTransform: "uppercase", color: "#C9A84C", margin: 0, lineHeight: 1.9, whiteSpace: "pre-line" }}>
                         {CATEGORY_TAGLINES[cat] || ""}
                       </p>
                     </div>
@@ -518,7 +511,7 @@ export default function OrderPreview() {
                           }}
                         >
                           <div style={{ flex: 1, minWidth: 0 }}>
-                            <h3 style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 17, fontWeight: 600, color: "#F5F0E8", margin: "0 0 5px", lineHeight: 1.3 }}>
+                            <h3 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 17, fontWeight: 600, color: "#F5F0E8", margin: "0 0 5px", lineHeight: 1.3 }}>
                               {dish.name}
                             </h3>
                             {dish.description && (
@@ -609,7 +602,7 @@ export default function OrderPreview() {
 
           <button
             onClick={() => setDrawerOpen(true)}
-            style={{ display: "flex", alignItems: "center", gap: 8, padding: "13px 22px", background: "#C9A84C", border: "none", borderRadius: 6, color: "#0f0d0a", fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", flexShrink: 0, fontFamily: "'Montserrat', sans-serif" }}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "13px 22px", background: "#C9A84C", border: "none", borderRadius: 6, color: "#0f0d0a", fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer", flexShrink: 0, fontFamily: "'Manrope', sans-serif" }}
           >
             View Order <ChevronRight size={14} />
           </button>
@@ -680,7 +673,7 @@ function PaginatedDishList({ dishes, renderDish }) {
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
         <PageArrow dir="back" disabled={displayPage === 0} onClick={() => go(displayPage - 1)} />
-        <span style={{ fontSize: 11, color: "#9C8E7A", fontFamily: "'Montserrat', sans-serif", letterSpacing: "0.12em", minWidth: 36, textAlign: "center" }}>
+        <span style={{ fontSize: 11, color: "#9C8E7A", fontFamily: "'Manrope', sans-serif", letterSpacing: "0.12em", minWidth: 36, textAlign: "center" }}>
           {displayPage + 1} / {totalPages}
         </span>
         <PageArrow dir="fwd" disabled={displayPage === totalPages - 1} onClick={() => go(displayPage + 1)} />

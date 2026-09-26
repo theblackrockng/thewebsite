@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-25 (/order hero redesign: Cormorant Garamond headline, framer-motion stagger, floating food card)_
+_Last updated: 2026-09-26 (/order page refinement: Playfair Display + Manrope typography, hero composition fixed, WhatsApp button, float card removed)_
 
 ---
 
@@ -72,6 +72,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Console operations screen | _pending commit_ kitchen/bar/waiter/front_desk accounts get `OperationsScreen` (link to their website screen + sign out) instead of the console Layout; guard in `ProtectedRoute` and `AnalyticsRoute`; sidebar role labels for Kitchen, Bar, Front Desk; front_desk links to `/front-desk-display` |
 | Hero tagline + sub-paragraph update | Hero `<h1>` changed to fine dining brand statement; sub-paragraph updated; h1 font sizes reduced further to text-2xl/3xl/5xl/6xl; hardcoded br tags removed for natural wrapping |
 | /order hero redesign | Editorial hero: Cormorant Garamond display headline (`clamp(38px,5vw,72px)`), italic gold "fresh." accent, staggered framer-motion entrance, text-only stats row (no icon chips), floating food card in image column, grilled-fish hero image. Fixed dangling `ArrowRight` import (replaced with `ChevronRight`). |
+| /order page refinement (premium editorial) | Fonts: Playfair Display (Canela substitute) + Manrope added via Google Fonts. Playfair on h1/h2/h3; Manrope on all UI. Hero: float card removed, grid `52/48`, right padding tightened, gradient `28%→65%`, "fresh." italic weight 400, sub-headline added. Stats pared to 2 (Ready in, Method). WhatsApp becomes real `<a>` button via `BRAND.whatsapp` phone extraction. Toggle flat borderRadius 3. |
 
 ---
 
