@@ -235,6 +235,7 @@ module.exports = async function handler(req, res) {
       qty: item.qty,
       line_total: item.price * item.qty,
       category: item.menuType === 'drink' ? 'drink' : 'food',
+      modifiers: item.modifiers || null,
     }));
 
     const { error: itemsErr } = await db.from('order_items').insert(orderItemsRows);
@@ -264,7 +265,7 @@ module.exports = async function handler(req, res) {
 
     // Telegram notification (fire-and-forget in background, but await for main flow)
     const itemsText = items
-      .map((i) => `  ${i.qty}× ${i.name} — ₦${(i.price * i.qty).toLocaleString('en-NG')}`)
+      .map((i) => `  ${i.qty}× ${i.name}${i.modifiers ? ` (${i.modifiers})` : ''} — ₦${(i.price * i.qty).toLocaleString('en-NG')}`)
       .join('\n');
 
     const locationLine =

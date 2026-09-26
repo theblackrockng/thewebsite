@@ -1,10 +1,18 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-26 (Critical fix: IdleLock was unmounting KitchenContent on lock, killing Realtime/polling/sound; restructured to overlay-not-replace and disabled entirely for Kitchen)_
+_Last updated: 2026-09-26 (Soup/swallow data now stored in `order_items.modifiers`; side picker added for Charcoal Grills + Continental; modifiers rendered on Kitchen, Bar, Front Desk displays)_
 
 ---
 
 ## Pending SQL
+
+### Run now — enables modifiers to be stored on order_items
+
+```sql
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS modifiers TEXT;
+```
+
+---
 
 ### Run in Supabase before Waiter Shift-Login goes live (`004_waiter_profiles.sql`)
 
@@ -94,6 +102,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Order-ready alert | `FrontDeskDisplay.jsx`: `playReadyChime()` (784→659→523 Hz, triangle wave, descending bell — distinct from new-order sine chime); `readyIdsRef` + `readyFlashIds` added to `fetchOrders()` for transition detection; `OrderCard` gains `readyFlashing` prop (green border + READY badge), and `placed_by` shown in gold below table number on all cards. `WaiterOrder.jsx`: same `woPlayReadyChime()`; Realtime subscription (`event: UPDATE` on orders, client-side ready check) with full hardened pattern (5s drift tick, visibility, online, JWT refresh, polling fallback); fixed-position `readyBanners` strip (auto-dismisses after 10s) shows "Table 4 — Ready · Emeka" format; audio unlocked on any tap. Commit `b1a6537`. |
 | Android APK polish | Mac build environment confirmed (Java 21 Temurin, Android SDK, jq, Pillow all present). BLACKROCK logo (1536×1024) resized to all mipmap densities (48→192 px launcher + 108→432 px adaptive foreground). Build scripts for all three apps now `sed`-patch `strings.xml` before `cap sync` to set correct per-app display name (Kitchen/Bar/Waiter) — Capacitor never overwrites this file on sync. Kitchen `MainActivity` gains `onWindowFocusChanged` override so fullscreen re-asserts after notification pull-downs. New `native/bar/` and `native/waiter/` directories created with full fullscreen `MainActivity` (FLAG_KEEP_SCREEN_ON, `hideSystemUI` on resume + focus change, back button disabled on Bar, enabled on Waiter); Bar manifest locks landscape + adds `showWhenLocked`/`turnScreenOn`; Waiter manifest adds same flags without orientation lock. Build scripts updated to copy from the new per-app native dirs. All three APKs build successfully. |
 | Fix IdleLock killing Kitchen orders during lock | **Root cause:** `IdleLock` used `if (!locked) return children` — when locked, `KitchenContent` was fully **unmounted**, tearing down all Realtime channels, polling intervals, and sound alerts. Orders placed during a lock were silently lost until staff manually unlocked. **Fix (3 files):** `IdleLock.jsx` split into a shell + `IdleLockActive` inner component; active path now renders `<>{children}{locked && <overlay/>}</>` so children stay mounted at all times. Added `disabled` prop. `StaffLoginGate.jsx` accepts `disableIdleLock` and passes it to `IdleLock`. `KitchenDisplay.jsx` passes `disableIdleLock` — Kitchen never idle-locks; Bar and FrontDesk keep the lock but their subscriptions now survive it. |
+| Soup/swallow + side picker — full stack fix | **Problem:** soup and swallow selections were captured in modals but never sent to the API or stored in DB. **Fix (8 files):** `order_items` table needs `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS modifiers TEXT;` (run manually). `api/orders.js`: `modifiers` stored in `order_items` insert and shown in Telegram notification. `Order.jsx`, `OrderPreview.jsx`, `WaiterOrder.jsx`: `modifiers: [soup, swallow, side].filter(Boolean).join(", ")` added to POST items. `Checkout.jsx`: same. New `SidePickerModal` (Order.jsx, OrderPreview.jsx) and `WaiterSidePickerModal` (WaiterOrder.jsx) added for Charcoal Grills + Continental categories (3 sides: Rice, Potato Wedges, Yam Chips). `KitchenDisplay.jsx`, `BarDisplay.jsx`, `FrontDeskDisplay.jsx`: `item.modifiers` rendered in gold below the item name. |
 
 ---
 

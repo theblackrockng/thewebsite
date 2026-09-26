@@ -223,7 +223,7 @@ export default function Checkout() {
         specialInstructions: specialInstructions.trim() || null,
         scheduledTime,
         paymentMethod: "pay_on_arrival",
-        items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, menuType: i.menuType || "food" })),
+        items: items.map((i) => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, menuType: i.menuType || "food", modifiers: [i.soup, i.swallow, i.side].filter(Boolean).join(", ") || null })),
       };
 
       const res = await fetch("/api/orders", {

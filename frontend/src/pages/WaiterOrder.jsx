@@ -28,6 +28,7 @@ const SOUPS = [
   "Fisherman Soup", "Seafood", "Banga", "Ofe Nsala", "Miyan Kuka", "Ewedu",
 ];
 const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo"];
+const SIDES = ["Rice", "Potato Wedges", "Yam Chips"];
 
 const CATEGORY_IMAGES = {
   "Starters":             "/images/menu/starters.jpg",
@@ -167,6 +168,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
   const [dbCategoryImages, setDbCategoryImages] = useState({});
   const [soupModal, setSoupModal] = useState(null);
   const [traditionalModal, setTraditionalModal] = useState(null);
+  const [sideModal, setSideModal] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [doneOrder, setDoneOrder] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -375,7 +377,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
           specialInstructions: null,
           scheduledTime: null,
           paymentMethod: "pay_on_arrival",
-          items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, menuType: i.menuType || "food" })),
+          items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, menuType: i.menuType || "food", modifiers: [i.soup, i.swallow, i.side].filter(Boolean).join(", ") || null })),
         }),
       });
       const data = await res.json();
@@ -595,7 +597,8 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
                     renderDish={(dish, idx, chunk) => {
                       const isNational    = cat === "National Dishes";
                       const isTraditional = cat === "Traditional Specials";
-                      const needsPicker   = isNational || isTraditional;
+                      const isGrill       = cat === "Charcoal Grills" || cat === "Continental";
+                      const needsPicker   = isNational || isTraditional || isGrill;
                       const cartItem      = needsPicker ? null : getCartItem(dish.id);
                       const natItems      = needsPicker ? getNationalCartItems(dish.id) : null;
                       const natQty        = natItems ? natItems.reduce((s, i) => s + i.qty, 0) : 0;
@@ -617,7 +620,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
                             <span style={{ fontSize: 15, fontWeight: 700, color: "#C9A84C", whiteSpace: "nowrap" }}>{fmtPrice(dish.price)}</span>
                             {needsPicker ? (
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                <WoCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : setTraditionalModal(dish)} />
+                                <WoCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : setSideModal(dish)} />
                                 {natQty > 0 && <span style={{ fontSize: 10, color: "#C9A84C", fontWeight: 700, lineHeight: 1 }}>{natQty}</span>}
                               </div>
                             ) : cartItem ? (
@@ -678,6 +681,16 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
           onConfirm={(_soup, swallow) => {
             addItem({ id: `${traditionalModal.id}|${swallow}`, baseId: traditionalModal.id, name: traditionalModal.name, price: traditionalModal.price, category: traditionalModal.category, menuType: "food", swallow });
             setTraditionalModal(null);
+          }}
+        />
+      )}
+      {sideModal && (
+        <WaiterSidePickerModal
+          dish={sideModal}
+          onClose={() => setSideModal(null)}
+          onConfirm={(side) => {
+            addItem({ id: `${sideModal.id}|${side}`, baseId: sideModal.id, name: sideModal.name, price: sideModal.price, category: sideModal.category, menuType: "food", side });
+            setSideModal(null);
           }}
         />
       )}
@@ -830,6 +843,45 @@ function WaiterPickerModal({ dish, showSoup = true, onClose, onConfirm }) {
   );
 }
 
+/* ── Side picker modal ──────────────────────────────────────────────── */
+function WaiterSidePickerModal({ dish, onClose, onConfirm }) {
+  const [side, setSide] = useState("");
+  const chip = (active) => ({
+    padding: "8px 16px", borderRadius: 99, fontSize: 13, fontWeight: 500, cursor: "pointer",
+    background: active ? "#c8a96e" : "transparent", color: active ? "#0f0d0a" : "#9C8E7A",
+    border: `1px solid ${active ? "#c8a96e" : "#3e3426"}`, transition: "all 0.15s", fontFamily: "inherit",
+  });
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)", padding: 16 }}>
+      <div style={{ background: "#1a1612", border: "1px solid #3e3426", borderRadius: 12, width: "100%", maxWidth: 480 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px 16px", borderBottom: "1px solid #2e2820" }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: "0.2em", textTransform: "uppercase", color: "#c8a96e" }}>Choose side</p>
+            <h3 style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 700, color: "#F5F0E8", fontFamily: "'Cormorant Garamond', serif" }}>{dish.name}</h3>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9C8E7A", display: "flex" }}><X size={20} /></button>
+        </div>
+        <div style={{ padding: "20px 24px" }}>
+          <p style={{ margin: "0 0 12px", fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#F5F0E8" }}>Side <span style={{ color: "#ef4444" }}>*</span></p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+            {SIDES.map(s => <button key={s} onClick={() => setSide(s)} style={chip(side === s)}>{s}</button>)}
+          </div>
+        </div>
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #2e2820", display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 6, border: "1px solid #3e3426", background: "transparent", color: "#9C8E7A", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          <button
+            onClick={() => side && onConfirm(side)}
+            disabled={!side}
+            style={{ flex: 2, padding: "12px", borderRadius: 6, border: "none", background: side ? "#c8a96e" : "#2e2820", color: side ? "#0f0d0a" : "#5a4e46", fontSize: 13, fontWeight: 700, cursor: side ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: "inherit" }}
+          >
+            <Check size={14} /> Add to Order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Confirm overlay ────────────────────────────────────────────────── */
 function WaiterConfirmOverlay({ cart, cartTotal, tables, selectedTable, setSelectedTable, tableFlash, submitting, submitError, waiterName, onClose, onPlaceOrder }) {
   const selectedTableObj = tables.find(t => String(t.id) === String(selectedTable));
@@ -878,9 +930,9 @@ function WaiterConfirmOverlay({ cart, cartTotal, tables, selectedTable, setSelec
               <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "13px 18px", borderBottom: idx < cart.length - 1 ? "1px solid #1e1a16" : "none", gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "#F5F0E8" }}>{item.name}</div>
-                  {(item.soup || item.swallow) && (
+                  {(item.soup || item.swallow || item.side) && (
                     <div style={{ fontSize: 11, color: "#9C8E7A", marginTop: 2 }}>
-                      {[item.soup, item.swallow].filter(Boolean).join(" · ")}
+                      {[item.soup, item.swallow, item.side].filter(Boolean).join(" · ")}
                     </div>
                   )}
                   <div style={{ fontSize: 12, color: "#9C8E7A", marginTop: 2 }}>{fmtPrice(item.price)} × {item.qty}</div>

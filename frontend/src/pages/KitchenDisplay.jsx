@@ -303,6 +303,9 @@ function OrderCard({ order, loading, onStatusUpdate }) {
               <div style={{ fontSize: 15, fontWeight: 600, color: "#F5F0E8", flex: 1 }}>
                 <span style={{ display: "inline-block", minWidth: 28, color: "#c8a96e", fontWeight: 700 }}>{item.qty}×</span>
                 {item.item_name}
+                {item.modifiers && (
+                  <div style={{ fontSize: 12, color: "#c8a96e", fontWeight: 500, marginTop: 2, marginLeft: 28 }}>{item.modifiers}</div>
+                )}
               </div>
             </div>
           ))}

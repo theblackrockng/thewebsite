@@ -405,7 +405,12 @@ function BarOrderCard({ order, loading, onStatusUpdate }) {
         {order.displayItems.map((item, idx) => (
           <div key={item.id || idx} style={{ display: "flex", gap: 8, marginBottom: idx < order.displayItems.length - 1 ? 8 : 0 }}>
             <span style={{ color: "#c8a96e", fontWeight: 700, fontSize: 15, minWidth: 26 }}>{item.qty}×</span>
-            <span style={{ fontSize: 14, fontWeight: 500, color: "#F5F0E8" }}>{item.item_name}</span>
+            <div>
+              <span style={{ fontSize: 14, fontWeight: 500, color: "#F5F0E8" }}>{item.item_name}</span>
+              {item.modifiers && (
+                <div style={{ fontSize: 12, color: "#c8a96e", fontWeight: 500, marginTop: 1 }}>{item.modifiers}</div>
+              )}
+            </div>
           </div>
         ))}
       </div>

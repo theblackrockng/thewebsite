@@ -1357,6 +1357,9 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
                 <div style={{ fontWeight: 600 }}>
                   <span style={{ display: "inline-block", minWidth: 40, color: t.gold, fontWeight: 800 }}>{item.qty}×</span>
                   {item.item_name}
+                  {item.modifiers && (
+                    <div style={{ fontSize: 15, color: t.gold, fontWeight: 500, fontStyle: "italic", marginTop: 2, marginLeft: 40 }}>{item.modifiers}</div>
+                  )}
                 </div>
                 <div style={{ color: t.muted, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmtPrice(item.line_total)}</div>
               </div>
