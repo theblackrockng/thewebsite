@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-26 (/order page refinement: Playfair Display + Manrope typography, hero composition fixed, WhatsApp button, float card removed)_
+_Last updated: 2026-09-25 (/order page: reduce LIST_H 440→360 so image card height matches items list height across all category cards)_
 
 ---
 

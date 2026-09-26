@@ -11,7 +11,7 @@ import { useCart } from "../context/CartContext";
 import SEO from "../components/SEO";
 
 const PER_PAGE = 5;
-const LIST_H   = 440; // fixed px — both image col and list clip zone
+const LIST_H   = 360; // fixed px — both image col and list clip zone
 
 const FOOD_CATEGORY_ORDER = [
   "Starters", "Salads", "Rice", "Pasta",
