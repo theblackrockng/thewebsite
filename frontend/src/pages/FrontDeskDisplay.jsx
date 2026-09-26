@@ -197,6 +197,14 @@ function playAlert() {
   ]);
 }
 
+function playReadyChime() {
+  playTones([
+    { freq: 784, at: 0,    len: 0.5, vol: 0.28, type: "triangle" },
+    { freq: 659, at: 0.22, len: 0.5, vol: 0.28, type: "triangle" },
+    { freq: 523, at: 0.44, len: 0.6, vol: 0.28, type: "triangle" },
+  ]);
+}
+
 // "ok": signed in with a token good for a while. "offline": could not reach the
 // auth server, so keep going. "lost": there is no session that can be recovered.
 async function ensureSession(force = false) {
@@ -313,6 +321,7 @@ function FrontDeskMain({ onSessionLost }) {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [now, setNow] = useState(() => Date.now());
   const [flashIds, setFlashIds] = useState(() => new Set());
+  const [readyFlashIds, setReadyFlashIds] = useState(() => new Set());
   const [actionIds, setActionIds] = useState(() => new Set());
   const [actionError, setActionError] = useState("");
   const [audioReady, setAudioReady] = useState(() => !!audio.ctx);
@@ -337,6 +346,7 @@ function FrontDeskMain({ onSessionLost }) {
   const resInFlightRef = useRef(false);
   const resPendingRef = useRef(false);
   const knownIdsRef = useRef(null);
+  const readyIdsRef = useRef(null);
   const lastCallAlertRef = useRef(0);
   const mountedRef = useRef(true);
   const inFlightRef = useRef(false);
@@ -453,6 +463,21 @@ function FrontDeskMain({ onSessionLost }) {
         }
       }
       knownIdsRef.current = ids;
+
+      // Detect transitions to "ready" — play distinct chime and flash the card
+      const readySet = new Set(list.filter(o => o.order_status === "ready").map(o => o.id));
+      if (readyIdsRef.current !== null) {
+        const newlyReadyIds = [...readySet].filter(id => !readyIdsRef.current.has(id));
+        if (newlyReadyIds.length > 0) {
+          playReadyChime();
+          setReadyFlashIds(prev => new Set([...prev, ...newlyReadyIds]));
+          setTimeout(() => {
+            if (!mountedRef.current) return;
+            setReadyFlashIds(prev => { const n = new Set(prev); newlyReadyIds.forEach(id => n.delete(id)); return n; });
+          }, FLASH_MS);
+        }
+      }
+      readyIdsRef.current = readySet;
     } finally {
       inFlightRef.current = false;
       if (pendingRef.current && mountedRef.current) {
@@ -1025,6 +1050,7 @@ function FrontDeskMain({ onSessionLost }) {
               now={now}
               completion={info}
               flashing={!isCompletedTab && flashIds.has(order.id)}
+              readyFlashing={!isCompletedTab && readyFlashIds.has(order.id)}
               busy={actionIds.has(order.id)}
               onConfirm={confirmOrder}
               onComplete={completeOrder}
@@ -1264,7 +1290,7 @@ function Badge({ cfg }) {
   );
 }
 
-function OrderCard({ order, t, now, completion, flashing, busy, onConfirm, onComplete, onPayment }) {
+function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, onConfirm, onComplete, onPayment }) {
   const statusCfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
   const payCfg = PAYMENT_CFG[order.payment_status] ?? { label: order.payment_status || "Unknown", color: "#6b7280" };
   const items = order.order_items || [];
@@ -1290,7 +1316,7 @@ function OrderCard({ order, t, now, completion, flashing, busy, onConfirm, onCom
       className={flashing ? "fd-flash" : undefined}
       style={{
         background: t.card, borderRadius: 14, overflow: "hidden", display: "flex", flexDirection: "column",
-        border: `2px solid ${flashing ? t.gold : t.border}`, opacity: cancelled ? 0.72 : 1,
+        border: `2px solid ${readyFlashing ? "#16a34a" : flashing ? t.gold : t.border}`, opacity: cancelled ? 0.72 : 1,
       }}
     >
       <div style={{ background: t.cardHead, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, borderBottom: `1px solid ${t.border}` }}>
@@ -1298,6 +1324,9 @@ function OrderCard({ order, t, now, completion, flashing, busy, onConfirm, onCom
           <OrderIcon order={order} color={t.gold} />
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 26, fontWeight: 800, color: t.text, lineHeight: 1.1 }}>{orderLabel(order)}</div>
+            {order.placed_by && (
+              <div style={{ fontSize: 15, fontWeight: 700, color: t.gold, marginTop: 3, lineHeight: 1 }}>Waiter: {order.placed_by}</div>
+            )}
             <div style={{ fontSize: 16, color: t.muted, marginTop: 2 }}>
               {order.order_number || order.id.slice(0, 8)}
               {order.guest_name ? ` · ${order.guest_name}` : ""}
@@ -1306,7 +1335,10 @@ function OrderCard({ order, t, now, completion, flashing, busy, onConfirm, onCom
         </div>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            {flashing && (
+            {readyFlashing && (
+              <span style={{ background: "#16a34a", color: "#fff", borderRadius: 99, padding: "5px 12px", fontSize: 14, fontWeight: 800, letterSpacing: "0.08em" }}>READY</span>
+            )}
+            {flashing && !readyFlashing && (
               <span style={{ background: t.gold, color: t.onGold, borderRadius: 99, padding: "5px 12px", fontSize: 14, fontWeight: 800, letterSpacing: "0.08em" }}>NEW ORDER</span>
             )}
             <Badge cfg={statusCfg} />

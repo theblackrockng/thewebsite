@@ -99,6 +99,41 @@ function fmtPrice(n) {
   return `₦${Number(n).toLocaleString("en-NG")}`;
 }
 
+const woAudio = { ctx: null };
+function woUnlockAudio() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  if (!woAudio.ctx) woAudio.ctx = new Ctx();
+  woAudio.ctx.resume();
+}
+function woPlayTones(list) {
+  const ctx = woAudio.ctx;
+  if (!ctx || ctx.state !== "running") return;
+  try {
+    list.forEach(({ freq, at, len, vol, type }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = ctx.currentTime + at;
+      osc.type = type || "sine";
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(vol, start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + len);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + len + 0.05);
+    });
+  } catch {}
+}
+function woPlayReadyChime() {
+  woPlayTones([
+    { freq: 784, at: 0,    len: 0.5, vol: 0.28, type: "triangle" },
+    { freq: 659, at: 0.22, len: 0.5, vol: 0.28, type: "triangle" },
+    { freq: 523, at: 0.44, len: 0.6, vol: 0.28, type: "triangle" },
+  ]);
+}
+
 function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
@@ -140,6 +175,11 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
   const sectionRefs = useRef({});
   const scrollingRef = useRef(false);
   const tabsRef = useRef(null);
+  const [readyBanners, setReadyBanners] = useState([]);
+  const mountedRef = useRef(true);
+  const channelRef = useRef(null);
+  const woConnectedRef = useRef(false);
+  const notifiedReadyIdsRef = useRef(new Set());
 
   useEffect(() => {
     supabase.from("tables").select("*").eq("active", true).order("table_number", { ascending: true })
@@ -225,6 +265,72 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
     setTimeout(() => { scrollingRef.current = false; }, 900);
   }, []);
 
+  const subscribeReady = useCallback(() => {
+    if (channelRef.current) supabase.removeChannel(channelRef.current);
+    const ch = supabase
+      .channel(`waiter-ready-${Date.now()}`)
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "orders" }, (payload) => {
+        if (!mountedRef.current) return;
+        if (payload.new?.order_status !== "ready") return;
+        const id = payload.new?.id;
+        if (!id || notifiedReadyIdsRef.current.has(id)) return;
+        notifiedReadyIdsRef.current.add(id);
+        woPlayReadyChime();
+        setReadyBanners(prev => [...prev, {
+          id,
+          tableNum: payload.new?.table_number,
+          orderNum: payload.new?.order_number,
+          placedBy: payload.new?.placed_by,
+        }]);
+        setTimeout(() => {
+          if (!mountedRef.current) return;
+          setReadyBanners(prev => prev.filter(b => b.id !== id));
+        }, 10_000);
+      })
+      .subscribe((status) => { woConnectedRef.current = status === "SUBSCRIBED"; });
+    channelRef.current = ch;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    mountedRef.current = true;
+    subscribeReady();
+    let misses = 0;
+    const pollId = setInterval(() => {
+      if (!mountedRef.current) return;
+      if (!woConnectedRef.current) { misses++; if (misses % 4 === 0) subscribeReady(); }
+      else misses = 0;
+    }, 15_000);
+    let last = Date.now();
+    const driftId = setInterval(() => {
+      const now = Date.now();
+      if (now - last > 30_000 && !woConnectedRef.current) subscribeReady();
+      last = now;
+    }, 5_000);
+    const onVisible = () => { if (document.visibilityState === "visible" && !woConnectedRef.current) subscribeReady(); };
+    const onOnline = () => { if (!woConnectedRef.current) subscribeReady(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(pollId);
+      clearInterval(driftId);
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
+      if (channelRef.current) { supabase.removeChannel(channelRef.current); channelRef.current = null; }
+    };
+  }, [subscribeReady]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "TOKEN_REFRESHED") return;
+      setTimeout(() => {
+        if (!mountedRef.current) return;
+        if (channelRef.current?.state !== "joined") subscribeReady();
+      }, 2000);
+    });
+    return () => subscription.unsubscribe();
+  }, [subscribeReady]);
+
   const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
 
@@ -284,20 +390,46 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
     }
   }
 
+  const readyBannerUI = readyBanners.length === 0 ? null : (
+    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 70, display: "flex", flexDirection: "column" }}>
+      {readyBanners.map(b => (
+        <div
+          key={b.id}
+          style={{ background: "#16a34a", color: "#fff", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, fontSize: 15, fontWeight: 700, fontFamily: "inherit", borderBottom: "1px solid rgba(0,0,0,0.12)", animation: "wo-ready-slide 0.25s ease" }}
+        >
+          <span>
+            {b.tableNum ? `Table ${b.tableNum}` : b.orderNum ? `#${b.orderNum}` : "Order"} — Ready
+            {b.placedBy ? ` · ${b.placedBy}` : ""}
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); setReadyBanners(prev => prev.filter(x => x.id !== b.id)); }}
+            style={{ background: "rgba(0,0,0,0.18)", border: "none", color: "#fff", borderRadius: 4, width: 26, height: 26, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+          >
+            ×
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
   if (doneOrder) {
     return (
-      <WaiterDoneOverlay
-        orderNumber={doneOrder.orderNumber}
-        tableNumber={doneOrder.tableNumber}
-        waiterName={waiterName}
-        onNewOrder={() => { setDoneOrder(null); setSelectedTable(""); }}
-        onSwitchWaiter={onSwitchWaiter}
-      />
+      <>
+        {readyBannerUI}
+        <WaiterDoneOverlay
+          orderNumber={doneOrder.orderNumber}
+          tableNumber={doneOrder.tableNumber}
+          waiterName={waiterName}
+          onNewOrder={() => { setDoneOrder(null); setSelectedTable(""); }}
+          onSwitchWaiter={onSwitchWaiter}
+        />
+      </>
     );
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f0d0a", color: "#F5F0E8" }}>
+    <div style={{ minHeight: "100vh", background: "#0f0d0a", color: "#F5F0E8" }} onClick={woUnlockAudio}>
+      {readyBannerUI}
       <style>{`
         .wo-cat-body { display: grid; grid-template-columns: 300px 1fr; gap: 48px; align-items: start; }
         @media (max-width: 860px) { .wo-cat-body { grid-template-columns: 1fr; gap: 28px; } }
@@ -309,6 +441,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
         @keyframes wo-out-bwd  { from { transform: translateX(0); }     to { transform: translateX(100%);  } }
         @keyframes wo-in-fwd   { from { transform: translateX(100%); }  to { transform: translateX(0); }    }
         @keyframes wo-in-bwd   { from { transform: translateX(-100%); } to { transform: translateX(0); }    }
+        @keyframes wo-ready-slide { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       `}</style>
 
       {/* STICKY HEADER */}
