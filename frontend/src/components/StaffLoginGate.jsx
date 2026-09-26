@@ -16,7 +16,7 @@ export function useStaffSession() {
 // Front Desk). Replaces the old client-side PinGate. A PIN still exists,
 // but only as the IdleLock re-lock screen rendered once a session is
 // established — it is never the access control.
-export default function StaffLoginGate({ children, allowedRoles, title, idleMinutes = 5, renderSignedOut }) {
+export default function StaffLoginGate({ children, allowedRoles, title, idleMinutes = 5, disableIdleLock = false, renderSignedOut }) {
   const [booting, setBooting] = useState(true);
   const [profile, setProfile] = useState(null);
   const [email, setEmail] = useState("");
@@ -115,7 +115,7 @@ export default function StaffLoginGate({ children, allowedRoles, title, idleMinu
 
   return (
     <StaffSessionContext.Provider value={{ profile, signOut: handleSignOut }}>
-      <IdleLock idleMinutes={idleMinutes}>{children}</IdleLock>
+      <IdleLock idleMinutes={idleMinutes} disabled={disableIdleLock}>{children}</IdleLock>
     </StaffSessionContext.Provider>
   );
 }

@@ -59,7 +59,7 @@ function playAlert() {
 
 export default function KitchenDisplay() {
   return (
-    <StaffLoginGate allowedRoles={KITCHEN_ROLES} title="Kitchen">
+    <StaffLoginGate allowedRoles={KITCHEN_ROLES} title="Kitchen" disableIdleLock>
       <KitchenContent />
     </StaffLoginGate>
   );
