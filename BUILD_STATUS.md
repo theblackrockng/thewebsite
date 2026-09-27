@@ -1,10 +1,18 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-27 (Dine-in ordering unified: CartDrawer now places dine-in orders directly; Checkout.jsx redirects dine-in guests back to /order — no name/phone/payment flow for table scans)_
+_Last updated: 2026-09-27 (Custom QR image upload per table: upload your own QR code in the Tables page, stored in Supabase Storage, displayed in the table row thumbnail)_
 
 ---
 
 ## Pending SQL
+
+### Run now — adds custom QR image column to tables
+
+```sql
+ALTER TABLE tables ADD COLUMN IF NOT EXISTS custom_qr_url TEXT;
+```
+
+---
 
 ### Run now — enables modifiers to be stored on order_items
 

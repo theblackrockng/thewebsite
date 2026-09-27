@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { QrCode, Plus, Pencil, Trash2, Download, Check, X, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { QrCode, Plus, Pencil, Trash2, Download, Check, X, RefreshCw, ToggleLeft, ToggleRight, UploadCloud, ImagePlus } from "lucide-react";
 import QRCodeStyling from "qr-code-styling";
 import { authHeader } from "../../lib/authHeader";
+import { supabase } from "../../lib/supabase";
 
 const API_BASE = "/api/tables";
 
@@ -76,13 +77,18 @@ const btn = (variant = "primary") => ({
 });
 
 /* ── QR preview modal ── */
-function QRModal({ table, onClose }) {
+function QRModal({ table, onClose, onUpdated }) {
   const containerRef = useRef(null);
   const qrRef = useRef(null);
+  const fileRef = useRef(null);
   const url = getTableUrl(table);
+  const [customUrl, setCustomUrl] = useState(table.custom_qr_url || "");
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   useEffect(() => {
-    qrRef.current = makeQR(url, 260);
+    qrRef.current = makeQR(url, 240);
     if (containerRef.current) {
       containerRef.current.innerHTML = "";
       qrRef.current.append(containerRef.current);
@@ -101,6 +107,50 @@ function QRModal({ table, onClose }) {
     });
   }
 
+  async function handleUpload(file) {
+    if (!file || !file.type.startsWith("image/")) { setUploadError("Please select an image file."); return; }
+    setUploadError("");
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop().toLowerCase() || "png";
+      const path = `qr-codes/table-${table.table_number}-${Date.now()}.${ext}`;
+      const { error: upErr } = await supabase.storage
+        .from("media-library")
+        .upload(path, file, { contentType: file.type, upsert: true });
+      if (upErr) throw upErr;
+      const { data: { publicUrl } } = supabase.storage.from("media-library").getPublicUrl(path);
+      const res = await fetch(API_BASE, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ id: table.id, custom_qr_url: publicUrl }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to save.");
+      setCustomUrl(publicUrl);
+      onUpdated(json.data);
+    } catch (e) {
+      setUploadError(e.message || "Upload failed.");
+    }
+    setUploading(false);
+  }
+
+  async function removeCustomQr() {
+    setUploadError("");
+    try {
+      const res = await fetch(API_BASE, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ id: table.id, custom_qr_url: null }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed to remove.");
+      setCustomUrl("");
+      onUpdated(json.data);
+    } catch (e) {
+      setUploadError(e.message || "Remove failed.");
+    }
+  }
+
   return (
     <div
       onClick={onClose}
@@ -108,6 +158,7 @@ function QRModal({ table, onClose }) {
         position: "fixed", inset: 0, zIndex: 200,
         background: "rgba(0,0,0,0.7)",
         display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 16,
       }}
     >
       <div
@@ -116,35 +167,114 @@ function QRModal({ table, onClose }) {
           background: "var(--ds-surface)",
           border: "1px solid var(--ds-border)",
           borderRadius: 14,
-          padding: "28px 32px",
-          width: 340,
-          display: "flex", flexDirection: "column", alignItems: "center", gap: 18,
+          width: 360,
+          maxHeight: "90vh",
+          overflowY: "auto",
+          display: "flex", flexDirection: "column",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "22px 24px 16px" }}>
           <div>
             <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 700, color: "#c8a96e", letterSpacing: "2px", textTransform: "uppercase" }}>
               Table {table.table_number}
             </div>
-            <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 2 }}>QR Code Preview</div>
+            <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 2 }}>QR Code</div>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)", display: "flex" }}>
             <X size={18} />
           </button>
         </div>
 
-        {/* QR */}
-        <div style={{ borderRadius: 12, overflow: "hidden", border: "2px solid #2e2820" }}>
-          <div ref={containerRef} />
+        {/* ── Generated QR ── */}
+        <div style={{ padding: "0 24px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ds-muted)", alignSelf: "flex-start" }}>
+            BLACKROCK Generated QR
+          </div>
+          <div style={{ borderRadius: 12, overflow: "hidden", border: "2px solid #2e2820" }}>
+            <div ref={containerRef} />
+          </div>
+          <div style={{ fontSize: 10.5, color: "var(--ds-muted)", textAlign: "center", wordBreak: "break-all", maxWidth: 300 }}>
+            {url}
+          </div>
+          <button onClick={download} style={{ ...btn("ghost"), width: "100%", justifyContent: "center" }}>
+            <Download size={13} /> Download PNG (High-Res)
+          </button>
         </div>
 
-        <div style={{ fontSize: 11, color: "var(--ds-muted)", textAlign: "center", wordBreak: "break-all", maxWidth: 270 }}>
-          {url}
-        </div>
+        {/* Divider */}
+        <div style={{ borderTop: "1px solid var(--ds-border)", margin: "0 24px" }} />
 
-        <button onClick={download} style={{ ...btn("primary"), width: "100%", justifyContent: "center" }}>
-          <Download size={14} /> Download PNG (High-Res)
-        </button>
+        {/* ── Custom QR upload ── */}
+        <div style={{ padding: "18px 24px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ds-muted)" }}>
+            Your Custom QR Code
+          </div>
+
+          {customUrl ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+              <img
+                src={customUrl}
+                alt={`Custom QR Table ${table.table_number}`}
+                style={{ width: 160, height: 160, objectFit: "contain", borderRadius: 10, border: "2px solid #c8a96e", background: "#fff" }}
+              />
+              <div style={{ display: "flex", gap: 8, width: "100%" }}>
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  style={{ ...btn("ghost"), flex: 1, justifyContent: "center" }}
+                >
+                  <ImagePlus size={13} /> Replace
+                </button>
+                <button
+                  onClick={removeCustomQr}
+                  style={{ ...btn("danger"), flex: 1, justifyContent: "center" }}
+                >
+                  <X size={13} /> Remove
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(false); handleUpload(e.dataTransfer.files[0]); }}
+              onClick={() => !uploading && fileRef.current?.click()}
+              style={{
+                border: `2px dashed ${dragOver ? "#c8a96e" : "var(--ds-border)"}`,
+                borderRadius: 10,
+                padding: "28px 16px",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+                cursor: uploading ? "wait" : "pointer",
+                background: dragOver ? "rgba(200,169,110,0.06)" : "transparent",
+                transition: "border-color 0.15s, background 0.15s",
+              }}
+            >
+              {uploading ? (
+                <div style={{ fontSize: 13, color: "var(--ds-muted)" }}>Uploading…</div>
+              ) : (
+                <>
+                  <UploadCloud size={24} style={{ color: "var(--ds-muted)" }} />
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ds-text)" }}>Click or drop an image</div>
+                  <div style={{ fontSize: 11, color: "var(--ds-muted)" }}>PNG, JPG, or WebP</div>
+                </>
+              )}
+            </div>
+          )}
+
+          {uploadError && (
+            <div style={{ fontSize: 12, color: "#ef4444", background: "rgba(239,68,68,0.08)", padding: "8px 12px", borderRadius: 6 }}>
+              {uploadError}
+            </div>
+          )}
+
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={(e) => { if (e.target.files[0]) handleUpload(e.target.files[0]); e.target.value = ""; }}
+          />
+        </div>
       </div>
     </div>
   );
@@ -311,13 +441,14 @@ function TableRow({ table, onEdit, onDelete, onQR }) {
   const qrInstance = useRef(null);
 
   useEffect(() => {
+    if (table.custom_qr_url) return;
     const url = getTableUrl(table);
     qrInstance.current = makeQR(url, 56);
     if (miniRef.current) {
       miniRef.current.innerHTML = "";
       qrInstance.current.append(miniRef.current);
     }
-  }, [table.qr_slug]);
+  }, [table.qr_slug, table.custom_qr_url]);
 
   return (
     <div style={{
@@ -332,13 +463,17 @@ function TableRow({ table, onEdit, onDelete, onQR }) {
     onMouseEnter={(e) => { e.currentTarget.style.background = "var(--ds-input-bg)"; }}
     onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
     >
-      {/* Mini QR */}
+      {/* Mini QR — custom image if uploaded, generated otherwise */}
       <div
         onClick={() => onQR(table)}
-        style={{ cursor: "pointer", borderRadius: 6, overflow: "hidden", width: 56, height: 56, flexShrink: 0, border: "1px solid #2e2820" }}
-        title="View & download QR"
+        style={{ cursor: "pointer", borderRadius: 6, overflow: "hidden", width: 56, height: 56, flexShrink: 0, border: `1px solid ${table.custom_qr_url ? "#c8a96e" : "#2e2820"}`, background: "#fff" }}
+        title="View QR / upload custom"
       >
-        <div ref={miniRef} style={{ transform: "scale(1)", transformOrigin: "top left" }} />
+        {table.custom_qr_url ? (
+          <img src={table.custom_qr_url} alt={`Table ${table.table_number} QR`} style={{ width: 56, height: 56, objectFit: "contain", display: "block" }} />
+        ) : (
+          <div ref={miniRef} style={{ transform: "scale(1)", transformOrigin: "top left" }} />
+        )}
       </div>
 
       {/* Table number */}
@@ -438,6 +573,11 @@ export default function Tables() {
     setDeleteTable(null);
   }
 
+  function handleQRUpdated(row) {
+    setTables((prev) => prev.map((t) => (t.id === row.id ? row : t)));
+    setQrTable(row);
+  }
+
   return (
     <div style={{ padding: "28px 32px", maxWidth: 960, margin: "0 auto" }}>
       {/* Page header */}
@@ -512,7 +652,7 @@ export default function Tables() {
       {showAdd && <TableFormModal onClose={() => setShowAdd(false)} onSaved={handleSaved} />}
       {editTable && <TableFormModal table={editTable} onClose={() => setEditTable(null)} onSaved={handleSaved} />}
       {deleteTable && <DeleteConfirm table={deleteTable} onClose={() => setDeleteTable(null)} onDeleted={handleDeleted} />}
-      {qrTable && <QRModal table={qrTable} onClose={() => setQrTable(null)} />}
+      {qrTable && <QRModal table={qrTable} onClose={() => setQrTable(null)} onUpdated={handleQRUpdated} />}
     </div>
   );
 }

@@ -60,7 +60,7 @@ export default async function handler(req, res) {
     const staff = await requireStaff(req, res, TABLE_MANAGE_ROLES);
     if (!staff) return;
 
-    const { id, table_number, qr_slug, active } = req.body || {};
+    const { id, table_number, qr_slug, active, custom_qr_url } = req.body || {};
     if (!id) return res.status(400).json({ error: "Missing table id." });
     const updates = {};
     if (table_number !== undefined) {
@@ -70,6 +70,7 @@ export default async function handler(req, res) {
     }
     if (qr_slug !== undefined) updates.qr_slug = qr_slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-");
     if (active !== undefined) updates.active = Boolean(active);
+    if (custom_qr_url !== undefined) updates.custom_qr_url = custom_qr_url || null;
     const { data, error } = await db.from("tables").update(updates).eq("id", id).select().single();
     if (error) {
       if (error.code === "23505") return res.status(409).json({ error: "Table number or slug already exists." });
