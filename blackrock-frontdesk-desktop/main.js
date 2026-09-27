@@ -9,6 +9,7 @@ const START_URL = `${SITE_ORIGIN}/front-desk-display`;
 const OFFLINE_PAGE = path.join(__dirname, 'offline.html');
 const BAR_PAGE = path.join(__dirname, 'bar.html');
 const BAR_PRELOAD = path.join(__dirname, 'bar-preload.js');
+const FRONTDESK_PRELOAD = path.join(__dirname, 'frontdesk-preload.js');
 const PARTITION = 'persist:frontdesk';
 
 const RETRY_MS = 10000;
@@ -264,6 +265,42 @@ ipcMain.on('frontdesk:close', (event) => {
   if (fromBar(event)) requestClose();
 });
 
+ipcMain.handle('frontdesk:print-receipt', (_event, html) => new Promise((resolve) => {
+  let settled = false;
+  function done(result) {
+    if (settled) return;
+    settled = true;
+    resolve(result);
+  }
+
+  const receipt = new BrowserWindow({
+    show: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
+  });
+
+  receipt.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`).catch(() => {});
+
+  receipt.webContents.once('did-finish-load', () => {
+    receipt.webContents.print(
+      {
+        silent: true,
+        printBackground: false,
+        pageSize: { width: 80000, height: 297000 },
+        margins: { marginType: 'none' },
+      },
+      (success, failureReason) => {
+        receipt.destroy();
+        done({ success, reason: failureReason || null });
+      }
+    );
+  });
+
+  receipt.webContents.once('did-fail-load', () => {
+    receipt.destroy();
+    done({ success: false, reason: 'load-failed' });
+  });
+}));
+
 function createWindow() {
   win = new BrowserWindow({
     title: 'BLACKROCK Front Desk',
@@ -275,6 +312,7 @@ function createWindow() {
     autoHideMenuBar: true,
     backgroundColor: '#1a1a1a',
     webPreferences: {
+      preload: FRONTDESK_PRELOAD,
       partition: PARTITION,
       contextIsolation: true,
       nodeIntegration: false,
