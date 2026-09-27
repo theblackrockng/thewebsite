@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer } from "lucide-react";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
 
@@ -256,6 +256,80 @@ function OrderIcon({ order, color }) {
   if (isTableOrder(order)) return <UtensilsCrossed {...props} />;
   if (order.order_type === "delivery") return <Truck {...props} />;
   return <Package {...props} />;
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function buildReceiptHtml(orders) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Lagos' });
+  const timeStr = now.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Lagos' });
+  const isMulti = orders.length > 1;
+  const tableHeader = orders.filter((o) => o.table_number).map((o) => `Table ${o.table_number}`).join('  /  ');
+  const anyPaid = orders.some((o) => o.payment_status === 'paid');
+  const payLabel = anyPaid ? 'PAID' : 'PENDING';
+  const grandTotal = orders.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const fmtN = (n) => '₦' + Number(n || 0).toLocaleString('en-NG');
+
+  let rows = '';
+  for (const o of orders) {
+    const items = o.order_items || [];
+    if (isMulti) rows += `<tr class="tl"><td colspan="2">-- Table ${esc(String(o.table_number))} --</td></tr>`;
+    for (const item of items) {
+      rows += `<tr class="item"><td class="nm">${esc(item.qty)}x ${esc(item.item_name)}</td><td class="pr">${esc(fmtN(item.line_total))}</td></tr>`;
+      if (item.modifiers) rows += `<tr class="mod"><td colspan="2">${esc(item.modifiers)}</td></tr>`;
+    }
+    if (isMulti) rows += `<tr class="gap"><td colspan="2"></td></tr>`;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+@page{size:80mm 297mm;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:72mm;margin:0 auto;padding:4mm 3mm;font-family:'Courier New',Courier,monospace;font-size:10pt;color:#000;background:#fff}
+.brand{font-size:16pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
+.sub{font-size:9pt;text-align:center;margin-bottom:3mm}
+.hr{border-top:1px dashed #000;margin:2mm 0}
+.tbl{font-size:11pt;font-weight:bold;text-align:center;margin:1mm 0}
+.meta{font-size:9pt;text-align:center;margin-bottom:2mm}
+table{width:100%;border-collapse:collapse}
+.tl td{font-weight:bold;padding:1.5mm 0 0.5mm;font-size:9.5pt}
+.item .nm{font-size:9.5pt;padding-right:2mm}
+.item .pr{text-align:right;white-space:nowrap;font-size:9.5pt}
+.mod td{font-size:8.5pt;padding-left:4mm;padding-bottom:0.5mm;font-style:italic}
+.gap td{height:2mm}
+.tot td{padding-top:1.5mm;font-weight:bold;font-size:10.5pt}
+.tot .pr{text-align:right}
+.pay{text-align:center;font-size:11pt;font-weight:bold;margin:2mm 0}
+.bl{font-size:9pt;font-weight:bold;margin-bottom:1mm}
+.bd{font-size:9pt;margin-bottom:0.5mm}
+.foot{font-size:8pt;text-align:center;margin-top:3mm}
+</style>
+</head>
+<body>
+<div class="brand">BLACKROCK</div>
+<div class="sub">Restaurant and Lounge Bar</div>
+<div class="hr"></div>
+<div class="tbl">${esc(tableHeader || 'Receipt')}</div>
+<div class="meta">${esc(dateStr)}  ${esc(timeStr)}</div>
+<div class="hr"></div>
+<table>${rows}<tr><td colspan="2"><div class="hr"></div></td></tr><tr class="tot"><td>Total</td><td class="pr">${esc(fmtN(grandTotal))}</td></tr></table>
+<div class="hr"></div>
+<div class="pay">Payment: ${payLabel}</div>
+<div class="hr"></div>
+<div class="bl">Bank Transfer:</div>
+<div class="bd">Guaranty Trust Bank (GTB)</div>
+<div class="bd">Blackrock Restaurant LoungeBar</div>
+<div class="bd">9006080442</div>
+<div class="hr"></div>
+<div class="foot">Thank you for dining with us</div>
+</body>
+</html>`;
 }
 
 export default function FrontDeskDisplay() {
@@ -1055,6 +1129,7 @@ function FrontDeskMain({ onSessionLost }) {
               onConfirm={confirmOrder}
               onComplete={completeOrder}
               onPayment={setPayment}
+              otherTableOrders={orders.filter((o) => isTableOrder(o) && o.id !== order.id)}
             />
           ))}
         </div>
@@ -1290,10 +1365,112 @@ function Badge({ cfg }) {
   );
 }
 
-function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, onConfirm, onComplete, onPayment }) {
+function MergePickerModal({ t, orders, selectedIds, onToggle, onDone }) {
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{ position: "fixed", inset: 0, zIndex: 910, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+    >
+      <div style={{ background: t.card, color: t.text, border: `2px solid ${t.border}`, borderRadius: 16, padding: 32, maxWidth: 480, width: "100%", display: "flex", flexDirection: "column", gap: 20 }}>
+        <div style={{ fontSize: 24, fontWeight: 800 }}>Add tables to this bill</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {orders.map((o) => {
+            const sel = selectedIds.has(o.id);
+            const itemCount = (o.order_items || []).length;
+            const total = `₦${Number(o.total || 0).toLocaleString("en-NG")}`;
+            return (
+              <button
+                key={o.id}
+                onClick={() => onToggle(o.id)}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "14px 18px", borderRadius: 10, cursor: "pointer", textAlign: "left",
+                  background: sel ? "rgba(200,169,110,0.12)" : "transparent",
+                  border: `2px solid ${sel ? t.gold : t.border}`,
+                  color: t.text, fontFamily: "inherit",
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: 18, fontWeight: 700 }}>Table {o.table_number}</div>
+                  <div style={{ fontSize: 13, color: t.muted, marginTop: 2 }}>
+                    {itemCount} item{itemCount !== 1 ? "s" : ""} · {total}
+                  </div>
+                </div>
+                <div style={{
+                  width: 22, height: 22, borderRadius: 4, flexShrink: 0,
+                  border: `2px solid ${sel ? t.gold : t.border}`,
+                  background: sel ? t.gold : "transparent",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {sel && <span style={{ color: t.onGold, fontSize: 14, fontWeight: 800, lineHeight: 1 }}>✓</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={onDone}
+          style={{ padding: "16px 20px", borderRadius: 10, border: "none", background: t.gold, color: t.onGold, fontSize: 18, fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}
+        >
+          Done
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, onConfirm, onComplete, onPayment, otherTableOrders }) {
   const statusCfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
   const payCfg = PAYMENT_CFG[order.payment_status] ?? { label: order.payment_status || "Unknown", color: "#6b7280" };
   const items = order.order_items || [];
+  const [mergedIds, setMergedIds] = useState(() => new Set());
+  const [showMerge, setShowMerge] = useState(false);
+  const [printStatus, setPrintStatus] = useState(null);
+
+  const mergedOrders = (otherTableOrders || []).filter((o) => mergedIds.has(o.id));
+  const printOrders = [order, ...mergedOrders];
+  const tableList = printOrders.filter((o) => o.table_number).map((o) => `Table ${o.table_number}`).join(', ');
+  const printLabel = printStatus === 'printing' ? 'Printing...'
+    : printStatus === 'ok' ? 'Sent to Printer'
+    : printStatus === 'error' ? 'Print Failed - Try Again'
+    : mergedIds.size > 0 ? `Print Bill (${tableList})`
+    : 'Print Receipt';
+  const hasMergeable = isTableOrder(order) && otherTableOrders && otherTableOrders.length > 0;
+
+  function toggleMerge(id) {
+    setMergedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function handlePrint() {
+    setPrintStatus('printing');
+    const html = buildReceiptHtml(printOrders);
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.printReceipt(html);
+        setPrintStatus(result.success ? 'ok' : 'error');
+      } else {
+        const w = window.open('', '_blank');
+        if (w) {
+          w.document.write(html);
+          w.document.close();
+          w.focus();
+          try { w.print(); } catch {}
+          setPrintStatus('ok');
+        } else {
+          setPrintStatus('error');
+        }
+      }
+    } catch {
+      setPrintStatus('error');
+    }
+    setTimeout(() => setPrintStatus(null), 3000);
+  }
+
   const inCompletedTab = !!completion;
   const cancelled = order.order_status === "cancelled";
   const canConfirm = !inCompletedTab && order.order_status === "new";
@@ -1401,6 +1578,53 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
             </button>
           )}
         </div>
+      )}
+
+      {items.length > 0 && (
+        <div style={{ padding: "0 20px 18px" }}>
+          <div style={{ borderTop: `1px dashed ${t.border}`, paddingTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            <button
+              onClick={handlePrint}
+              disabled={printStatus === 'printing'}
+              style={{
+                width: "100%", padding: "11px 16px", borderRadius: 10,
+                border: `1.5px solid ${printStatus === 'error' ? t.accent : t.gold}`,
+                background: printStatus === 'ok' ? "rgba(200,169,110,0.10)" : "transparent",
+                color: printStatus === 'error' ? t.accent : t.gold,
+                fontSize: 15, fontWeight: 700,
+                cursor: printStatus === 'printing' ? "default" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                fontFamily: "inherit", opacity: printStatus === 'printing' ? 0.6 : 1,
+              }}
+            >
+              <Printer size={15} />
+              {printLabel}
+            </button>
+            {hasMergeable && (
+              <button
+                onClick={() => setShowMerge(true)}
+                style={{
+                  display: "block", width: "100%", background: "none", border: "none",
+                  cursor: "pointer", color: t.muted, fontSize: 13, textAlign: "center",
+                  fontFamily: "inherit", padding: "2px 0",
+                }}
+              >
+                + Add another table to this bill
+                {mergedIds.size > 0 && <span style={{ color: t.gold, marginLeft: 6 }}>({mergedIds.size} added)</span>}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showMerge && (
+        <MergePickerModal
+          t={t}
+          orders={otherTableOrders}
+          selectedIds={mergedIds}
+          onToggle={toggleMerge}
+          onDone={() => setShowMerge(false)}
+        />
       )}
     </div>
   );
