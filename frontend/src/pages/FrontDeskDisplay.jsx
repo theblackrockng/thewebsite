@@ -291,7 +291,7 @@ function buildReceiptHtml(orders) {
 <style>
 @page{size:80mm 297mm;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{width:72mm;margin:0 auto;padding:4mm 3mm;font-family:'Courier New',Courier,monospace;font-size:10pt;color:#000;background:#fff}
+body{margin:0;padding:0 4mm;font-family:'Courier New',Courier,monospace;font-size:10pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .brand{font-size:16pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
 .sub{font-size:9pt;text-align:center;margin-bottom:3mm}
 .hr{border-top:1px dashed #000;margin:2mm 0}
