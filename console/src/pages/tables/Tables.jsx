@@ -437,18 +437,24 @@ function DeleteConfirm({ table, onClose, onDeleted }) {
 
 /* ── TableRow ── */
 function TableRow({ table, onEdit, onDelete, onQR }) {
-  const miniRef = useRef(null);
-  const qrInstance = useRef(null);
+  const [thumbSrc, setThumbSrc] = useState("");
 
   useEffect(() => {
-    if (table.custom_qr_url) return;
-    const url = getTableUrl(table);
-    qrInstance.current = makeQR(url, 56);
-    if (miniRef.current) {
-      miniRef.current.innerHTML = "";
-      qrInstance.current.append(miniRef.current);
-    }
+    if (table.custom_qr_url) { setThumbSrc(""); return; }
+    let cancelled = false;
+    makeQR(getTableUrl(table), 80)
+      .getRawData("png")
+      .then((blob) => {
+        if (cancelled || !blob) return;
+        const reader = new FileReader();
+        reader.onloadend = () => { if (!cancelled) setThumbSrc(reader.result); };
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, [table.qr_slug, table.custom_qr_url]);
+
+  const thumbUrl = table.custom_qr_url || thumbSrc;
 
   return (
     <div style={{
@@ -463,16 +469,16 @@ function TableRow({ table, onEdit, onDelete, onQR }) {
     onMouseEnter={(e) => { e.currentTarget.style.background = "var(--ds-input-bg)"; }}
     onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
     >
-      {/* Mini QR — custom image if uploaded, generated otherwise */}
+      {/* Mini QR thumbnail */}
       <div
         onClick={() => onQR(table)}
-        style={{ cursor: "pointer", borderRadius: 6, overflow: "hidden", width: 56, height: 56, flexShrink: 0, border: `1px solid ${table.custom_qr_url ? "#c8a96e" : "#2e2820"}`, background: "#fff" }}
+        style={{ cursor: "pointer", borderRadius: 6, overflow: "hidden", width: 56, height: 56, flexShrink: 0, border: `1px solid ${table.custom_qr_url ? "#c8a96e" : "#2e2820"}`, background: "#0f0d0a", display: "flex", alignItems: "center", justifyContent: "center" }}
         title="View QR / upload custom"
       >
-        {table.custom_qr_url ? (
-          <img src={table.custom_qr_url} alt={`Table ${table.table_number} QR`} style={{ width: 56, height: 56, objectFit: "contain", display: "block" }} />
+        {thumbUrl ? (
+          <img src={thumbUrl} alt={`Table ${table.table_number} QR`} style={{ width: 56, height: 56, objectFit: "cover", display: "block" }} />
         ) : (
-          <div ref={miniRef} style={{ transform: "scale(1)", transformOrigin: "top left" }} />
+          <QrCode size={22} style={{ color: "#3e3426" }} />
         )}
       </div>
 
