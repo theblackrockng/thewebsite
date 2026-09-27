@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-27 (Custom QR image upload per table: upload your own QR code in the Tables page, stored in Supabase Storage, displayed in the table row thumbnail)_
+_Last updated: 2026-09-27 (New-order alerts now dual-posted: main staff group + BLACKROCK Kitchen Orders group via KITCHEN_TELEGRAM_CHAT_ID; no other alert types affected)_
 
 ---
 

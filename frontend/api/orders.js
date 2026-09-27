@@ -17,8 +17,9 @@ const { sendBlackRockEmail } = require('./_lib/email');
 const { orderConfirmationEmail } = require('./_lib/templates');
 const { sendPush } = require('./_lib/fcm');
 
-const TOKEN   = process.env.TELEGRAM_BOT_TOKEN   || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID     || process.env.REACT_APP_TELEGRAM_CHAT_ID;
+const TOKEN          = process.env.TELEGRAM_BOT_TOKEN       || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
+const CHAT_ID        = process.env.TELEGRAM_CHAT_ID         || process.env.REACT_APP_TELEGRAM_CHAT_ID;
+const KITCHEN_CHAT_ID = process.env.KITCHEN_TELEGRAM_CHAT_ID || null;
 
 let _supabase = null;
 function getSupabase() {
@@ -41,6 +42,15 @@ async function sendTelegram(text, replyMarkup) {
       body: JSON.stringify(body),
     });
     const data = await res.json();
+
+    if (KITCHEN_CHAT_ID) {
+      fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: KITCHEN_CHAT_ID, text, parse_mode: 'HTML' }),
+      }).catch(() => {});
+    }
+
     return data?.result?.message_id || null;
   } catch (err) {
     console.error('[orders] Telegram error:', err);
