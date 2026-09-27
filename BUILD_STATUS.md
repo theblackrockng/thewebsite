@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-27 (Receipt printing added to Front Desk desktop app: Print Receipt button on every active order card, merge-tables picker, Electron silent print + browser window.print() fallback)_
+_Last updated: 2026-09-27 (Dine-in ordering unified: CartDrawer now places dine-in orders directly; Checkout.jsx redirects dine-in guests back to /order — no name/phone/payment flow for table scans)_
 
 ---
 

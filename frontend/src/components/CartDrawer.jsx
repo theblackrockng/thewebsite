@@ -1,8 +1,9 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { X, Trash2, ShoppingBag, Plus, Minus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCart } from "../context/CartContext";
+import { useTable } from "../context/TableContext";
 
 function fmtPrice(n) {
   return `₦${Number(n).toLocaleString("en-NG")}`;
@@ -10,7 +11,12 @@ function fmtPrice(n) {
 
 export default function CartDrawer() {
   const navigate = useNavigate();
-  const { items, removeItem, setQty, subtotal, totalItems, drawerOpen, setDrawerOpen } = useCart();
+  const { items, removeItem, setQty, clearCart, subtotal, totalItems, drawerOpen, setDrawerOpen } = useCart();
+  const { tableNumber, tableValid } = useTable();
+  const isDineIn = tableValid && tableNumber !== null;
+  const [placing, setPlacing] = useState(false);
+  const [placed, setPlaced] = useState(false);
+  const [placeError, setPlaceError] = useState("");
 
   // Lock body scroll when open
   useEffect(() => {
@@ -32,6 +38,46 @@ export default function CartDrawer() {
   function handleOrderLink() {
     setDrawerOpen(false);
     navigate("/order");
+  }
+
+  async function handleDineInPlace() {
+    if (items.length === 0 || placing) return;
+    setPlaceError("");
+    setPlacing(true);
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderType: "dine-in",
+          tableNumber,
+          orderSource: "qr",
+          placedBy: "guest",
+          guestName: `Table ${tableNumber}`,
+          guestPhone: "—",
+          items: items.map((i) => ({
+            id: i.id,
+            name: i.name,
+            price: i.price,
+            qty: i.qty,
+            menuType: i.menuType || "food",
+            modifiers: [i.soup, i.swallow, i.side].filter(Boolean).join(", ") || null,
+          })),
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        clearCart();
+        setPlaced(true);
+        setTimeout(() => { setDrawerOpen(false); setPlaced(false); }, 2200);
+      } else {
+        setPlaceError(json.error || "Failed to place order. Please try again.");
+      }
+    } catch {
+      setPlaceError("Network error. Please try again.");
+    } finally {
+      setPlacing(false);
+    }
   }
 
   return (
@@ -315,24 +361,58 @@ export default function CartDrawer() {
                     {fmtPrice(subtotal)}
                   </span>
                 </div>
-                <button
-                  onClick={handleCheckout}
-                  style={{
-                    width: "100%",
-                    background: "var(--gold, #C9A84C)",
-                    color: "#0f0d0a",
-                    border: "none",
-                    borderRadius: 6,
-                    padding: "14px 24px",
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    letterSpacing: "0.08em",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Proceed to Checkout
-                </button>
+
+                {isDineIn ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {placeError && (
+                      <div style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", borderRadius: 6, padding: "10px 14px", fontSize: 12, color: "#e07070", lineHeight: 1.5 }}>
+                        {placeError}
+                      </div>
+                    )}
+                    <button
+                      onClick={handleDineInPlace}
+                      disabled={placing || placed}
+                      style={{
+                        width: "100%",
+                        background: placed ? "#22c55e" : placing ? "#a07840" : "var(--gold, #C9A84C)",
+                        color: "#0f0d0a",
+                        border: "none",
+                        borderRadius: 6,
+                        padding: "14px 24px",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        cursor: placing || placed ? "not-allowed" : "pointer",
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase",
+                        transition: "background 0.2s",
+                      }}
+                    >
+                      {placed ? "Order Sent to Kitchen!" : placing ? "Placing Order…" : `Confirm Order — Table ${tableNumber}`}
+                    </button>
+                    <p style={{ margin: 0, fontSize: 11, color: "var(--muted, #9C8E7A)", textAlign: "center", lineHeight: 1.5 }}>
+                      Pay at the table when ready
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleCheckout}
+                    style={{
+                      width: "100%",
+                      background: "var(--gold, #C9A84C)",
+                      color: "#0f0d0a",
+                      border: "none",
+                      borderRadius: 6,
+                      padding: "14px 24px",
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: "pointer",
+                      letterSpacing: "0.08em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Proceed to Checkout
+                  </button>
+                )}
               </div>
             )}
           </motion.div>

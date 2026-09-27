@@ -124,6 +124,12 @@ export default function Checkout() {
   const { items, subtotal, clearCart } = useCart();
   const { tableNumber, tableValid, clearTable } = useTable();
   const isDineIn = tableValid && tableNumber !== null;
+
+  // Dine-in guests place orders directly from the menu; Checkout is for pickup/delivery only.
+  useEffect(() => {
+    if (isDineIn) navigate("/order", { replace: true });
+  }, [isDineIn, navigate]);
+
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
