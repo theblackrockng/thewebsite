@@ -289,9 +289,9 @@ function buildReceiptHtml(orders) {
 <head>
 <meta charset="utf-8">
 <style>
-@page{size:80mm 297mm;margin:0}
+@page{size:80mm auto;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{margin:0;padding:0 8mm;font-family:'Courier New',Courier,monospace;font-size:9pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{margin:0;padding:0 8mm;width:80mm;font-family:'Courier New',Courier,monospace;font-size:9pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .brand{font-size:14pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
 .sub{font-size:8pt;text-align:center;margin-bottom:3mm}
 .hr{border-top:1px dashed #000;margin:2mm 0}
@@ -382,9 +382,9 @@ function buildEndOfDayHtml(completedOrders) {
 <head>
 <meta charset="utf-8">
 <style>
-@page{size:80mm 297mm;margin:0}
+@page{size:80mm auto;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{margin:0;padding:0 8mm;font-family:'Courier New',Courier,monospace;font-size:8.5pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{margin:0;padding:0 8mm;width:80mm;font-family:'Courier New',Courier,monospace;font-size:8.5pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .brand{font-size:13pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
 .sub{font-size:8pt;text-align:center;margin-bottom:1mm}
 .rpt{font-size:10pt;font-weight:bold;text-align:center;margin:2mm 0 1mm}
@@ -432,26 +432,34 @@ function buildTestPrintHtml() {
 <head>
 <meta charset="utf-8">
 <style>
-@page{size:80mm 297mm;margin:0}
+@page{size:80mm auto;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{margin:0;padding:0 8mm;font-family:'Courier New',Courier,monospace;font-size:9pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{margin:0;padding:0 8mm;width:80mm;font-family:'Courier New',Courier,monospace;font-size:9pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .hr{border-top:1px dashed #000;margin:2mm 0}
 .c{text-align:center}
 .sm{font-size:8pt;font-weight:bold}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
 .nm{word-break:break-word;padding-right:1mm}
 .pr{width:22mm;text-align:right;white-space:nowrap}
+.ruler{position:relative;height:5mm;border-left:2px solid #000;border-right:2px solid #000;margin:1mm 0}
+.ruler-mid{position:absolute;left:50%;top:0;bottom:0;border-left:1px solid #000}
+.ruler-lbl{display:flex;justify-content:space-between;font-size:7pt;margin-bottom:1mm}
 </style>
 </head>
 <body>
 <div class="c" style="font-size:11pt">PRINT WIDTH TEST</div>
-<div class="c sm">8mm margins / 64mm content width</div>
+<div class="c sm">8mm margins / 64mm content / 80mm total</div>
 <div class="hr"></div>
-<div class="sm">Count chars before right edge:</div>
-<div>${ruler}</div>
-<div>${ruler}</div>
+<div class="sm">Edge-to-edge bar (should touch both margins):</div>
+<div class="ruler"><div class="ruler-mid"></div></div>
+<div class="ruler-lbl"><span>|LEFT</span><span>CENTER|</span><span>RIGHT|</span></div>
 <div class="hr"></div>
-<div class="sm">Sample prices (must not be clipped):</div>
+<div class="sm">Straightness test (lines must be horizontal):</div>
+<div class="hr"></div>
+<div class="hr" style="margin-top:4mm"></div>
+<div class="hr" style="margin-top:4mm"></div>
+<div class="hr"></div>
+<div class="sm">Sample prices (right column must not clip):</div>
 <table>
 <tr><td class="nm">Goat Meat Pepper Soup</td><td class="pr">&#x20A6;145,000</td></tr>
 <tr><td class="nm">Seafood Okro with Pounded Yam</td><td class="pr">&#x20A6;63,500</td></tr>
@@ -461,9 +469,9 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}
 <tr><td style="font-weight:bold">Total</td><td class="pr" style="font-weight:bold">&#x20A6;222,800</td></tr>
 </table>
 <div class="hr"></div>
-<div class="c sm">If any price above is clipped, reduce</div>
-<div class="c sm">body padding from 8mm to 10mm.</div>
-<div class="c sm">If all prices show, 8mm margins are safe.</div>
+<div class="c sm">PASS: left/right bars align top-to-bottom</div>
+<div class="c sm">PASS: dashed lines are perfectly horizontal</div>
+<div class="c sm">PASS: all prices fully visible</div>
 </body>
 </html>`;
 }

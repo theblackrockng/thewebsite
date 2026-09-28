@@ -280,19 +280,29 @@ ipcMain.handle('frontdesk:print-receipt', (_event, html) => new Promise((resolve
 
   receipt.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`).catch(() => {});
 
-  receipt.webContents.once('did-finish-load', () => {
-    receipt.webContents.print(
-      {
-        silent: true,
-        printBackground: false,
-        pageSize: { width: 80000, height: 297000 },
-        margins: { marginType: 'none' },
-      },
-      (success, failureReason) => {
-        receipt.destroy();
-        done({ success, reason: failureReason || null });
-      }
-    );
+  receipt.webContents.once('did-finish-load', async () => {
+    try {
+      const heightPx = await receipt.webContents.executeJavaScript(
+        'Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)'
+      );
+      const heightMicrons = Math.ceil(heightPx * 264.583) + 5000;
+      receipt.webContents.print(
+        {
+          silent: true,
+          printBackground: false,
+          pageSize: { width: 80000, height: heightMicrons },
+          margins: { marginType: 'none' },
+          scaleFactor: 100,
+        },
+        (success, failureReason) => {
+          receipt.destroy();
+          done({ success, reason: failureReason || null });
+        }
+      );
+    } catch (err) {
+      receipt.destroy();
+      done({ success: false, reason: err?.message || 'measure-failed' });
+    }
   });
 
   receipt.webContents.once('did-fail-load', () => {
