@@ -452,7 +452,6 @@ function BankAccountSection({ toast }) {
     accountName: "BlackRock Restaurant",
     accountNumber: "0012345678",
     bankName: "Moniepoint MFB",
-    whatsappNumber: "2348055238353",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -492,9 +491,6 @@ function BankAccountSection({ toast }) {
       </Field>
       <Field label="Bank Name" icon={Globe}>
         <input style={inputStyle} value={fields.bankName} onChange={e => set("bankName", e.target.value)} />
-      </Field>
-      <Field label="WhatsApp Number" icon={Phone}>
-        <input style={inputStyle} value={fields.whatsappNumber} onChange={e => set("whatsappNumber", e.target.value)} placeholder="e.g. 2348055238353 (no +)" />
       </Field>
       <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
         <button style={saveBtn(saving)} onClick={save} disabled={saving}>

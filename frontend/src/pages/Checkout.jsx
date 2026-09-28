@@ -150,18 +150,24 @@ export default function Checkout() {
   const [scheduleDate, setScheduleDate] = useState("");
   const [scheduleTime, setScheduleTime] = useState("12:00");
 
-  // Bank account details
+  const WHATSAPP_NUMBER = "2349030482774";
+
+  // Bank account details (whatsappNumber is hardcoded above, never from DB)
   const [bankAccount, setBankAccount] = useState({
     accountName: "BlackRock Restaurant",
     accountNumber: "0012345678",
     bankName: "Moniepoint MFB",
-    whatsappNumber: "2348055238353",
   });
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     supabase.from("site_content").select("data").eq("section", "bank-account").maybeSingle()
-      .then(({ data }) => { if (data?.data) setBankAccount(a => ({ ...a, ...data.data })); });
+      .then(({ data }) => {
+        if (data?.data) {
+          const { whatsappNumber: _ignored, ...safe } = data.data;
+          setBankAccount(a => ({ ...a, ...safe }));
+        }
+      });
   }, []);
 
   const total = subtotal;
@@ -247,7 +253,7 @@ export default function Checkout() {
         const msg = encodeURIComponent(
           `Hello BLACKROCK! 🍽️\n\nI just made a bank transfer for my order and would like to send proof of payment.\n\n*Order Details*\nName: ${guestName.trim()}\nPhone: ${guestPhone.trim()}\nType: ${orderType === "delivery" ? "Delivery" : "Pickup"}\nTotal: ${fmtPrice(total)}\n\n*Items:*\n${itemsList}\n\nPlease find attached my proof of payment. Thank you!`
         );
-        window.open(`https://wa.me/${bankAccount.whatsappNumber}?text=${msg}`, "_blank");
+        window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
       }
 
       const confirmationState = {

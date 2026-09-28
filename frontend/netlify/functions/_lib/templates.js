@@ -1,7 +1,7 @@
 const BRAND = {
   name: 'BLACKROCK',
   address: '11 Ajao Road, off Adeniyi Jones Road, Ikeja, Lagos',
-  phone: '08055238353 / 09030482774',
+  phone: '+234 903 048 2774',
   email: 'reservations@blackrockrestaurantng.com',
   website: 'blackrockrestaurantng.com',
   instagram: '@blackrockrestaurantng',
@@ -112,9 +112,7 @@ exports.confirmationEmail = ({ name, date, time, party, occasion, notes }) => {
     <div style="background:#0f0d0a;padding:20px 40px;border-top:1px solid #2e2820;border-bottom:1px solid #2e2820;text-align:center;">
       <p style="margin:0;font-family:Georgia,serif;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#9C8E7A;">
         For changes, call
-        <a href="tel:08055238353" style="color:#C9A84C;text-decoration:none;font-weight:600;">08055238353</a>
-        &nbsp;/&nbsp;
-        <a href="tel:09030482774" style="color:#C9A84C;text-decoration:none;font-weight:600;">09030482774</a>
+        <a href="tel:+2349030482774" style="color:#C9A84C;text-decoration:none;font-weight:600;">+234 903 048 2774</a>
       </p>
     </div>
 
@@ -155,7 +153,7 @@ exports.reminderEmail = ({ name, date, time, party, occasion }) => {
 
     <div style="padding:0 40px 32px;">
       <div style="background:#8B1A2B;border-radius:4px;padding:20px 24px;text-align:center;">
-        <p style="margin:0;font-family:Georgia,serif;font-size:13px;color:#F5F0E8;line-height:1.7;">Need to reschedule or make changes?<br>Call us at <strong style="color:#C9A84C;">08055238353 / 09030482774</strong> — we're happy to help.</p>
+        <p style="margin:0;font-family:Georgia,serif;font-size:13px;color:#F5F0E8;line-height:1.7;">Need to reschedule or make changes?<br>Call us at <strong style="color:#C9A84C;">+234 903 048 2774</strong> — we're happy to help.</p>
       </div>
     </div>
 

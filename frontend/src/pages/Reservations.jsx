@@ -50,7 +50,7 @@ const MEAL_CATEGORY_IMAGES = {
   "BLACKROCK EXPERIENCE":  "/images/menu/continental.jpg",
 };
 
-const WHATSAPP_NUMBER = "2348055238353";
+const WHATSAPP_NUMBER = "2349030482774";
 const BANK_NAME = "Guaranty Trust Bank";
 const BANK_ACCOUNT_NAME = "Blackrock Restaurant LoungeBar";
 const BANK_ACCOUNT_NUMBER = "9006080442";

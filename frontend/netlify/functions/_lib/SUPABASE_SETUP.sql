@@ -35,7 +35,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE site_theme;
 CREATE TABLE IF NOT EXISTS restaurant_settings (
   id          INTEGER PRIMARY KEY DEFAULT 1,
   name        TEXT DEFAULT 'BLACKROCK Restaurant & Lounge',
-  phone       TEXT DEFAULT '08055238353 / 09030482774',
+  phone       TEXT DEFAULT '+234 903 048 2774',
   email       TEXT DEFAULT 'theblackrock.ng@gmail.com',
   address     TEXT DEFAULT 'Ajao Road, off Adeniyi Jones Road, Ikeja, Lagos',
   instagram   TEXT DEFAULT '@blackrockrestaurantng',
