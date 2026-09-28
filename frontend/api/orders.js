@@ -48,7 +48,18 @@ async function sendTelegram(text, replyMarkup) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: KITCHEN_CHAT_ID, text, parse_mode: 'HTML' }),
-      }).catch(() => {});
+      })
+        .then(async (r) => {
+          if (!r.ok) {
+            const body = await r.json().catch(() => ({}));
+            console.error('[orders] kitchen Telegram failed — chat_id:', KITCHEN_CHAT_ID, 'status:', r.status, 'description:', body?.description || 'none');
+          }
+        })
+        .catch((err) => {
+          console.error('[orders] kitchen Telegram network error — chat_id:', KITCHEN_CHAT_ID, 'error:', err?.message || err);
+        });
+    } else {
+      console.error('[orders] kitchen Telegram skipped — KITCHEN_TELEGRAM_CHAT_ID is not set in this environment');
     }
 
     return data?.result?.message_id || null;
