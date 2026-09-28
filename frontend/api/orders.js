@@ -32,41 +32,56 @@ function getSupabase() {
 }
 
 async function sendTelegram(text, replyMarkup) {
-  if (!TOKEN || !CHAT_ID) return null;
-  try {
-    const body = { chat_id: CHAT_ID, text, parse_mode: 'HTML' };
-    if (replyMarkup) body.reply_markup = replyMarkup;
-    const res = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
+  if (!TOKEN || !CHAT_ID) {
+    console.warn('[orders] sendTelegram skipped — TOKEN or CHAT_ID missing');
+    return null;
+  }
 
-    if (KITCHEN_CHAT_ID) {
-      fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+  const mainBody = { chat_id: CHAT_ID, text, parse_mode: 'HTML' };
+  if (replyMarkup) mainBody.reply_markup = replyMarkup;
+
+  const mainSend = fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(mainBody),
+  }).then((r) => r.json());
+
+  const kitchenSend = KITCHEN_CHAT_ID
+    ? fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: KITCHEN_CHAT_ID, text, parse_mode: 'HTML' }),
-      })
-        .then(async (r) => {
-          if (!r.ok) {
-            const body = await r.json().catch(() => ({}));
-            console.error('[orders] kitchen Telegram failed — chat_id:', KITCHEN_CHAT_ID, 'status:', r.status, 'description:', body?.description || 'none');
-          }
-        })
-        .catch((err) => {
-          console.error('[orders] kitchen Telegram network error — chat_id:', KITCHEN_CHAT_ID, 'error:', err?.message || err);
-        });
-    } else {
-      console.error('[orders] kitchen Telegram skipped — KITCHEN_TELEGRAM_CHAT_ID is not set in this environment');
-    }
+      }).then((r) => r.json())
+    : Promise.resolve(null);
 
-    return data?.result?.message_id || null;
-  } catch (err) {
-    console.error('[orders] Telegram error:', err);
-    return null;
+  if (!KITCHEN_CHAT_ID) {
+    console.warn('[orders] kitchen Telegram skipped — KITCHEN_TELEGRAM_CHAT_ID not set in this environment');
   }
+
+  // Await both concurrently so neither blocks the other and neither is
+  // cut off when Vercel sends the HTTP response.
+  const [mainResult, kitchenResult] = await Promise.allSettled([mainSend, kitchenSend]);
+
+  if (mainResult.status === 'fulfilled') {
+    console.warn('[orders] main Telegram sent — message_id:', mainResult.value?.result?.message_id ?? 'none');
+  } else {
+    console.warn('[orders] main Telegram failed —', mainResult.reason?.message || mainResult.reason);
+  }
+
+  if (KITCHEN_CHAT_ID) {
+    if (kitchenResult.status === 'fulfilled') {
+      const val = kitchenResult.value;
+      if (val?.ok) {
+        console.warn('[orders] kitchen Telegram sent — message_id:', val.result?.message_id ?? 'none');
+      } else {
+        console.warn('[orders] kitchen Telegram rejected — description:', val?.description || 'none', 'error_code:', val?.error_code ?? 'none');
+      }
+    } else {
+      console.warn('[orders] kitchen Telegram network error —', kitchenResult.reason?.message || kitchenResult.reason);
+    }
+  }
+
+  return mainResult.status === 'fulfilled' ? (mainResult.value?.result?.message_id || null) : null;
 }
 
 function generateOrderNumber(id) {
