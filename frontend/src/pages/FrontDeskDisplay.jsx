@@ -291,23 +291,23 @@ function buildReceiptHtml(orders) {
 <style>
 @page{size:80mm 297mm;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{margin:0;padding:0 4mm;font-family:'Courier New',Courier,monospace;font-size:10pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.brand{font-size:16pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
-.sub{font-size:9pt;text-align:center;margin-bottom:3mm}
+body{margin:0;padding:0 8mm;font-family:'Courier New',Courier,monospace;font-size:9pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.brand{font-size:14pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
+.sub{font-size:8pt;text-align:center;margin-bottom:3mm}
 .hr{border-top:1px dashed #000;margin:2mm 0}
-.tbl{font-size:11pt;font-weight:bold;text-align:center;margin:1mm 0}
-.meta{font-size:9pt;text-align:center;margin-bottom:2mm}
-table{width:100%;border-collapse:collapse}
-.tl td{font-weight:bold;padding:1.5mm 0 0.5mm;font-size:9.5pt}
-.item .nm{font-size:9.5pt;padding-right:2mm}
-.item .pr{text-align:right;white-space:nowrap;font-size:9.5pt}
-.mod td{font-size:8.5pt;padding-left:4mm;padding-bottom:0.5mm;font-style:italic}
+.tbl{font-size:10pt;font-weight:bold;text-align:center;margin:1mm 0}
+.meta{font-size:8pt;text-align:center;margin-bottom:2mm}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+.tl td{font-weight:bold;padding:1.5mm 0 0.5mm}
+.item .nm{word-break:break-word;padding-right:1mm}
+.item .pr{width:22mm;text-align:right;white-space:nowrap}
+.mod td{font-size:8pt;padding-left:4mm;padding-bottom:0.5mm;font-style:italic}
 .gap td{height:2mm}
-.tot td{padding-top:1.5mm;font-weight:bold;font-size:10.5pt}
-.tot .pr{text-align:right}
-.pay{text-align:center;font-size:11pt;font-weight:bold;margin:2mm 0}
-.bl{font-size:9pt;font-weight:bold;margin-bottom:1mm}
-.bd{font-size:9pt;margin-bottom:0.5mm}
+.tot td{padding-top:1.5mm;font-weight:bold}
+.tot .pr{width:22mm;text-align:right;white-space:nowrap}
+.pay{text-align:center;font-size:10pt;font-weight:bold;margin:2mm 0}
+.bl{font-size:8pt;font-weight:bold;margin-bottom:1mm}
+.bd{font-size:8pt;margin-bottom:0.5mm}
 .foot{font-size:8pt;text-align:center;margin-top:3mm}
 </style>
 </head>
@@ -384,23 +384,23 @@ function buildEndOfDayHtml(completedOrders) {
 <style>
 @page{size:80mm 297mm;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{margin:0;padding:0 4mm;font-family:'Courier New',Courier,monospace;font-size:9pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.brand{font-size:15pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
-.sub{font-size:8.5pt;text-align:center;margin-bottom:1mm}
-.rpt{font-size:11pt;font-weight:bold;text-align:center;margin:2mm 0 1mm}
-.dt{font-size:8.5pt;text-align:center;margin-bottom:1mm}
+body{margin:0;padding:0 8mm;font-family:'Courier New',Courier,monospace;font-size:8.5pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.brand{font-size:13pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
+.sub{font-size:8pt;text-align:center;margin-bottom:1mm}
+.rpt{font-size:10pt;font-weight:bold;text-align:center;margin:2mm 0 1mm}
+.dt{font-size:8pt;text-align:center;margin-bottom:1mm}
 .hr{border-top:1px dashed #000;margin:2mm 0}
-table{width:100%;border-collapse:collapse}
-thead tr th{font-size:8pt;text-align:left;padding-bottom:1.5mm;border-bottom:1px solid #000}
-.nm{width:44%;font-size:8.5pt;padding:1mm 1mm 1mm 0;word-break:break-word;text-align:left}
-.qty{width:10%;font-size:8.5pt;text-align:right;padding:1mm 1mm}
-.up{width:22%;font-size:8.5pt;text-align:right;padding:1mm 1mm}
-.ln{width:24%;font-size:8.5pt;text-align:right;padding:1mm 0 1mm 1mm}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+thead tr th{font-size:7.5pt;text-align:left;padding-bottom:1.5mm;border-bottom:1px solid #000}
+.nm{font-size:8.5pt;padding:1mm 1mm 1mm 0;word-break:break-word;text-align:left}
+.qty{width:8mm;font-size:8.5pt;text-align:right;padding:1mm 1mm;white-space:nowrap}
+.up{width:16mm;font-size:8.5pt;text-align:right;padding:1mm 1mm;white-space:nowrap}
+.ln{width:18mm;font-size:8.5pt;text-align:right;padding:1mm 0 1mm 1mm;white-space:nowrap}
 thead .qty,thead .up,thead .ln{text-align:right}
-.grand td{padding-top:2mm;font-size:10.5pt}
+.grand td{padding-top:2mm;font-size:9.5pt}
 .gl{text-align:left}
-.gv{text-align:right}
-.smry{font-size:8.5pt;text-align:center;margin-top:2mm}
+.gv{text-align:right;white-space:nowrap}
+.smry{font-size:8pt;text-align:center;margin-top:2mm}
 .foot{font-size:8pt;text-align:center;margin-top:3mm}
 </style>
 </head>
@@ -421,6 +421,49 @@ thead .qty,thead .up,thead .ln{text-align:right}
 <div class="smry">${esc(String(orderCount))} completed order${orderCount !== 1 ? "s" : ""} included</div>
 <div class="hr"></div>
 <div class="foot">Generated by BLACKROCK Front Desk</div>
+</body>
+</html>`;
+}
+
+function buildTestPrintHtml() {
+  const ruler = '1234567890'.repeat(5);
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+@page{size:80mm 297mm;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;padding:0 8mm;font-family:'Courier New',Courier,monospace;font-size:9pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.hr{border-top:1px dashed #000;margin:2mm 0}
+.c{text-align:center}
+.sm{font-size:8pt;font-weight:bold}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+.nm{word-break:break-word;padding-right:1mm}
+.pr{width:22mm;text-align:right;white-space:nowrap}
+</style>
+</head>
+<body>
+<div class="c" style="font-size:11pt">PRINT WIDTH TEST</div>
+<div class="c sm">8mm margins / 64mm content width</div>
+<div class="hr"></div>
+<div class="sm">Count chars before right edge:</div>
+<div>${ruler}</div>
+<div>${ruler}</div>
+<div class="hr"></div>
+<div class="sm">Sample prices (must not be clipped):</div>
+<table>
+<tr><td class="nm">Goat Meat Pepper Soup</td><td class="pr">&#x20A6;145,000</td></tr>
+<tr><td class="nm">Seafood Okro with Pounded Yam</td><td class="pr">&#x20A6;63,500</td></tr>
+<tr><td class="nm">Chapman</td><td class="pr">&#x20A6;800</td></tr>
+<tr><td class="nm">Grilled Fish, Chips and Salad</td><td class="pr">&#x20A6;12,500</td></tr>
+<tr><td colspan="2"><div class="hr"></div></td></tr>
+<tr><td style="font-weight:bold">Total</td><td class="pr" style="font-weight:bold">&#x20A6;222,800</td></tr>
+</table>
+<div class="hr"></div>
+<div class="c sm">If any price above is clipped, reduce</div>
+<div class="c sm">body padding from 8mm to 10mm.</div>
+<div class="c sm">If all prices show, 8mm margins are safe.</div>
 </body>
 </html>`;
 }
@@ -529,6 +572,7 @@ function FrontDeskMain({ onSessionLost }) {
   const [callActionIds, setCallActionIds] = useState(() => new Set());
   const [statusFilter, setStatusFilter] = useState(null);
   const [eodPrintStatus, setEodPrintStatus] = useState(null);
+  const [testPrintStatus, setTestPrintStatus] = useState(null);
 
   const knownResIdsRef = useRef(null);
   const resInFlightRef = useRef(false);
@@ -931,6 +975,31 @@ function FrontDeskMain({ onSessionLost }) {
       setEodPrintStatus("error");
     }
     setTimeout(() => setEodPrintStatus(null), 3000);
+  }
+
+  async function handleTestPrint() {
+    setTestPrintStatus("printing");
+    const html = buildTestPrintHtml();
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.printReceipt(html);
+        setTestPrintStatus(result.success ? "ok" : "error");
+      } else {
+        const w = window.open("", "_blank");
+        if (w) {
+          w.document.write(html);
+          w.document.close();
+          w.focus();
+          try { w.print(); } catch {}
+          setTestPrintStatus("ok");
+        } else {
+          setTestPrintStatus("error");
+        }
+      }
+    } catch {
+      setTestPrintStatus("error");
+    }
+    setTimeout(() => setTestPrintStatus(null), 4000);
   }
 
   async function sendPatch(orderId, fields) {
@@ -1441,6 +1510,21 @@ function FrontDeskMain({ onSessionLost }) {
         >
           <Printer size={16} />
           {eodPrintStatus === "printing" ? "Printing..." : eodPrintStatus === "ok" ? "Sent to Printer" : eodPrintStatus === "error" ? "Print Failed" : "End of Day Report"}
+        </button>
+        <button
+          onClick={handleTestPrint}
+          disabled={testPrintStatus === "printing"}
+          style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", borderRadius: 10,
+            border: `1px solid ${t.border}`,
+            background: "transparent",
+            color: testPrintStatus === "ok" ? "#16a34a" : testPrintStatus === "error" ? t.accent : t.muted,
+            fontSize: 13, fontWeight: 700, cursor: testPrintStatus === "printing" ? "default" : "pointer",
+            fontFamily: "inherit", opacity: testPrintStatus === "printing" ? 0.6 : 1, flexShrink: 0,
+          }}
+        >
+          <Printer size={13} />
+          {testPrintStatus === "printing" ? "Printing..." : testPrintStatus === "ok" ? "Test sent" : testPrintStatus === "error" ? "Failed" : "Test Width"}
         </button>
       </div>
 
