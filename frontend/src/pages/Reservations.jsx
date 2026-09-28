@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Check, Phone, MessageCircle, X, ArrowRight, ArrowLeft, Minus, Plus, UtensilsCrossed, Loader2, Calendar } from "lucide-react";
+import { Check, Phone, MessageCircle, X, ArrowRight, ArrowLeft, Minus, Plus, UtensilsCrossed, Loader2, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { OCCASIONS, BRAND, IMAGES, MENU } from "../lib/data";
 import { supabase } from "../lib/supabase";
 import SEO from "../components/SEO";
+import { PickerModal, SidePickerModal, SOUPS, SWALLOWS, SIDES } from "./OrderPreview";
 
 const today = new Date().toISOString().split("T")[0];
 
@@ -22,6 +23,40 @@ const CATEGORY_ORDER = [
   "National Dishes",
   "Traditional Specials",
 ];
+
+const FOOD_CATEGORY_ORDER = [
+  "Starters", "Salads", "Rice", "Pasta",
+  "Bush Bar Kitchen", "Continental", "Sauces",
+  "Charcoal Grills", "National Dishes", "Traditional Specials",
+  "BLACKROCK EXPERIENCE",
+];
+
+const DRINK_CATEGORIES = new Set([
+  "Wines", "Spirits", "Beer & Cider", "Cocktails",
+  "Mocktails", "Soft Drinks & Water", "Hot Drinks", "Fresh Juice",
+]);
+
+const MEAL_CATEGORY_IMAGES = {
+  "Starters":             "/images/menu/starters.jpg",
+  "Salads":               "/images/menu/salads.jpg",
+  "Rice":                 "/images/menu/rice.jpg",
+  "Pasta":                "/images/menu/noodles.jpg",
+  "Bush Bar Kitchen":     "/images/menu/pepper-soup.jpg",
+  "Continental":          "/images/menu/continental.jpg",
+  "Sauces":               "/images/menu/sauces.jpg",
+  "Charcoal Grills":      "/images/menu/grills.jpg",
+  "National Dishes":      "/images/menu/national.jpg",
+  "Traditional Specials":  "/images/menu/traditional.jpg",
+  "BLACKROCK EXPERIENCE":  "/images/menu/continental.jpg",
+};
+
+const WHATSAPP_NUMBER = "2348055238353";
+const BANK_NAME = "Guaranty Trust Bank";
+const BANK_ACCOUNT_NAME = "Blackrock Restaurant LoungeBar";
+const BANK_ACCOUNT_NUMBER = "9006080442";
+
+const RES_PER_PAGE = 5;
+const RES_LIST_H = 360;
 
 const timeSlots = [
   "10:00 AM", "10:30 AM", "11:00 AM", "11:30 AM",
@@ -192,7 +227,13 @@ export default function Reservations() {
   // Meal pre-selection state
   const [menuItems, setMenuItems] = useState([]);
   const [menuLoading, setMenuLoading] = useState(false);
-  const [mealSelections, setMealSelections] = useState({}); // { [itemId]: qty }
+  const [mealCart, setMealCart] = useState([]); // [{ cartKey, id, name, qty, price, category, modifier }]
+  const [activeCat, setActiveCat] = useState(null);
+  const [soupModal, setSoupModal] = useState(null);
+  const [traditionalModal, setTraditionalModal] = useState(null);
+  const [sideModal, setSideModal] = useState(null);
+  const [payStep, setPayStep] = useState(null); // null | 'choice' | 'bank' | 'done'
+  const [payChoice, setPayChoice] = useState(null); // null | 'deposit_70' | 'pay_full' | 'preference_only'
 
   useEffect(() => {
     if (initialOcc) setOccasion(initialOcc);
@@ -256,25 +297,40 @@ export default function Reservations() {
     setStep(3);
   };
 
-  const setMealQty = (id, qty) => {
-    setMealSelections((prev) => ({ ...prev, [id]: Math.max(0, Math.min(qty, partyMax)) }));
+  const cartTotal = useMemo(() => mealCart.reduce((s, i) => s + i.price * i.qty, 0), [mealCart]);
+  const cartItemCount = useMemo(() => mealCart.reduce((s, i) => s + i.qty, 0), [mealCart]);
+
+  const addToCart = (cartKey, id, name, price, category, modifier) => {
+    setMealCart((prev) => {
+      const existing = prev.find((i) => i.cartKey === cartKey);
+      if (existing) return prev.map((i) => i.cartKey === cartKey ? { ...i, qty: i.qty + 1 } : i);
+      return [...prev, { cartKey, id, name, qty: 1, price, category, modifier: modifier || null }];
+    });
   };
 
-  const totalSelected = Object.values(mealSelections).reduce((s, q) => s + q, 0);
+  const removeFromCart = (cartKey) => {
+    setMealCart((prev) => prev.filter((i) => i.cartKey !== cartKey));
+  };
+
+  const updateCartQty = (cartKey, delta) => {
+    setMealCart((prev) => prev
+      .map((i) => i.cartKey === cartKey ? { ...i, qty: Math.max(0, i.qty + delta) } : i)
+      .filter((i) => i.qty > 0)
+    );
+  };
 
   const buildMealsPayload = () =>
-    menuItems
-      .filter((item) => (mealSelections[item.id] ?? 0) > 0)
-      .map((item) => ({
-        id: item.id,
-        name: item.name,
-        qty: mealSelections[item.id],
-        price: item.price,
-        category: item.category,
-      }));
+    mealCart.map((i) => ({
+      id: i.id,
+      name: i.name,
+      qty: i.qty,
+      price: i.price,
+      category: i.category,
+      modifier: i.modifier || null,
+    }));
 
   // Actual reservation submission
-  const handleFinalSubmit = async (skipMeals = false) => {
+  const handleFinalSubmit = async (skipMeals = false, mealPaymentChoice = null) => {
     setSubmitError("");
     setSubmitting(true);
 
@@ -290,6 +346,12 @@ export default function Reservations() {
 
     const preSelectedMeals = skipMeals ? null : buildMealsPayload();
     const hasMeals = preSelectedMeals && preSelectedMeals.length > 0;
+    const mealPaymentStatus = (mealPaymentChoice === "deposit_70" || mealPaymentChoice === "pay_full") ? "awaiting_proof" : null;
+    const mealPaymentAmount = hasMeals && mealPaymentChoice === "deposit_70"
+      ? Math.round(cartTotal * 0.7)
+      : hasMeals && mealPaymentChoice === "pay_full"
+      ? cartTotal
+      : null;
 
     try {
       const res = await fetch("/api/send-confirmation", {
@@ -305,6 +367,9 @@ export default function Reservations() {
           occasion: selectedOcc?.label || occasion,
           notes: notes || null,
           preSelectedMeals: hasMeals ? preSelectedMeals : null,
+          mealPaymentChoice: mealPaymentChoice || null,
+          mealPaymentStatus,
+          mealPaymentAmount,
           _hp: form._hp,
         }),
       });
@@ -321,25 +386,37 @@ export default function Reservations() {
     }
 
     setSubmitting(false);
-    setSubmitted(true);
+    if (mealPaymentStatus === "awaiting_proof") {
+      setPayStep("done");
+    } else {
+      setSubmitted(true);
+    }
   };
 
   const indicatorStep = submitted ? 4 : step >= 3 ? 3 : step >= 2 ? 2 : 1;
 
-  // Group menu items by category, normalised key
-  const menuByCategory = menuItems.reduce((acc, item) => {
+  const foodMenuItems = useMemo(() =>
+    menuItems.filter((item) => !DRINK_CATEGORIES.has(item.category?.trim())),
+    [menuItems]
+  );
+
+  const menuByCategory = useMemo(() => foodMenuItems.reduce((acc, item) => {
     const cat = item.category?.trim() || "Other";
     if (!acc[cat]) acc[cat] = [];
     acc[cat].push(item);
     return acc;
-  }, {});
+  }, {}), [foodMenuItems]);
 
-  const CATEGORY_ORDER_LOWER = CATEGORY_ORDER.map((c) => c.toLowerCase());
-  const sortedCategories = Object.entries(menuByCategory).sort(([a], [b]) => {
-    const ai = CATEGORY_ORDER_LOWER.indexOf(a.toLowerCase());
-    const bi = CATEGORY_ORDER_LOWER.indexOf(b.toLowerCase());
-    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
-  });
+  const sortedCategories = useMemo(() => {
+    const lower = FOOD_CATEGORY_ORDER.map((c) => c.toLowerCase());
+    return Object.entries(menuByCategory).sort(([a], [b]) => {
+      const ai = lower.indexOf(a.toLowerCase());
+      const bi = lower.indexOf(b.toLowerCase());
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  }, [menuByCategory]);
+
+  const activeCatFinal = activeCat || (sortedCategories.length > 0 ? sortedCategories[0][0] : null);
 
   return (
     <div className="page-enter pt-20 md:pt-28 lg:pt-36">
@@ -758,138 +835,376 @@ export default function Reservations() {
                 animate="center"
                 exit="exit"
                 transition={pageTransition}
-                className="max-w-3xl mx-auto"
                 data-testid="step-meals"
               >
-                <div className="text-center mb-10">
-                  <div className="flex items-center justify-center gap-3 mb-4">
-                    <UtensilsCrossed size={20} className="text-[var(--gold)]" />
-                    <h2 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
-                      Plan your meal <span className="font-serif-italic text-[var(--gold)] text-2xl md:text-3xl">(optional)</span>
-                    </h2>
-                  </div>
-                  <p className="text-[var(--muted)] text-sm md:text-base max-w-lg mx-auto leading-relaxed">
-                    Let us know what you're thinking and we'll have everything ready for you.
-                  </p>
-                </div>
+                {/* ── Meal picker ── */}
+                {!payStep && (
+                  <div className="max-w-5xl mx-auto">
+                    <div className="text-center mb-8">
+                      <div className="flex items-center justify-center gap-3 mb-4">
+                        <UtensilsCrossed size={20} className="text-[var(--gold)]" />
+                        <h2 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
+                          Plan your meal <span className="font-serif-italic text-[var(--gold)] text-2xl md:text-3xl">(optional)</span>
+                        </h2>
+                      </div>
+                      <p className="text-[var(--muted)] text-sm md:text-base max-w-xl mx-auto leading-relaxed">
+                        Pick dishes you would like. Pay a deposit and we will have them ready when you arrive.
+                      </p>
+                    </div>
 
-                {menuLoading ? (
-                  <div className="flex items-center justify-center py-16 gap-3 text-[var(--muted)]">
-                    <Loader2 size={18} className="animate-spin text-[var(--gold)]" />
-                    <span className="text-sm">Loading menu…</span>
-                  </div>
-                ) : (
-                  <div className="space-y-8">
-                    {sortedCategories.map(([category, items]) => (
-                      <div key={category}>
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="h-px flex-1" style={{ background: "rgba(201,168,76,0.2)" }} />
-                          <span className="text-[10px] uppercase tracking-[0.28em] text-[var(--gold)] font-medium whitespace-nowrap">{category}</span>
-                          <div className="h-px flex-1" style={{ background: "rgba(201,168,76,0.2)" }} />
+                    {menuLoading ? (
+                      <div className="flex items-center justify-center py-16 gap-3 text-[var(--muted)]">
+                        <Loader2 size={18} className="animate-spin text-[var(--gold)]" />
+                        <span className="text-sm">Loading menu...</span>
+                      </div>
+                    ) : (
+                      <>
+                        {/* Category tabs */}
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 28 }}>
+                          {sortedCategories.map(([cat]) => (
+                            <button
+                              key={cat}
+                              onClick={() => setActiveCat(cat)}
+                              style={{
+                                padding: "7px 16px",
+                                borderRadius: 99,
+                                fontSize: 12,
+                                fontWeight: 600,
+                                letterSpacing: "0.1em",
+                                textTransform: "uppercase",
+                                cursor: "pointer",
+                                border: `1.5px solid ${activeCatFinal === cat ? "rgba(201,168,76,0.8)" : "rgba(201,168,76,0.25)"}`,
+                                background: activeCatFinal === cat ? "rgba(201,168,76,0.12)" : "transparent",
+                                color: activeCatFinal === cat ? "#C9A84C" : "#9C8E7A",
+                                transition: "all 0.15s",
+                              }}
+                            >
+                              {cat}
+                            </button>
+                          ))}
                         </div>
-                        <div className="space-y-2">
-                          {items.map((item) => {
-                            const qty = mealSelections[item.id] ?? 0;
-                            return (
-                              <div
-                                key={item.id}
-                                className="flex items-center gap-4 px-4 py-3 border transition-colors"
-                                style={{
-                                  borderColor: qty > 0 ? "rgba(201,168,76,0.4)" : "var(--border-soft)",
-                                  background: qty > 0 ? "rgba(201,168,76,0.05)" : "transparent",
-                                }}
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-baseline gap-3 flex-wrap">
-                                    <span className="text-sm font-medium text-[var(--warm-white)]">{item.name}</span>
-                                    <span className="text-xs text-[var(--gold)] font-medium">{fmtPrice(item.price)}</span>
-                                  </div>
-                                  {item.description && (
-                                    <p className="text-xs text-[var(--muted)] mt-0.5 leading-relaxed line-clamp-1">{item.description}</p>
-                                  )}
+
+                        {/* Image + dish list */}
+                        {activeCatFinal && (() => {
+                          const dishes = menuByCategory[activeCatFinal] || [];
+                          const imgSrc = MEAL_CATEGORY_IMAGES[activeCatFinal];
+                          const isNational    = activeCatFinal === "National Dishes";
+                          const isTraditional = activeCatFinal === "Traditional Specials";
+                          const isGrill       = activeCatFinal === "Charcoal Grills" || activeCatFinal === "Continental";
+                          const needsPicker   = isNational || isTraditional || isGrill;
+
+                          return (
+                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "start" }}>
+                              {imgSrc && (
+                                <div style={{ aspectRatio: "4/5", overflow: "hidden", borderRadius: 4 }}>
+                                  <img src={imgSrc} alt={activeCatFinal} style={{ width: "100%", height: "100%", objectFit: "cover" }} loading="lazy" />
                                 </div>
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                  <button
-                                    type="button"
-                                    onClick={() => setMealQty(item.id, qty - 1)}
-                                    disabled={qty === 0}
-                                    className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
-                                    style={{
-                                      border: "1px solid var(--border-soft)",
-                                      background: qty > 0 ? "rgba(201,168,76,0.12)" : "transparent",
-                                      color: qty > 0 ? "var(--gold)" : "var(--muted)",
-                                      cursor: qty === 0 ? "not-allowed" : "pointer",
-                                      opacity: qty === 0 ? 0.4 : 1,
-                                    }}
-                                  >
-                                    <Minus size={10} />
-                                  </button>
-                                  <span className="w-5 text-center text-sm font-medium text-[var(--warm-white)]">{qty}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setMealQty(item.id, qty + 1)}
-                                    disabled={qty >= partyMax}
-                                    className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
-                                    style={{
-                                      border: "1px solid var(--border-soft)",
-                                      background: qty < partyMax ? "rgba(201,168,76,0.12)" : "transparent",
-                                      color: qty < partyMax ? "var(--gold)" : "var(--muted)",
-                                      cursor: qty >= partyMax ? "not-allowed" : "pointer",
-                                      opacity: qty >= partyMax ? 0.4 : 1,
-                                    }}
-                                  >
-                                    <Plus size={10} />
-                                  </button>
-                                </div>
+                              )}
+                              <div style={{ minWidth: 0 }}>
+                                <ResPaginatedList
+                                  dishes={dishes}
+                                  renderDish={(dish) => {
+                                    const cartEntries = mealCart.filter((i) => i.id === dish.id);
+                                    const totalQty = cartEntries.reduce((s, i) => s + i.qty, 0);
+
+                                    return (
+                                      <div
+                                        key={dish.id}
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "flex-start",
+                                          justifyContent: "space-between",
+                                          gap: 16,
+                                          padding: "18px 0",
+                                          borderTop: "1px solid rgba(255,255,255,0.08)",
+                                        }}
+                                      >
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 15, fontWeight: 600, color: "#F5F0E8", margin: "0 0 4px", lineHeight: 1.3 }}>{dish.name}</div>
+                                          {dish.description && (
+                                            <p style={{ fontSize: 12, color: "#9C8E7A", margin: 0, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" }}>{dish.description}</p>
+                                          )}
+                                        </div>
+                                        <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
+                                          <span style={{ fontSize: 14, fontWeight: 700, color: "#C9A84C", whiteSpace: "nowrap" }}>{fmtPrice(dish.price)}</span>
+                                          {needsPicker ? (
+                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                              <ResCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : setSideModal(dish)} />
+                                              {totalQty > 0 && <span style={{ fontSize: 10, color: "#C9A84C", fontWeight: 700 }}>{totalQty}</span>}
+                                            </div>
+                                          ) : totalQty > 0 ? (
+                                            <ResQtyControl
+                                              qty={totalQty}
+                                              onDec={() => {
+                                                const entry = cartEntries[0];
+                                                if (entry) updateCartQty(entry.cartKey, -1);
+                                              }}
+                                              onInc={() => {
+                                                const entry = cartEntries[0];
+                                                if (entry) updateCartQty(entry.cartKey, 1);
+                                                else addToCart(dish.id, dish.id, dish.name, dish.price, dish.category, null);
+                                              }}
+                                            />
+                                          ) : (
+                                            <ResCircleAddBtn onClick={() => addToCart(dish.id, dish.id, dish.name, dish.price, dish.category, null)} />
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  }}
+                                />
                               </div>
-                            );
-                          })}
+                            </div>
+                          );
+                        })()}
+                      </>
+                    )}
+
+                    {/* Running total */}
+                    {cartItemCount > 0 && (
+                      <div className="mt-8 px-4 py-4 border border-[var(--gold)]/30 bg-[var(--gold)]/5 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Your selection</span>
+                          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                            {mealCart.map((i) => (
+                              <span key={i.cartKey} className="text-xs text-[var(--warm-white)]">
+                                {i.qty}x {i.name}{i.modifier ? ` (${i.modifier})` : ""}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-6">
+                          <div className="font-serif-display text-lg text-[var(--gold)]">{fmtPrice(cartTotal)}</div>
+                          <div className="text-xs text-[var(--muted)]">{cartItemCount} {cartItemCount === 1 ? "dish" : "dishes"}</div>
                         </div>
                       </div>
-                    ))}
+                    )}
+
+                    {submitError && (
+                      <p className="text-sm text-red-400 border border-red-400/20 bg-red-400/5 px-4 py-3 mt-4">{submitError}</p>
+                    )}
+
+                    <div className="flex items-center justify-between flex-wrap gap-4 mt-8">
+                      <button type="button" onClick={goBackToDetails} className="btn-ghost-dark">
+                        <ArrowLeft size={14} /> Back to details
+                      </button>
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => handleFinalSubmit(true)}
+                          disabled={submitting}
+                          className="text-sm text-[var(--muted)] hover:text-[var(--warm-white)] transition-colors underline underline-offset-2"
+                          data-testid="meal-skip"
+                        >
+                          Skip, just reserve my table
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (cartItemCount === 0) {
+                              handleFinalSubmit(true);
+                            } else {
+                              setPayStep("choice");
+                            }
+                          }}
+                          disabled={submitting}
+                          className="btn-burgundy"
+                          data-testid="meal-confirm"
+                        >
+                          {cartItemCount === 0
+                            ? <><span>Confirm Reservation</span><ArrowRight size={14} /></>
+                            : <><span>Confirm selection</span><ArrowRight size={14} /></>
+                          }
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
-                {/* Running total */}
-                {totalSelected > 0 && (
-                  <div className="mt-6 px-4 py-3 border border-[var(--gold)]/30 bg-[var(--gold)]/5 flex items-center justify-between">
-                    <span className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Dishes selected</span>
-                    <span className="font-serif-display text-lg text-[var(--gold)]">{totalSelected} {totalSelected === 1 ? "dish" : "dishes"}</span>
-                  </div>
-                )}
-
-                {submitError && (
-                  <p className="text-sm text-red-400 border border-red-400/20 bg-red-400/5 px-4 py-3 mt-4">{submitError}</p>
-                )}
-
-                <div className="flex items-center justify-between flex-wrap gap-4 mt-8">
-                  <button type="button" onClick={goBackToDetails} className="btn-ghost-dark">
-                    <ArrowLeft size={14} /> Back to details
-                  </button>
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => handleFinalSubmit(true)}
-                      disabled={submitting}
-                      className="text-sm text-[var(--muted)] hover:text-[var(--warm-white)] transition-colors underline underline-offset-2"
-                      data-testid="meal-skip"
-                    >
-                      Skip this step
+                {/* ── Payment choice ── */}
+                {payStep === "choice" && (
+                  <div className="max-w-xl mx-auto">
+                    <div className="text-center mb-8">
+                      <div className="text-xs uppercase tracking-[0.32em] text-[var(--burgundy)] mb-3">Step 3 of 3</div>
+                      <h2 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
+                        How would you like to handle payment?
+                      </h2>
+                      <p className="text-[var(--muted)] text-sm mt-3">
+                        Your selected meals total <span className="text-[var(--gold)] font-medium">{fmtPrice(cartTotal)}</span>.
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      {[
+                        { key: "deposit_70", label: "Pay 70% deposit now", sub: `${fmtPrice(Math.round(cartTotal * 0.7))} via bank transfer`, note: "We will have your dishes ready. Settle the balance on arrival." },
+                        { key: "pay_full", label: "Pay in full now", sub: `${fmtPrice(cartTotal)} via bank transfer`, note: "Full amount paid ahead. Nothing to settle on arrival." },
+                        { key: "preference_only", label: "No payment now", sub: "Preferences only", note: "We will note your selections. No payment is required at this stage." },
+                      ].map((opt) => (
+                        <button
+                          key={opt.key}
+                          type="button"
+                          onClick={() => {
+                            setPayChoice(opt.key);
+                            if (opt.key === "preference_only") {
+                              handleFinalSubmit(false, "preference_only");
+                            } else {
+                              setPayStep("bank");
+                            }
+                          }}
+                          disabled={submitting}
+                          style={{
+                            width: "100%",
+                            textAlign: "left",
+                            padding: "18px 20px",
+                            border: "1px solid var(--border-soft)",
+                            background: "transparent",
+                            color: "var(--warm-white)",
+                            cursor: "pointer",
+                            transition: "border-color 0.15s",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.borderColor = "var(--gold)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.borderColor = "var(--border-soft)")}
+                        >
+                          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 20, fontWeight: 600, marginBottom: 2 }}>{opt.label}</div>
+                          <div style={{ fontSize: 13, color: "var(--gold)", fontWeight: 600 }}>{opt.sub}</div>
+                          <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>{opt.note}</div>
+                          {submitting && opt.key === payChoice && <Loader2 size={14} style={{ marginTop: 6, animation: "spin 1s linear infinite", color: "var(--gold)" }} />}
+                        </button>
+                      ))}
+                    </div>
+                    {submitError && (
+                      <p className="text-sm text-red-400 border border-red-400/20 bg-red-400/5 px-4 py-3 mt-4">{submitError}</p>
+                    )}
+                    <button type="button" onClick={() => setPayStep(null)} className="btn-ghost-dark mt-8">
+                      <ArrowLeft size={14} /> Back to dishes
                     </button>
+                  </div>
+                )}
+
+                {/* ── Bank transfer ── */}
+                {payStep === "bank" && (
+                  <div className="max-w-xl mx-auto">
+                    <div className="text-center mb-8">
+                      <div className="text-xs uppercase tracking-[0.32em] text-[var(--burgundy)] mb-3">Bank Transfer</div>
+                      <h2 className="font-serif-display text-3xl text-[var(--warm-white)]">
+                        Transfer {payChoice === "deposit_70" ? "70% deposit" : "full amount"}
+                      </h2>
+                    </div>
+                    <div style={{ border: "1px solid rgba(201,168,76,0.3)", padding: "24px 28px", marginBottom: 24 }}>
+                      {[
+                        { label: "Bank", value: BANK_NAME },
+                        { label: "Account Name", value: BANK_ACCOUNT_NAME },
+                        { label: "Account Number", value: BANK_ACCOUNT_NUMBER },
+                        { label: "Amount", value: fmtPrice(payChoice === "deposit_70" ? Math.round(cartTotal * 0.7) : cartTotal) },
+                      ].map(({ label, value }) => (
+                        <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", padding: "10px 0", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "#9C8E7A" }}>{label}</span>
+                          <span style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 18, fontWeight: 600, color: label === "Amount" ? "#C9A84C" : "#F5F0E8" }}>{value}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 24, lineHeight: 1.6 }}>
+                      Once you have made the transfer, click the button below. We will verify your payment and have your dishes ready.
+                    </p>
+                    {submitError && (
+                      <p className="text-sm text-red-400 border border-red-400/20 bg-red-400/5 px-4 py-3 mb-4">{submitError}</p>
+                    )}
                     <button
                       type="button"
-                      onClick={() => handleFinalSubmit(false)}
+                      onClick={() => handleFinalSubmit(false, payChoice)}
                       disabled={submitting}
-                      className="btn-burgundy"
-                      data-testid="meal-confirm"
+                      className="btn-burgundy w-full justify-center"
+                      style={{ padding: "16px", fontSize: 15 }}
                     >
                       {submitting
-                        ? <><Loader2 size={14} className="animate-spin" /> Confirming…</>
-                        : <><span>Confirm Reservation</span><ArrowRight size={14} /></>
+                        ? <><Loader2 size={14} className="animate-spin" /> Confirming...</>
+                        : "I have made payment"
                       }
                     </button>
+                    <button type="button" onClick={() => setPayStep("choice")} className="btn-ghost-dark mt-4">
+                      <ArrowLeft size={14} /> Back
+                    </button>
                   </div>
-                </div>
+                )}
+
+                {/* ── Payment confirmed ── */}
+                {payStep === "done" && (
+                  <div className="max-w-xl mx-auto text-center py-10">
+                    <div className="w-16 h-16 rounded-full bg-[var(--gold)] flex items-center justify-center mx-auto mb-8">
+                      <Check size={28} className="text-[var(--charcoal)]" strokeWidth={2.5} />
+                    </div>
+                    <div className="gold-line mb-4">Reservation Confirmed</div>
+                    <h3 className="font-serif-display text-3xl md:text-4xl text-[var(--warm-white)]">
+                      Your table awaits, <span className="font-serif-italic text-[var(--gold)]">{form.name.split(" ")[0] || "friend"}.</span>
+                    </h3>
+                    <p style={{ color: "rgba(245,240,232,0.65)", marginTop: 12, fontSize: 14, lineHeight: 1.6 }}>
+                      We have received your reservation and meal selections. Send your payment proof on WhatsApp so we can verify and confirm.
+                    </p>
+                    <a
+                      href={`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(`Hello, I just made a payment for my reservation.\n\nName: ${form.name}\nDate: ${form.date ? new Date(form.date).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) : ""}\nTime: ${form.time || ""}\n\nPlease find my proof of payment attached.`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-burgundy inline-flex mt-8"
+                      style={{ padding: "14px 28px" }}
+                    >
+                      <MessageCircle size={16} />
+                      <span>Send Payment Proof on WhatsApp</span>
+                    </a>
+                    <div className="mt-6">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSubmitted(false);
+                          setPayStep(null);
+                          setPayChoice(null);
+                          setMealCart([]);
+                          setActiveCat(null);
+                          setStep(1);
+                          setOccasion("");
+                        }}
+                        className="text-sm text-[var(--muted)] hover:text-[var(--warm-white)] transition-colors underline underline-offset-2"
+                      >
+                        Make another reservation
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Picker modals */}
+                {soupModal && (
+                  <PickerModal
+                    dish={soupModal}
+                    showSoup
+                    onClose={() => setSoupModal(null)}
+                    onConfirm={(soup, swallow) => {
+                      const key = `${soupModal.id}|${soup}|${swallow}`;
+                      addToCart(key, soupModal.id, soupModal.name, soupModal.price, soupModal.category, `${soup} + ${swallow}`);
+                      setSoupModal(null);
+                    }}
+                  />
+                )}
+                {traditionalModal && (
+                  <PickerModal
+                    dish={traditionalModal}
+                    showSoup={false}
+                    onClose={() => setTraditionalModal(null)}
+                    onConfirm={(_soup, swallow) => {
+                      const key = `${traditionalModal.id}|${swallow}`;
+                      addToCart(key, traditionalModal.id, traditionalModal.name, traditionalModal.price, traditionalModal.category, swallow);
+                      setTraditionalModal(null);
+                    }}
+                  />
+                )}
+                {sideModal && (
+                  <SidePickerModal
+                    dish={sideModal}
+                    onClose={() => setSideModal(null)}
+                    onConfirm={(side) => {
+                      const key = `${sideModal.id}|${side}`;
+                      addToCart(key, sideModal.id, sideModal.name, sideModal.price, sideModal.category, side);
+                      setSideModal(null);
+                    }}
+                  />
+                )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -906,11 +1221,114 @@ export default function Reservations() {
               setSubmitted(false);
               setStep(1);
               setOccasion("");
-              setMealSelections({});
+              setMealCart([]);
+              setActiveCat(null);
+              setPayStep(null);
+              setPayChoice(null);
             }}
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function ResPageArrow({ dir, disabled, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        width: 32, height: 32, borderRadius: "50%",
+        border: `1.5px solid ${disabled ? "rgba(201,168,76,0.18)" : "rgba(201,168,76,0.65)"}`,
+        background: "transparent",
+        color: disabled ? "rgba(201,168,76,0.25)" : "#C9A84C",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        cursor: disabled ? "default" : "pointer",
+        transition: "background 0.15s, color 0.15s",
+        flexShrink: 0,
+      }}
+      onMouseEnter={(e) => { if (!disabled) { e.currentTarget.style.background = "#C9A84C"; e.currentTarget.style.color = "#0f0d0a"; } }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = disabled ? "rgba(201,168,76,0.25)" : "#C9A84C"; }}
+    >
+      {dir === "back" ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+    </button>
+  );
+}
+
+function ResCircleAddBtn({ onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{ width: 32, height: 32, borderRadius: "50%", border: "1.5px solid rgba(201,168,76,0.65)", background: "transparent", color: "#C9A84C", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0, transition: "background 0.15s, color 0.15s" }}
+      onMouseEnter={(e) => { e.currentTarget.style.background = "#C9A84C"; e.currentTarget.style.color = "#0f0d0a"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "#C9A84C"; }}
+    >
+      <Plus size={14} />
+    </button>
+  );
+}
+
+function ResQtyControl({ qty, onDec, onInc }) {
+  const btn = { width: 28, height: 28, border: "none", background: "#2a2118", color: "#F5F0E8", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 4 };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <button onClick={onDec} style={btn}><Minus size={12} /></button>
+      <span style={{ width: 22, textAlign: "center", fontSize: 13, fontWeight: 700, color: "#F5F0E8" }}>{qty}</span>
+      <button onClick={onInc} style={btn}><Plus size={12} /></button>
+    </div>
+  );
+}
+
+function ResPaginatedList({ dishes, renderDish }) {
+  const [page, setPage] = useState(0);
+  const [slide, setSlide] = useState(null);
+  const totalPages = Math.ceil(dishes.length / RES_PER_PAGE);
+
+  useEffect(() => { setPage(0); setSlide(null); }, [dishes]);
+
+  const chunk = (p) => dishes.slice(p * RES_PER_PAGE, (p + 1) * RES_PER_PAGE);
+
+  if (totalPages <= 1) {
+    return (
+      <div style={{ overflow: "hidden", minHeight: RES_LIST_H }}>
+        {chunk(0).map((dish) => renderDish(dish))}
+      </div>
+    );
+  }
+
+  const displayPage = slide ? slide.to : page;
+
+  const go = (newPage) => {
+    if (slide !== null || newPage === displayPage || newPage < 0 || newPage >= totalPages) return;
+    const d = newPage > displayPage ? 1 : -1;
+    setSlide({ from: page, to: newPage, dir: d });
+    setTimeout(() => { setPage(newPage); setSlide(null); }, 360);
+  };
+
+  const outAnim = slide ? (slide.dir === 1 ? "op-out-fwd" : "op-out-bwd") : undefined;
+  const inAnim  = slide ? (slide.dir === 1 ? "op-in-fwd"  : "op-in-bwd")  : undefined;
+  const DUR = "0.34s cubic-bezier(0.4,0,0.2,1) forwards";
+
+  return (
+    <div>
+      <div style={{ position: "relative", overflow: "hidden", minHeight: RES_LIST_H }}>
+        <div style={{ position: "absolute", inset: 0, animation: outAnim ? `${outAnim} ${DUR}` : "none" }}>
+          {chunk(page).map((dish) => renderDish(dish))}
+        </div>
+        {slide && (
+          <div style={{ position: "absolute", inset: 0, animation: `${inAnim} ${DUR}` }}>
+            {chunk(slide.to).map((dish) => renderDish(dish))}
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, marginTop: 16 }}>
+        <ResPageArrow dir="back" disabled={displayPage === 0} onClick={() => go(displayPage - 1)} />
+        <span style={{ fontSize: 11, color: "#9C8E7A", letterSpacing: "0.12em", minWidth: 34, textAlign: "center" }}>
+          {displayPage + 1} / {totalPages}
+        </span>
+        <ResPageArrow dir="fwd" disabled={displayPage === totalPages - 1} onClick={() => go(displayPage + 1)} />
+      </div>
     </div>
   );
 }

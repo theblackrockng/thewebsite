@@ -967,6 +967,24 @@ function FrontDeskMain({ onSessionLost }) {
   const confirmReservation = (id) => patchReservation(id, "confirmed", "Confirm");
   const cancelReservation = (id) => patchReservation(id, "cancelled", "Cancel Booking");
 
+  async function markPaymentVerified(id) {
+    setResActionIds((prev) => new Set([...prev, id]));
+    try {
+      const res = await apiRequest(RESERVATIONS_API, "PATCH", { id, meal_payment_status: "paid" });
+      if (res === "lost") { onSessionLost(); return; }
+      if (!res.ok && res !== "offline") {
+        const json = await res.json().catch(() => ({}));
+        setActionError(`Mark Payment Verified failed. ${json.error || res.statusText || ""}`);
+        return;
+      }
+      setReservations((prev) => prev.map((r) => (r.id === id ? { ...r, meal_payment_status: "paid" } : r)));
+    } catch (err) {
+      setActionError(`Mark Payment Verified failed. ${err?.message || "Network error."}`);
+    } finally {
+      setResActionIds((prev) => { const n = new Set(prev); n.delete(id); return n; });
+    }
+  }
+
   async function ackCall(id) {
     setCallActionIds((prev) => new Set([...prev, id]));
     try {
@@ -1185,6 +1203,7 @@ function FrontDeskMain({ onSessionLost }) {
           actionIds={resActionIds}
           onConfirm={confirmReservation}
           onAskCancel={setCancelTarget}
+          onMarkPaymentVerified={markPaymentVerified}
         />
       ) : (
       <>
@@ -1335,7 +1354,7 @@ function FrontDeskMain({ onSessionLost }) {
   );
 }
 
-function ReservationsView({ t, now, today, tab, setTab, lists, counts, loaded, flashIds, actionIds, onConfirm, onAskCancel }) {
+function ReservationsView({ t, now, today, tab, setTab, lists, counts, loaded, flashIds, actionIds, onConfirm, onAskCancel, onMarkPaymentVerified }) {
   const isPast = tab === "past";
   const visible = lists[tab];
 
@@ -1407,6 +1426,7 @@ function ReservationsView({ t, now, today, tab, setTab, lists, counts, loaded, f
               busy={actionIds.has(r.id)}
               onConfirm={onConfirm}
               onAskCancel={onAskCancel}
+              onMarkPaymentVerified={onMarkPaymentVerified}
             />
           ))}
         </div>
@@ -1415,7 +1435,7 @@ function ReservationsView({ t, now, today, tab, setTab, lists, counts, loaded, f
   );
 }
 
-function ReservationCard({ r, t, now, today, readOnly, flashing, busy, onConfirm, onAskCancel }) {
+function ReservationCard({ r, t, now, today, readOnly, flashing, busy, onConfirm, onAskCancel, onMarkPaymentVerified }) {
   const cfg = RES_STATUS_CFG[r.status] ?? { label: r.status, color: "#6b7280" };
   const canConfirm = !readOnly && (r.status === "pending" || r.status === "rescheduled");
   const canCancel = !readOnly && r.status !== "cancelled";
@@ -1492,6 +1512,26 @@ function ReservationCard({ r, t, now, today, readOnly, flashing, busy, onConfirm
             Note: {r.notes}
           </div>
         )}
+
+        {r.pre_selected_meals?.length > 0 && (
+          <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(201,168,76,0.06)", border: `1px solid rgba(201,168,76,0.25)` }}>
+            <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: "0.1em", textTransform: "uppercase", color: t.gold, marginBottom: 6 }}>
+              Pre-selected meals
+            </div>
+            {r.pre_selected_meals.map((m, i) => (
+              <div key={i} style={{ fontSize: 16, color: t.text, display: "flex", gap: 6 }}>
+                <span style={{ color: t.gold, fontWeight: 700 }}>{m.qty}x</span>
+                <span>{m.name}{m.modifier ? ` (${m.modifier})` : ""}</span>
+              </div>
+            ))}
+            {r.meal_payment_status && (
+              <div style={{ marginTop: 8, fontSize: 14, fontWeight: 700, color: r.meal_payment_status === "paid" ? "#22c55e" : t.gold }}>
+                Payment: {r.meal_payment_status === "paid" ? "Verified" : r.meal_payment_status === "awaiting_proof" ? "Awaiting proof" : r.meal_payment_status}
+                {r.meal_payment_choice === "deposit_70" ? " (70% deposit)" : r.meal_payment_choice === "pay_full" ? " (full)" : ""}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {(canConfirm || canCancel) && (
@@ -1506,6 +1546,18 @@ function ReservationCard({ r, t, now, today, readOnly, flashing, busy, onConfirm
               Cancel
             </button>
           )}
+        </div>
+      )}
+
+      {r.meal_payment_status === "awaiting_proof" && onMarkPaymentVerified && (
+        <div style={{ padding: "0 20px 18px" }}>
+          <button
+            disabled={busy}
+            onClick={() => onMarkPaymentVerified(r.id)}
+            style={{ width: "100%", padding: "14px 20px", borderRadius: 10, border: "none", background: "#22c55e", color: "#ffffff", fontSize: 16, fontWeight: 800, cursor: busy ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: busy ? 0.6 : 1 }}
+          >
+            {busy ? "Updating..." : "Mark Payment Verified"}
+          </button>
         </div>
       )}
     </div>

@@ -104,6 +104,9 @@ module.exports = async function handler(req, res) {
 
   const { name, email, phone, date, time, party, occasion, notes } = sanitized;
   const preSelectedMeals = Array.isArray(req.body?.preSelectedMeals) ? req.body.preSelectedMeals : [];
+  const mealPaymentChoice = typeof req.body?.mealPaymentChoice === 'string' ? req.body.mealPaymentChoice : null;
+  const mealPaymentStatus = typeof req.body?.mealPaymentStatus === 'string' ? req.body.mealPaymentStatus : null;
+  const mealPaymentAmount = Number.isInteger(req.body?.mealPaymentAmount) ? req.body.mealPaymentAmount : null;
 
   if (!name || !email) return res.status(400).json({ error: 'Missing required fields' });
   if (name.trim().length < 2) return res.status(400).json({ error: 'Name must be at least 2 characters.' });
@@ -120,7 +123,7 @@ module.exports = async function handler(req, res) {
   let reservationId = null;
   try {
     const hasMeals = preSelectedMeals.length > 0;
-    const { data: inserted, error: insertErr } = await db.from('reservations').insert({
+    const basePayload = {
       name,
       email,
       phone: phone || null,
@@ -131,7 +134,21 @@ module.exports = async function handler(req, res) {
       notes: notes || null,
       status: 'pending',
       pre_selected_meals: hasMeals ? preSelectedMeals : null,
-    }).select('id').single();
+    };
+
+    const fullPayload = {
+      ...basePayload,
+      meal_payment_choice: mealPaymentChoice,
+      meal_payment_status: mealPaymentStatus,
+      meal_payment_amount: mealPaymentAmount,
+    };
+
+    let inserted, insertErr;
+    ({ data: inserted, error: insertErr } = await db.from('reservations').insert(fullPayload).select('id').single());
+
+    if (insertErr && (insertErr.code === '42703' || insertErr.message?.includes('column'))) {
+      ({ data: inserted, error: insertErr } = await db.from('reservations').insert(basePayload).select('id').single());
+    }
 
     if (insertErr) {
       console.error('[send-confirmation] Supabase insert error:', insertErr.message);
@@ -150,7 +167,13 @@ module.exports = async function handler(req, res) {
       : '—';
     const hasMeals = preSelectedMeals.length > 0;
     const mealsLines = hasMeals
-      ? ['\n🍽️ Pre-selected meals:', ...preSelectedMeals.map((m) => `  ${m.qty}× ${escapeHtml(String(m.name || ''))}`)]
+      ? [
+          '\n🍽️ Pre-selected meals:',
+          ...preSelectedMeals.map((m) => `  ${m.qty}× ${escapeHtml(String(m.name || ''))}${m.modifier ? ` (${escapeHtml(String(m.modifier))})` : ''}`),
+          mealPaymentChoice === 'deposit_70' ? `💳 Deposit (70%) — awaiting proof` :
+          mealPaymentChoice === 'pay_full'   ? `💳 Full payment — awaiting proof` :
+          mealPaymentChoice === 'preference_only' ? `📋 Preferences only — no payment` : null,
+        ].filter(Boolean)
       : [];
 
     const tgText = [

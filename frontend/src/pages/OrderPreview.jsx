@@ -27,13 +27,13 @@ const DRINK_CATEGORY_ORDER = [
 
 const ALL_CATEGORY_ORDER = [...FOOD_CATEGORY_ORDER, ...DRINK_CATEGORY_ORDER];
 
-const SOUPS = [
+export const SOUPS = [
   "Efo Riro", "Edika-Ikong", "Egusi", "Mixed Okro",
   "Fisherman Soup", "Seafood", "Banga", "Ofe Nsala", "Miyan Kuka", "Ewedu",
 ];
 
-const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo"];
-const SIDES = ["Rice", "Potato Wedges", "Yam Chips"];
+export const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo"];
+export const SIDES = ["Rice", "Potato Wedges", "Yam Chips"];
 
 const CATEGORY_IMAGES = {
   "Starters":             "/images/menu/starters.jpg",
@@ -716,7 +716,7 @@ function QtyControl({ qty, onDec, onInc }) {
   );
 }
 
-function SidePickerModal({ dish, onClose, onConfirm }) {
+export function SidePickerModal({ dish, onClose, onConfirm }) {
   const [side, setSide] = useState("");
   const chip = (active) => ({
     padding: "8px 16px", borderRadius: 99, fontSize: 13, fontWeight: 500, cursor: "pointer",
@@ -758,7 +758,7 @@ function SidePickerModal({ dish, onClose, onConfirm }) {
   );
 }
 
-function PickerModal({ dish, showSoup = true, onClose, onConfirm }) {
+export function PickerModal({ dish, showSoup = true, onClose, onConfirm }) {
   const [soup, setSoup] = useState("");
   const [swallow, setSwallow] = useState("");
   const ready = (!showSoup || soup) && swallow;

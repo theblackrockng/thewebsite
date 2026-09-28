@@ -322,6 +322,20 @@ function MealSelectionsPanel({ reservation, onClose }) {
     return `₦${Number(p).toLocaleString("en-NG")}`;
   }
 
+  const paymentLabel = reservation.meal_payment_choice === "deposit_70"
+    ? `70% deposit (${fmtMealPrice(reservation.meal_payment_amount || Math.round(total * 0.7))})`
+    : reservation.meal_payment_choice === "pay_full"
+    ? `Full payment (${fmtMealPrice(reservation.meal_payment_amount || total)})`
+    : reservation.meal_payment_choice === "preference_only"
+    ? "Preferences only — no payment"
+    : null;
+
+  const paymentStatusColor = reservation.meal_payment_status === "paid"
+    ? "#22c55e"
+    : reservation.meal_payment_status === "awaiting_proof"
+    ? "var(--ds-gold)"
+    : "var(--ds-muted)";
+
   const byCategory = meals.reduce((acc, m) => {
     const cat = m.category || "Other";
     if (!acc[cat]) acc[cat] = [];
@@ -350,19 +364,34 @@ function MealSelectionsPanel({ reservation, onClose }) {
               <div key={cat} style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ds-gold)", marginBottom: 8 }}>{cat}</div>
                 {items.map((m, i) => (
-                  <div key={m.id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "9px 0", borderBottom: "1px solid var(--ds-border)" }}>
-                    <div>
+                  <div key={m.id || i} style={{ padding: "9px 0", borderBottom: "1px solid var(--ds-border)" }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                       <div style={{ fontSize: 13.5, fontWeight: 500, color: "var(--ds-text)" }}>
                         <span style={{ color: "var(--ds-gold)", marginRight: 6 }}>{m.qty}×</span>{m.name}
                       </div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ds-text)", whiteSpace: "nowrap" }}>
+                        {fmtMealPrice(Number(m.price) * m.qty)}
+                      </div>
                     </div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ds-text)", whiteSpace: "nowrap" }}>
-                      {fmtMealPrice(Number(m.price) * m.qty)}
-                    </div>
+                    {m.modifier && (
+                      <div style={{ fontSize: 12, color: "var(--ds-muted)", marginTop: 2 }}>{m.modifier}</div>
+                    )}
                   </div>
                 ))}
               </div>
             ))
+          )}
+
+          {paymentLabel && (
+            <div style={{ marginTop: 16, padding: "12px 14px", background: "rgba(201,168,76,0.07)", borderRadius: 6 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ds-muted)", marginBottom: 4 }}>Payment</div>
+              <div style={{ fontSize: 13.5, color: "var(--ds-gold)" }}>{paymentLabel}</div>
+              {reservation.meal_payment_status && (
+                <div style={{ fontSize: 13, fontWeight: 700, color: paymentStatusColor, marginTop: 4 }}>
+                  {reservation.meal_payment_status === "paid" ? "Payment Verified" : reservation.meal_payment_status === "awaiting_proof" ? "Awaiting Proof" : reservation.meal_payment_status}
+                </div>
+              )}
+            </div>
           )}
         </div>
 

@@ -188,7 +188,7 @@ async function ordersHandler(req, res) {
 
 // ── Reservations ────────────────────────────────────────────────────────
 
-const RESERVATION_KEYS = new Set(['id', 'status']);
+const RESERVATION_KEYS = new Set(['id', 'status', 'meal_payment_status']);
 const RANGES = ['all', 'today', 'upcoming', 'pending', 'past'];
 
 const PAST_DAYS = 7;
@@ -252,6 +252,10 @@ function publicRow(r) {
     status: r.status,
     is_concierge: !!r.is_concierge,
     created_at: r.created_at,
+    pre_selected_meals: r.pre_selected_meals || null,
+    meal_payment_status: r.meal_payment_status || null,
+    meal_payment_choice: r.meal_payment_choice || null,
+    meal_payment_amount: r.meal_payment_amount || null,
   };
 }
 
@@ -320,14 +324,33 @@ async function handleUpdate(req, res, db, staff) {
     return res.status(400).json({ error: 'Invalid request body.' });
   }
   if (Object.keys(body).some((k) => !RESERVATION_KEYS.has(k))) {
-    return res.status(400).json({ error: 'Only the status can be changed.' });
+    return res.status(400).json({ error: 'Only status or meal_payment_status can be changed.' });
   }
 
-  const { id, status: nextStatus } = body;
+  const { id, status: nextStatus, meal_payment_status: nextMealPayment } = body;
 
   if (typeof id !== 'string' || !UUID_RE.test(id)) {
     return res.status(400).json({ error: 'Missing or invalid reservation id.' });
   }
+
+  // meal_payment_status-only update (Mark Payment Verified)
+  if (!nextStatus && nextMealPayment) {
+    if (nextMealPayment !== 'paid') {
+      return res.status(400).json({ error: 'meal_payment_status can only be set to paid.' });
+    }
+    const { error: updateErr } = await db
+      .from('reservations')
+      .update({ meal_payment_status: 'paid' })
+      .eq('id', id)
+      .eq('meal_payment_status', 'awaiting_proof');
+    if (updateErr) {
+      console.error('[front-desk-reservations] meal payment update error:', updateErr);
+      if (updateErr.code === '42703') return res.status(200).json({ ok: true, meal_payment_status: 'paid', note: 'column_absent' });
+      return res.status(500).json({ error: 'Failed to update payment status.' });
+    }
+    return res.status(200).json({ ok: true, meal_payment_status: 'paid' });
+  }
+
   if (typeof nextStatus !== 'string' || !Object.prototype.hasOwnProperty.call(TRANSITIONS, nextStatus)) {
     return res.status(400).json({ error: 'Front desk can only confirm or cancel a reservation.' });
   }

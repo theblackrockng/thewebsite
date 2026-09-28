@@ -1,10 +1,29 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-27 (Front Desk: all 5 stat cards clickable with status filter; Amount Made Today (completed+paid) live total; End of Day Report button prints aggregated 80mm sales sheet)_
+_Last updated: 2026-09-27 (preview-reservation-meals branch: reservation step 3 redesign with category tabs + image/paginated list + soup/swallow/side pickers, payment sub-steps (70% deposit / full / preference only), bank transfer modal, WhatsApp proof success screen; Front Desk "Mark Payment Verified" button; console MealSelectionsPanel shows modifiers + payment status)_
 
 ---
 
 ## Pending SQL
+
+### Run before `preview-reservation-meals` goes live — adds meal payment columns to reservations
+
+```sql
+ALTER TABLE reservations
+  ADD COLUMN IF NOT EXISTS meal_payment_choice  TEXT    DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS meal_payment_amount  INTEGER DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS meal_payment_status  TEXT    DEFAULT NULL;
+
+-- Rollback:
+-- ALTER TABLE reservations
+--   DROP COLUMN IF EXISTS meal_payment_choice,
+--   DROP COLUMN IF EXISTS meal_payment_amount,
+--   DROP COLUMN IF EXISTS meal_payment_status;
+```
+
+If columns are absent, `send-confirmation.js` catches the 42703 error and retries without them (no crash).
+
+---
 
 ### Run now — adds custom QR image column to tables
 
@@ -115,6 +134,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Front Desk: stat card filters + Amount Made Today + End of Day Report | `FrontDeskDisplay.jsx`: All 5 stat cards (New/Confirmed/Preparing/Ready/Completed) now clickable; clicking New/Confirmed/Preparing/Ready sets a status filter on the All Orders list (toggle off by clicking again or using Clear; switching tabs clears filter). "Amount Made Today" 6th stat card shows live sum of all completed+paid order totals today — recomputed from `completedOrders` state which `patchOrder` updates instantly on Mark Paid. `completedOrders` now always fetched on every poll (not only when on the Completed tab) so the total is live from first load. "End of Day Report" button (gold, Printer icon, right of tab bar) prints an 80mm thermal sheet: BLACKROCK header, date, items aggregated by name+modifier (e.g. "Goat Meat (Egusi, Pounded Yam)" and "Goat Meat (Efo Riro, Amala)" are separate rows; items without modifiers aggregate by name), columns ITEM/QTY/UNIT/TOTAL, dashed dividers, grand total, order count footer. Same Electron/browser print pipeline as receipts. |
 | Receipt print CSS fix | `FrontDeskDisplay.jsx` line 294: `width:72mm;margin:0 auto;padding:4mm 3mm` → `margin:0;padding:0 4mm` (body fills full 80mm page, 4mm symmetric padding gives deterministic 72mm content); `font-weight:bold` added to body; `-webkit-print-color-adjust:exact;print-color-adjust:exact` added. Fixes off-center and faint text on 80mm thermal receipts from Electron. |
 | Soup/swallow + side picker — full stack fix | **Problem:** soup and swallow selections were captured in modals but never sent to the API or stored in DB. **Fix (8 files):** `order_items` table needs `ALTER TABLE order_items ADD COLUMN IF NOT EXISTS modifiers TEXT;` (run manually). `api/orders.js`: `modifiers` stored in `order_items` insert and shown in Telegram notification. `Order.jsx`, `OrderPreview.jsx`, `WaiterOrder.jsx`: `modifiers: [soup, swallow, side].filter(Boolean).join(", ")` added to POST items. `Checkout.jsx`: same. New `SidePickerModal` (Order.jsx, OrderPreview.jsx) and `WaiterSidePickerModal` (WaiterOrder.jsx) added for Charcoal Grills + Continental categories (3 sides: Rice, Potato Wedges, Yam Chips). `KitchenDisplay.jsx`, `BarDisplay.jsx`, `FrontDeskDisplay.jsx`: `item.modifiers` rendered in gold below the item name. |
+| Reservation step 3 redesign (`preview-reservation-meals` branch) | `Reservations.jsx`: step 3 rebuilt with category tabs (food only, no drinks), image-left + paginated-list-right layout, soup/swallow picker (National Dishes), swallow picker (Traditional Specials), side picker (Charcoal Grills + Continental); local `mealCart` array with modifier support replaces `mealSelections` object. Payment sub-steps: choose 70% deposit / pay in full / preferences only → bank transfer modal (GTB / Blackrock Restaurant LoungeBar / 9006080442 / exact amount) → "I have made payment" → WhatsApp proof success screen. "Skip, just reserve my table" unchanged path to Confirm. `OrderPreview.jsx`: `PickerModal`, `SidePickerModal`, `SOUPS`, `SWALLOWS`, `SIDES` exported for reuse. `frontend/api/send-confirmation.js`: accepts `mealPaymentChoice/Status/Amount`; tries insert with new columns, retries without on 42703. `frontend/api/front-desk.js`: `meal_payment_status`, `meal_payment_choice`, `meal_payment_amount`, `pre_selected_meals` added to `publicRow()`; `RESERVATION_KEYS` extended; `handleUpdate` handles `{id, meal_payment_status: 'paid'}` PATCH. `FrontDeskDisplay.jsx`: `ReservationCard` shows meal selections with modifiers and payment status; green "Mark Payment Verified" button when `meal_payment_status === 'awaiting_proof'`. Console `Reservations.jsx`: `MealSelectionsPanel` shows modifiers per item + payment info block. |
 
 ---
 
