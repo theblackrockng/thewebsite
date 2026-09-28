@@ -177,7 +177,8 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
   const sectionRefs = useRef({});
   const scrollingRef = useRef(false);
   const tabsRef = useRef(null);
-  const [readyBanners, setReadyBanners] = useState([]);
+  const [readyAlert, setReadyAlert] = useState(null);
+  const woAlertLoopRef = useRef(null);
   const mountedRef = useRef(true);
   const channelRef = useRef(null);
   const woConnectedRef = useRef(false);
@@ -267,6 +268,11 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
     setTimeout(() => { scrollingRef.current = false; }, 900);
   }, []);
 
+  function stopWoAlertLoop() {
+    if (woAlertLoopRef.current) { clearInterval(woAlertLoopRef.current); woAlertLoopRef.current = null; }
+    setReadyAlert(null);
+  }
+
   const subscribeReady = useCallback(() => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     const ch = supabase
@@ -277,17 +283,29 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
         const id = payload.new?.id;
         if (!id || notifiedReadyIdsRef.current.has(id)) return;
         notifiedReadyIdsRef.current.add(id);
-        woPlayReadyChime();
-        setReadyBanners(prev => [...prev, {
-          id,
-          tableNum: payload.new?.table_number,
-          orderNum: payload.new?.order_number,
-          placedBy: payload.new?.placed_by,
-        }]);
-        setTimeout(() => {
-          if (!mountedRef.current) return;
-          setReadyBanners(prev => prev.filter(b => b.id !== id));
-        }, 10_000);
+        const tableNum = payload.new?.table_number;
+        const placedBy = payload.new?.placed_by;
+        const label = tableNum
+          ? `Table ${tableNum} ready${placedBy ? ` (${placedBy})` : ""}`
+          : `Order ready`;
+        setReadyAlert((prev) => prev
+          ? { count: prev.count + 1, label }
+          : { count: 1, label });
+        if (!woAlertLoopRef.current) {
+          woUnlockAudio();
+          woPlayReadyChime();
+          let elapsed = 0;
+          woAlertLoopRef.current = setInterval(() => {
+            elapsed += 2000;
+            if (elapsed >= 30000) {
+              clearInterval(woAlertLoopRef.current); woAlertLoopRef.current = null;
+              setReadyAlert(null);
+              return;
+            }
+            woUnlockAudio();
+            woPlayReadyChime();
+          }, 2000);
+        }
       })
       .subscribe((status) => { woConnectedRef.current = status === "SUBSCRIBED"; });
     channelRef.current = ch;
@@ -308,7 +326,12 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
       if (now - last > 30_000 && !woConnectedRef.current) subscribeReady();
       last = now;
     }, 5_000);
-    const onVisible = () => { if (document.visibilityState === "visible" && !woConnectedRef.current) subscribeReady(); };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        if (woAudio.ctx?.state === "suspended") woAudio.ctx.resume().catch(() => {});
+        if (!woConnectedRef.current) subscribeReady();
+      }
+    };
     const onOnline = () => { if (!woConnectedRef.current) subscribeReady(); };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onOnline);
@@ -332,6 +355,23 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
     });
     return () => subscription.unsubscribe();
   }, [subscribeReady]);
+
+  useEffect(() => {
+    let sentinel = null;
+    let cancelled = false;
+    async function acquire() {
+      try {
+        if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+        const lock = await navigator.wakeLock.request("screen");
+        if (cancelled) { lock.release().catch(() => {}); return; }
+        sentinel = lock;
+      } catch {}
+    }
+    function onVisible() { if (document.visibilityState === "visible") acquire(); }
+    acquire();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); if (sentinel) sentinel.release().catch(() => {}); };
+  }, []);
 
   const cartTotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
@@ -392,27 +432,15 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
     }
   }
 
-  const readyBannerUI = readyBanners.length === 0 ? null : (
-    <div style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 70, display: "flex", flexDirection: "column" }}>
-      {readyBanners.map(b => (
-        <div
-          key={b.id}
-          style={{ background: "#16a34a", color: "#fff", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, fontSize: 15, fontWeight: 700, fontFamily: "inherit", borderBottom: "1px solid rgba(0,0,0,0.12)", animation: "wo-ready-slide 0.25s ease" }}
-        >
-          <span>
-            {b.tableNum ? `Table ${b.tableNum}` : b.orderNum ? `#${b.orderNum}` : "Order"} — Ready
-            {b.placedBy ? ` · ${b.placedBy}` : ""}
-          </span>
-          <button
-            onClick={(e) => { e.stopPropagation(); setReadyBanners(prev => prev.filter(x => x.id !== b.id)); }}
-            style={{ background: "rgba(0,0,0,0.18)", border: "none", color: "#fff", borderRadius: 4, width: 26, height: 26, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
-          >
-            ×
-          </button>
-        </div>
-      ))}
+  const readyBannerUI = readyAlert ? (
+    <div
+      onClick={stopWoAlertLoop}
+      style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 70, background: "#16a34a", color: "#fff", padding: "13px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, fontSize: 15, fontWeight: 700, fontFamily: "inherit", cursor: "pointer" }}
+    >
+      <span>{readyAlert.count > 1 ? `${readyAlert.count} orders ready` : readyAlert.label}. Tap to silence</span>
+      <X size={18} />
     </div>
-  );
+  ) : null;
 
   if (doneOrder) {
     return (

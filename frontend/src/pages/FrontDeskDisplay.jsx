@@ -430,6 +430,7 @@ export default function FrontDeskDisplay() {
     <StaffLoginGate
       allowedRoles={FRONT_DESK_ROLES}
       title="Front Desk"
+      disableIdleLock
       renderSignedOut={({ onSignIn }) => <SignedOutScreen onSignIn={onSignIn} />}
     >
       <FrontDeskContent />
@@ -490,9 +491,19 @@ function FrontDeskMain({ onSessionLost }) {
   const [flashIds, setFlashIds] = useState(() => new Set());
   const [readyFlashIds, setReadyFlashIds] = useState(() => new Set());
   const [actionIds, setActionIds] = useState(() => new Set());
+  const actionIdsRef = useRef(actionIds);
+  actionIdsRef.current = actionIds;
   const [actionError, setActionError] = useState("");
   const [audioReady, setAudioReady] = useState(() => !!audio.ctx);
   const [muted, setMuted] = useState(() => audio.muted);
+
+  const fdAlertLoopRef = useRef(null);
+  const [fdAlertBanner, setFdAlertBanner] = useState(null);
+
+  function stopFdAlertLoop() {
+    if (fdAlertLoopRef.current) { clearInterval(fdAlertLoopRef.current); fdAlertLoopRef.current = null; }
+    setFdAlertBanner(null);
+  }
 
   const [view, setView] = useState("orders");
   const [reservations, setReservations] = useState([]);
@@ -605,7 +616,12 @@ function FrontDeskMain({ onSessionLost }) {
       }
 
       const list = (data || []).filter((o) => !completedIdsRef.current.has(o.id));
-      setOrders(list);
+      setOrders((prev) => {
+        const merged = list
+          .filter((o) => !actionIdsRef.current.has(o.id) || prev.some((p) => p.id === o.id))
+          .map((o) => (actionIdsRef.current.has(o.id) ? prev.find((p) => p.id === o.id) || o : o));
+        return merged;
+      });
       setLoading(false);
       setLastUpdated(new Date());
 
@@ -620,7 +636,6 @@ function FrontDeskMain({ onSessionLost }) {
         const arrivals = [...ids].filter((id) => !knownIdsRef.current.has(id));
         if (arrivals.length > 0) {
           setFlashIds((prev) => new Set([...prev, ...arrivals]));
-          playChime();
           setTimeout(() => {
             if (!mountedRef.current) return;
             setFlashIds((prev) => {
@@ -629,6 +644,27 @@ function FrontDeskMain({ onSessionLost }) {
               return n;
             });
           }, FLASH_MS);
+          const first = list.find((o) => arrivals.includes(o.id));
+          const label = first
+            ? `New order${arrivals.length > 1 ? "s" : ""}, ${orderLabel(first)}${arrivals.length > 1 ? ` +${arrivals.length - 1} more` : ""}`
+            : `${arrivals.length} new order${arrivals.length !== 1 ? "s" : ""}`;
+          setFdAlertBanner((prev) => prev ? { label, count: arrivals.length + (prev.count || 0) } : { label, count: arrivals.length });
+          if (!fdAlertLoopRef.current) {
+            unlockAudio();
+            setAudioReady(!!audio.ctx);
+            playChime();
+            let elapsed = 0;
+            fdAlertLoopRef.current = setInterval(() => {
+              elapsed += 2000;
+              if (elapsed >= 30000) {
+                clearInterval(fdAlertLoopRef.current); fdAlertLoopRef.current = null;
+                setFdAlertBanner(null);
+                return;
+              }
+              unlockAudio();
+              playChime();
+            }, 2000);
+          }
         }
       }
       knownIdsRef.current = ids;
@@ -782,7 +818,12 @@ function FrontDeskMain({ onSessionLost }) {
       if (n - last > WAKE_GAP_MS) { checkSession(); fetchOrders(); fetchReservations(); fetchWaiterCalls(); }
       last = n;
     }, 5000);
-    const onVisible = () => { if (document.visibilityState === "visible") checkSession(); };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        checkSession();
+        if (audio.ctx?.state === "suspended") audio.ctx.resume().catch(() => {});
+      }
+    };
     const onOnline = () => { checkSession(); fetchOrders(); fetchReservations(); fetchWaiterCalls(); };
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onOnline);
@@ -892,11 +933,28 @@ function FrontDeskMain({ onSessionLost }) {
 
   async function patchOrder(orderId, fields, actionLabel) {
     setActionError("");
+    // Optimistic update
+    const snapshot = ordersRef.current.find((o) => o.id === orderId);
+    if (fields.order_status === "completed") {
+      completedIdsRef.current.add(orderId);
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      if (snapshot) {
+        const done = { ...snapshot, order_status: "completed", ...(hasColRef.current ? { completed_at: new Date().toISOString() } : {}) };
+        setCompletedOrders((prev) => (prev.some((o) => o.id === orderId) ? prev : [done, ...prev]));
+      }
+      setCompletedCount((c) => c + 1);
+    } else {
+      const apply = (prev) => prev.map((o) => (o.id === orderId ? { ...o, ...fields } : o));
+      setOrders(apply);
+      setCompletedOrders(apply);
+    }
+    const t0 = Date.now();
     setActionIds((prev) => new Set([...prev, orderId]));
     try {
       if ((await ensureSession()) === "lost") { onSessionLost(); return; }
 
       let res = await sendPatch(orderId, fields);
+      console.log(`[front-desk patch] ${JSON.stringify(fields)} on ${orderId}: ${Date.now() - t0}ms HTTP ${res.status}`);
       if (res.status === 401) {
         const recovered = await ensureSession(true);
         if (recovered === "lost") { onSessionLost(); return; }
@@ -910,25 +968,32 @@ function FrontDeskMain({ onSessionLost }) {
 
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
+        // Roll back optimistic update
+        if (fields.order_status === "completed" && snapshot) {
+          completedIdsRef.current.delete(orderId);
+          setOrders((prev) => (prev.some((o) => o.id === orderId) ? prev : [snapshot, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))));
+          setCompletedOrders((prev) => prev.filter((o) => o.id !== orderId));
+          setCompletedCount((c) => Math.max(0, c - 1));
+        } else if (snapshot) {
+          const rollback = (prev) => prev.map((o) => (o.id === orderId ? snapshot : o));
+          setOrders(rollback);
+          setCompletedOrders(rollback);
+        }
         setActionError(`${actionLabel} failed. HTTP ${res.status}: ${json.error || res.statusText || "No message from the server."}`);
         return;
       }
-
-      if (fields.order_status === "completed") {
-        const moved = ordersRef.current.find((o) => o.id === orderId);
-        completedIdsRef.current.add(orderId);
-        setOrders((prev) => prev.filter((o) => o.id !== orderId));
-        if (moved) {
-          const done = { ...moved, order_status: "completed", ...(hasColRef.current ? { completed_at: new Date().toISOString() } : {}) };
-          setCompletedOrders((prev) => (prev.some((o) => o.id === orderId) ? prev : [done, ...prev]));
-        }
-        setCompletedCount((c) => c + 1);
-      } else {
-        const apply = (prev) => prev.map((o) => (o.id === orderId ? { ...o, ...fields } : o));
-        setOrders(apply);
-        setCompletedOrders(apply);
-      }
     } catch (err) {
+      console.log(`[front-desk patch] ${JSON.stringify(fields)} on ${orderId}: ${Date.now() - t0}ms network error`);
+      if (fields.order_status === "completed" && snapshot) {
+        completedIdsRef.current.delete(orderId);
+        setOrders((prev) => (prev.some((o) => o.id === orderId) ? prev : [snapshot, ...prev].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))));
+        setCompletedOrders((prev) => prev.filter((o) => o.id !== orderId));
+        setCompletedCount((c) => Math.max(0, c - 1));
+      } else if (snapshot) {
+        const rollback = (prev) => prev.map((o) => (o.id === orderId ? snapshot : o));
+        setOrders(rollback);
+        setCompletedOrders(rollback);
+      }
       setActionError(`${actionLabel} failed. Network error: ${err?.message || "could not reach the server."}`);
     } finally {
       setActionIds((prev) => { const n = new Set(prev); n.delete(orderId); return n; });
@@ -1078,6 +1143,16 @@ function FrontDeskMain({ onSessionLost }) {
         }
         .fd-flash { animation: fd-pulse 1.4s ease-in-out infinite; }
       `}</style>
+
+      {fdAlertBanner && (
+        <div
+          onClick={stopFdAlertLoop}
+          style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 999, background: "#d97706", color: "#fff", padding: "12px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", fontWeight: 700, fontSize: 14, fontFamily: "inherit" }}
+        >
+          <span>{fdAlertBanner.count > 1 ? `${fdAlertBanner.count} new orders` : fdAlertBanner.label}. Tap to silence</span>
+          <span style={{ fontSize: 18, lineHeight: 1 }}>x</span>
+        </div>
+      )}
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, paddingBottom: 20, borderBottom: `1px solid ${t.border}` }}>

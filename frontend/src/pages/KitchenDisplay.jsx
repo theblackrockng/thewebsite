@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Wifi, WifiOff } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Wifi, WifiOff, X } from "lucide-react";
 
 const KITCHEN_ROLES = ["kitchen"];
 
@@ -41,19 +41,31 @@ function orderIcon(order) {
   return <Package size={16} style={{ color: "#c8a96e" }} />;
 }
 
-function playAlert() {
+const alertAudio = { ctx: null };
+
+function unlockAlertAudio() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return;
+  if (!alertAudio.ctx) alertAudio.ctx = new Ctx();
+  if (alertAudio.ctx.state === "suspended") alertAudio.ctx.resume().catch(() => {});
+}
+
+function playAlertTone() {
+  const ctx = alertAudio.ctx;
+  if (!ctx || ctx.state !== "running") return;
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    gain.gain.setValueAtTime(0.4, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.6);
+    [[880, 0, 0.42], [660, 0.2, 0.42]].forEach(([freq, at, len]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const s = ctx.currentTime + at;
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, s);
+      gain.gain.setValueAtTime(0.0001, s);
+      gain.gain.exponentialRampToValueAtTime(0.32, s + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, s + len);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(s); osc.stop(s + len + 0.05);
+    });
   } catch {}
 }
 
@@ -70,9 +82,19 @@ function KitchenContent() {
   const [loading, setLoading] = useState(true);
   const [actionIds, setActionIds] = useState(new Set());
   const [connected, setConnected] = useState(false);
-  const knownIdsRef = useRef(new Set());
-  const mountedRef  = useRef(true);
-  const channelRef  = useRef(null);
+  const [actionError, setActionError] = useState("");
+  const [audioReady, setAudioReady] = useState(false);
+  const [alertBanner, setAlertBanner] = useState(null);
+  const knownIdsRef    = useRef(new Set());
+  const mountedRef     = useRef(true);
+  const channelRef     = useRef(null);
+  const alertLoopRef   = useRef(null);
+  const inFlightIdsRef = useRef(new Set());
+
+  function stopAlertLoop() {
+    if (alertLoopRef.current) { clearInterval(alertLoopRef.current); alertLoopRef.current = null; }
+    setAlertBanner(null);
+  }
 
   const fetchOrders = useCallback(async () => {
     const { data, error } = await supabase
@@ -91,13 +113,39 @@ function KitchenContent() {
       }))
       .filter((o) => o.displayItems.length > 0);
 
-    setOrders(foodOrders);
+    // Preserve optimistic state for in-flight updates (prevent Realtime echo revert)
+    setOrders((prev) => {
+      const merged = foodOrders
+        .filter((o) => !inFlightIdsRef.current.has(o.id) || prev.some((p) => p.id === o.id))
+        .map((o) => (inFlightIdsRef.current.has(o.id) ? prev.find((p) => p.id === o.id) || o : o));
+      return merged;
+    });
     setLoading(false);
 
     const newIds = new Set(foodOrders.map((o) => o.id));
     const arrivals = [...newIds].filter((id) => !knownIdsRef.current.has(id));
     if (arrivals.length > 0 && knownIdsRef.current.size > 0) {
-      playAlert();
+      const first = foodOrders.find((o) => arrivals.includes(o.id));
+      const label = first
+        ? `New order${arrivals.length > 1 ? "s" : ""}, ${orderLabel(first)}${arrivals.length > 1 ? ` +${arrivals.length - 1} more` : ""}`
+        : `${arrivals.length} new order${arrivals.length !== 1 ? "s" : ""}`;
+      setAlertBanner((prev) => (prev ? { label, count: arrivals.length + (prev.count || 0) } : { label, count: arrivals.length }));
+      if (!alertLoopRef.current) {
+        unlockAlertAudio();
+        playAlertTone();
+        setAudioReady(alertAudio.ctx?.state === "running");
+        let elapsed = 0;
+        alertLoopRef.current = setInterval(() => {
+          elapsed += 2000;
+          if (elapsed >= 30000) {
+            clearInterval(alertLoopRef.current); alertLoopRef.current = null;
+            setAlertBanner(null);
+            return;
+          }
+          unlockAlertAudio();
+          playAlertTone();
+        }, 2000);
+      }
     }
     knownIdsRef.current = newIds;
   }, []);
@@ -181,31 +229,106 @@ function KitchenContent() {
     return () => subscription.unsubscribe();
   }, [subscribe, fetchOrders]);
 
+  // Screen wake lock
+  useEffect(() => {
+    let sentinel = null;
+    let cancelled = false;
+    async function acquire() {
+      try {
+        if (!("wakeLock" in navigator) || document.visibilityState !== "visible") return;
+        const lock = await navigator.wakeLock.request("screen");
+        if (cancelled) { lock.release().catch(() => {}); return; }
+        sentinel = lock;
+      } catch {}
+    }
+    function onVisible() { if (document.visibilityState === "visible") acquire(); }
+    acquire();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => { cancelled = true; document.removeEventListener("visibilitychange", onVisible); if (sentinel) sentinel.release().catch(() => {}); };
+  }, []);
+
+  // Resume AudioContext on visibility/focus so alerts work after tab switch
+  useEffect(() => {
+    function resume() { if (alertAudio.ctx?.state === "suspended") alertAudio.ctx.resume().catch(() => {}); }
+    const onVis = () => { if (document.visibilityState === "visible") resume(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", resume);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", resume); };
+  }, []);
+
   async function updateStatus(orderId, newStatus) {
+    const snapshot = orders.find((o) => o.id === orderId);
+    // Optimistic update
+    if (newStatus === "ready") {
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      knownIdsRef.current.delete(orderId);
+    } else {
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, order_status: newStatus } : o));
+    }
     setActionIds((prev) => new Set([...prev, orderId]));
+    inFlightIdsRef.current.add(orderId);
+    const t0 = Date.now();
     try {
       const res = await fetch("/api/kitchen-status", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ orderId, status: newStatus }),
       });
-      if (res.ok) {
-        if (newStatus === "ready") {
-          setOrders((prev) => prev.filter((o) => o.id !== orderId));
-          knownIdsRef.current.delete(orderId);
-        } else {
-          setOrders((prev) =>
-            prev.map((o) => o.id === orderId ? { ...o, order_status: newStatus } : o)
-          );
+      console.log(`[kitchen-status] ${newStatus} ${orderId}: ${Date.now() - t0}ms HTTP ${res.status}`);
+      if (!res.ok) {
+        // Roll back
+        if (newStatus === "ready" && snapshot) {
+          setOrders((prev) => [...prev, snapshot].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
+          knownIdsRef.current.add(orderId);
+        } else if (snapshot) {
+          setOrders((prev) => prev.map((o) => o.id === orderId ? snapshot : o));
         }
+        setActionError(`Update failed (HTTP ${res.status}). Order restored.`);
+        setTimeout(() => setActionError(""), 5000);
       }
+    } catch (err) {
+      console.log(`[kitchen-status] ${newStatus} ${orderId}: ${Date.now() - t0}ms network error`);
+      if (newStatus === "ready" && snapshot) {
+        setOrders((prev) => [...prev, snapshot].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
+        knownIdsRef.current.add(orderId);
+      } else if (snapshot) {
+        setOrders((prev) => prev.map((o) => o.id === orderId ? snapshot : o));
+      }
+      setActionError(`Update failed: network error. Order restored.`);
+      setTimeout(() => setActionError(""), 5000);
     } finally {
       setActionIds((prev) => { const n = new Set(prev); n.delete(orderId); return n; });
+      inFlightIdsRef.current.delete(orderId);
     }
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0f0d0a", padding: "20px 24px", fontFamily: "'DM Sans', 'Montserrat', sans-serif" }}>
+    <div onClick={() => { unlockAlertAudio(); setAudioReady(alertAudio.ctx?.state === "running"); }} style={{ minHeight: "100vh", background: "#0f0d0a", padding: "20px 24px", fontFamily: "'DM Sans', 'Montserrat', sans-serif" }}>
+      {/* Alert banner */}
+      {alertBanner && (
+        <div
+          onClick={stopAlertLoop}
+          style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 999, background: "#d97706", color: "#fff", padding: "13px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", fontWeight: 700, fontSize: 15, fontFamily: "inherit" }}
+        >
+          <span>{alertBanner.count > 1 ? `${alertBanner.count} new orders` : alertBanner.label}. Tap to silence</span>
+          <X size={18} />
+        </div>
+      )}
+      {/* Sound-off warning */}
+      {!audioReady && (
+        <div
+          onClick={() => { unlockAlertAudio(); setAudioReady(alertAudio.ctx?.state === "running"); }}
+          style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 998, background: "rgba(15,13,10,0.94)", color: "#d97706", padding: "10px 20px", textAlign: "center", cursor: "pointer", fontSize: 12, fontWeight: 600, borderTop: "1px solid #2e2820", fontFamily: "inherit" }}
+        >
+          Sound is off. Tap anywhere to enable alert sounds.
+        </div>
+      )}
+      {/* Action error */}
+      {actionError && (
+        <div style={{ position: "fixed", bottom: audioReady ? 0 : 44, left: 0, right: 0, zIndex: 997, background: "rgba(239,68,68,0.92)", color: "#fff", padding: "10px 20px", textAlign: "center", fontSize: 13, fontWeight: 600, fontFamily: "inherit" }}>
+          {actionError}
+        </div>
+      )}
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, borderBottom: "1px solid #2e2820", paddingBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
