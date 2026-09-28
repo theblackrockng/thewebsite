@@ -31,7 +31,7 @@ function getSupabase() {
   return _supabase;
 }
 
-async function sendTelegram(text, replyMarkup) {
+async function sendTelegram(text, replyMarkup, skipKitchen = false) {
   if (!TOKEN || !CHAT_ID) {
     console.warn('[orders] sendTelegram skipped — TOKEN or CHAT_ID missing');
     return null;
@@ -46,7 +46,7 @@ async function sendTelegram(text, replyMarkup) {
     body: JSON.stringify(mainBody),
   }).then((r) => r.json());
 
-  const kitchenSend = KITCHEN_CHAT_ID
+  const kitchenSend = (KITCHEN_CHAT_ID && !skipKitchen)
     ? fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -56,6 +56,8 @@ async function sendTelegram(text, replyMarkup) {
 
   if (!KITCHEN_CHAT_ID) {
     console.warn('[orders] kitchen Telegram skipped — KITCHEN_TELEGRAM_CHAT_ID not set in this environment');
+  } else if (skipKitchen) {
+    console.warn('[orders] kitchen Telegram skipped — pickup/delivery order, kitchen notified on confirm');
   }
 
   // Await both concurrently so neither blocks the other and neither is
@@ -342,7 +344,7 @@ module.exports = async function handler(req, res) {
       ]],
     };
 
-    await sendTelegram(telegramText, replyMarkup).catch((err) => {
+    await sendTelegram(telegramText, replyMarkup, orderType !== 'dine-in').catch((err) => {
       console.error('[orders] Telegram send error:', err);
     });
 

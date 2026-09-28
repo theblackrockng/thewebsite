@@ -21,8 +21,9 @@ const WAITER_CALL_ROLES  = ['bar', 'front_desk', 'manager', 'super_admin'];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const TOKEN   = process.env.TELEGRAM_BOT_TOKEN || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
-const CHAT_ID = process.env.TELEGRAM_CHAT_ID   || process.env.REACT_APP_TELEGRAM_CHAT_ID;
+const TOKEN          = process.env.TELEGRAM_BOT_TOKEN || process.env.REACT_APP_TELEGRAM_BOT_TOKEN;
+const CHAT_ID        = process.env.TELEGRAM_CHAT_ID   || process.env.REACT_APP_TELEGRAM_CHAT_ID;
+const KITCHEN_CHAT_ID = process.env.KITCHEN_TELEGRAM_CHAT_ID || null;
 
 let _db = null;
 function getDb() {
@@ -48,6 +49,19 @@ async function notifyTelegram(tag, text) {
     });
   } catch (err) {
     console.error(`[${tag}] Telegram error:`, err);
+  }
+}
+
+async function notifyKitchenTelegram(tag, text) {
+  if (!TOKEN || !KITCHEN_CHAT_ID) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: KITCHEN_CHAT_ID, text, parse_mode: 'HTML' }),
+    });
+  } catch (err) {
+    console.error(`[${tag}] kitchen Telegram error:`, err);
   }
 }
 
@@ -114,7 +128,7 @@ async function ordersHandler(req, res) {
   try {
     const { data: order, error: fetchErr } = await db
       .from('orders')
-      .select('id, order_number, order_status, payment_status')
+      .select('id, order_number, order_status, payment_status, order_type')
       .eq('id', id)
       .single();
 
@@ -177,6 +191,11 @@ async function ordersHandler(req, res) {
       const ref = order.order_number || id.slice(0, 8);
       const byLine = nextStatus === 'confirmed' ? ` by <b>${escapeHtml(updates.confirmed_by)}</b>` : '';
       await notifyTelegram('front-desk-orders', `📋 Order ${escapeHtml(ref)} is now <b>${nextStatus}</b>${byLine}`);
+      if (nextStatus === 'confirmed' && (order.order_type === 'pickup' || order.order_type === 'delivery')) {
+        const typeLabel = order.order_type === 'pickup' ? 'Pickup' : 'Delivery';
+        const kitchenMsg = `🛒 <b>Order ${escapeHtml(ref)} — ${typeLabel}</b>\nConfirmed by <b>${escapeHtml(updates.confirmed_by)}</b>`;
+        await notifyKitchenTelegram('front-desk-orders', kitchenMsg);
+      }
     }
 
     return res.status(200).json({ ok: true });

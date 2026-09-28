@@ -100,7 +100,7 @@ function KitchenContent() {
     const { data, error } = await supabase
       .from("orders")
       .select("*, order_items(*)")
-      .in("order_status", ACTIVE_STATUSES)
+      .or("order_status.in.(confirmed,preparing),and(order_status.eq.new,order_type.eq.dine-in)")
       .order("created_at", { ascending: true });
 
     if (!mountedRef.current) return;

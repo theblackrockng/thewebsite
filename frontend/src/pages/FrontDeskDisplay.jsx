@@ -1732,7 +1732,10 @@ function MergePickerModal({ t, orders, selectedIds, onToggle, onDone }) {
 }
 
 function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, onConfirm, onComplete, onPayment, otherTableOrders }) {
-  const statusCfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
+  const _baseCfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
+  const statusCfg = (order.order_status === "new" && (order.order_type === "pickup" || order.order_type === "delivery"))
+    ? { ..._baseCfg, label: "Awaiting confirmation" }
+    : _baseCfg;
   const payCfg = PAYMENT_CFG[order.payment_status] ?? { label: order.payment_status || "Unknown", color: "#6b7280" };
   const items = order.order_items || [];
   const [mergedIds, setMergedIds] = useState(() => new Set());
