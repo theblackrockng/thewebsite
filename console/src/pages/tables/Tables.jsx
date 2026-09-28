@@ -38,9 +38,7 @@ function makeQR(url, size = 240) {
 }
 
 function getTableUrl(table) {
-  const host = typeof window !== "undefined" ? window.location.host.replace("console.", "").replace(":5173", ":3000") : "";
-  const base = typeof window !== "undefined" ? `${window.location.protocol}//${host}` : "";
-  return `${base}/order?table=${table.table_number}`;
+  return `https://www.blackrockrestaurantng.com/order?table=${table.table_number}`;
 }
 
 /* ── tiny helpers ── */

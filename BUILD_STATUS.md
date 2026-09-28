@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-27 (preview-reservation-meals branch: reservation step 3 redesign with category tabs + image/paginated list + soup/swallow/side pickers, payment sub-steps (70% deposit / full / preference only), bank transfer modal, WhatsApp proof success screen; Front Desk "Mark Payment Verified" button; console MealSelectionsPanel shows modifiers + payment status)_
+_Last updated: 2026-09-28 (fix: console QR codes blank due to CSP missing blob: in img-src — qr-code-styling v1 renders via Blob URL internally; added blob: to img-src; hardcoded QR table URLs to https://www.blackrockrestaurantng.com/order?table=N)_
 
 ---
 
