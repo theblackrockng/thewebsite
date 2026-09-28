@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine } from "lucide-react";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
 
@@ -505,7 +505,15 @@ function FrontDeskMain({ onSessionLost }) {
     setFdAlertBanner(null);
   }
 
-  const [view, setView] = useState("orders");
+  const [view, setView] = useState(() => {
+    try { const v = localStorage.getItem("blackrock-frontdesk-view"); return ["orders","bar","reservations"].includes(v) ? v : "orders"; } catch { return "orders"; }
+  });
+
+  function changeView(v) {
+    setView(v);
+    try { localStorage.setItem("blackrock-frontdesk-view", v); } catch {}
+  }
+
   const [reservations, setReservations] = useState([]);
   const [resToday, setResToday] = useState(lagosToday);
   const [resLoaded, setResLoaded] = useState(false);
@@ -645,8 +653,10 @@ function FrontDeskMain({ onSessionLost }) {
             });
           }, FLASH_MS);
           const first = list.find((o) => arrivals.includes(o.id));
+          const firstHasDrinks = first && (first.order_items || []).some((i) => i.category === "drink");
+          const orderWord = firstHasDrinks ? "drink order" : "order";
           const label = first
-            ? `New order${arrivals.length > 1 ? "s" : ""}, ${orderLabel(first)}${arrivals.length > 1 ? ` +${arrivals.length - 1} more` : ""}`
+            ? `New ${orderWord}${arrivals.length > 1 ? "s" : ""}, ${orderLabel(first)}${arrivals.length > 1 ? ` +${arrivals.length - 1} more` : ""}`
             : `${arrivals.length} new order${arrivals.length !== 1 ? "s" : ""}`;
           setFdAlertBanner((prev) => prev ? { label, count: arrivals.length + (prev.count || 0) } : { label, count: arrivals.length });
           if (!fdAlertLoopRef.current) {
@@ -1004,6 +1014,45 @@ function FrontDeskMain({ onSessionLost }) {
   const completeOrder = (id) => patchOrder(id, { order_status: "completed" }, "Mark Completed");
   const setPayment = (id, payment_status) => patchOrder(id, { payment_status }, payment_status === "paid" ? "Mark Paid" : "Proof Received");
 
+  async function updateBarStatus(orderId, newStatus) {
+    const snapshot = ordersRef.current.find((o) => o.id === orderId);
+    if (newStatus === "ready") {
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+    } else {
+      setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, order_status: newStatus } : o));
+    }
+    setActionIds((prev) => new Set([...prev, orderId]));
+    const t0 = Date.now();
+    try {
+      const res = await fetch("/api/kitchen-status", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ orderId, status: newStatus }),
+      });
+      console.log(`[bar-status] ${newStatus} ${orderId}: ${Date.now() - t0}ms HTTP ${res.status}`);
+      if (!res.ok) {
+        if (newStatus === "ready" && snapshot) {
+          setOrders((prev) => prev.some((o) => o.id === orderId) ? prev : [snapshot, ...prev].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
+        } else if (snapshot) {
+          setOrders((prev) => prev.map((o) => o.id === orderId ? snapshot : o));
+        }
+        setActionError(`Bar status update failed. HTTP ${res.status}.`);
+        setTimeout(() => setActionError(""), 5000);
+      }
+    } catch (err) {
+      console.log(`[bar-status] ${newStatus} ${orderId}: ${Date.now() - t0}ms network error`);
+      if (newStatus === "ready" && snapshot) {
+        setOrders((prev) => prev.some((o) => o.id === orderId) ? prev : [snapshot, ...prev].sort((a, b) => new Date(a.created_at) - new Date(b.created_at)));
+      } else if (snapshot) {
+        setOrders((prev) => prev.map((o) => o.id === orderId ? snapshot : o));
+      }
+      setActionError(`Bar status update failed. Network error.`);
+      setTimeout(() => setActionError(""), 5000);
+    } finally {
+      setActionIds((prev) => { const n = new Set(prev); n.delete(orderId); return n; });
+    }
+  }
+
   async function patchReservation(id, status, actionLabel) {
     setActionError("");
     setResActionIds((prev) => new Set([...prev, id]));
@@ -1109,6 +1158,15 @@ function FrontDeskMain({ onSessionLost }) {
     completed: completedCount,
   }), [orders, completedCount]);
 
+  const barOrders = useMemo(() =>
+    orders
+      .filter((o) => ["new", "confirmed", "preparing"].includes(o.order_status))
+      .map((o) => ({ ...o, displayItems: (o.order_items || []).filter((i) => i.category === "drink") }))
+      .filter((o) => o.displayItems.length > 0)
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
+    [orders]
+  );
+
   const isCompletedTab = tab === "completed";
 
   const visible = useMemo(() => {
@@ -1124,7 +1182,7 @@ function FrontDeskMain({ onSessionLost }) {
   }, [isCompletedTab, completedOrders, orders, tab, statusFilter]);
 
   const onReservations = view === "reservations";
-  const switchBadge = onReservations ? counts.new : resCounts.pending;
+  const onBar = view === "bar";
   const linkOk = onReservations ? resOk : connected;
   const viewUpdated = onReservations ? resUpdated : lastUpdated;
 
@@ -1162,27 +1220,41 @@ function FrontDeskMain({ onSessionLost }) {
             <div style={{ fontSize: 15, color: t.muted, letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, marginTop: 6 }}>Front Desk</div>
           </div>
 
-          <button
-            onClick={() => setView(onReservations ? "orders" : "reservations")}
-            style={{
-              display: "flex", alignItems: "center", gap: 14, padding: "16px 28px", borderRadius: 12,
-              background: t.gold, color: t.onGold, border: `2px solid ${t.gold}`, cursor: "pointer",
-              fontSize: 26, fontWeight: 800, fontFamily: "inherit", letterSpacing: "0.02em",
-            }}
-          >
-            {onReservations ? <UtensilsCrossed size={28} /> : <CalendarDays size={28} />}
-            {onReservations ? "Orders" : "Reservations"}
-            <span
-              aria-label={onReservations ? `${counts.new} new orders waiting` : `${resCounts.pending} pending reservations`}
-              style={{
-                minWidth: 40, height: 40, padding: "0 12px", borderRadius: 99, display: "inline-flex", alignItems: "center", justifyContent: "center",
-                fontSize: 22, fontWeight: 800, fontVariantNumeric: "tabular-nums",
-                background: switchBadge > 0 ? t.accent : "rgba(0,0,0,0.18)", color: switchBadge > 0 ? "#ffffff" : t.onGold,
-              }}
-            >
-              {switchBadge}
-            </span>
-          </button>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {[
+              { v: "orders",       label: "Front Desk",   icon: <UtensilsCrossed size={26} />, badge: counts.new,         ariaDesc: "new orders" },
+              { v: "bar",          label: "Bar",          icon: <Wine size={26} />,            badge: barOrders.length,   ariaDesc: "drink orders" },
+              { v: "reservations", label: "Reservations", icon: <CalendarDays size={26} />,    badge: resCounts.pending,  ariaDesc: "pending reservations" },
+            ].map(({ v, label, icon, badge, ariaDesc }) => {
+              const active = view === v;
+              return (
+                <button
+                  key={v}
+                  onClick={() => changeView(v)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "14px 24px", borderRadius: 12,
+                    background: active ? t.gold : "transparent", color: active ? t.onGold : t.gold,
+                    border: `2px solid ${t.gold}`, cursor: "pointer",
+                    fontSize: 22, fontWeight: 800, fontFamily: "inherit",
+                  }}
+                >
+                  {icon}
+                  {label}
+                  <span
+                    aria-label={`${badge} ${ariaDesc}`}
+                    style={{
+                      minWidth: 36, height: 36, padding: "0 10px", borderRadius: 99, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                      background: badge > 0 ? t.accent : (active ? "rgba(0,0,0,0.18)" : "rgba(200,169,110,0.18)"),
+                      color: badge > 0 ? "#ffffff" : (active ? t.onGold : t.gold),
+                    }}
+                  >
+                    {badge}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
@@ -1264,7 +1336,7 @@ function FrontDeskMain({ onSessionLost }) {
         </div>
       )}
 
-      {onReservations ? (
+      {view === "reservations" ? (
         <ReservationsView
           t={t}
           now={now}
@@ -1280,6 +1352,8 @@ function FrontDeskMain({ onSessionLost }) {
           onAskCancel={setCancelTarget}
           onMarkPaymentVerified={markPaymentVerified}
         />
+      ) : view === "bar" ? (
+        <BarView t={t} now={now} orders={barOrders} actionIds={actionIds} onUpdateStatus={updateBarStatus} />
       ) : (
       <>
       {/* Stat cards */}
@@ -1940,6 +2014,77 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
           onDone={() => setShowMerge(false)}
         />
       )}
+    </div>
+  );
+}
+
+function BarView({ t, now, orders, actionIds, onUpdateStatus }) {
+  if (orders.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "80px 0" }}>
+        <Wine size={56} style={{ color: t.border, marginBottom: 16 }} />
+        <p style={{ color: t.muted, fontSize: 20, margin: 0 }}>No drink orders in queue</p>
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16, marginTop: 24 }}>
+      {orders.map((order) => (
+        <BarDeskCard key={order.id} order={order} t={t} now={now} busy={actionIds.has(order.id)} onUpdate={onUpdateStatus} />
+      ))}
+    </div>
+  );
+}
+
+function BarDeskCard({ order, t, now, busy, onUpdate }) {
+  const cfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
+  const isNew = order.order_status === "new" || order.order_status === "confirmed";
+  const nextStatus = isNew ? "preparing" : "ready";
+  const nextLabel = isNew ? "Start Preparing" : "Mark Ready";
+
+  return (
+    <div style={{
+      background: t.card, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column",
+      border: `2px solid ${order.order_status === "preparing" ? "#8b5cf6" : t.border}`,
+    }}>
+      <div style={{ background: t.cardHead, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${t.border}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Wine size={20} style={{ color: t.gold }} />
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: t.text }}>{orderLabel(order)}</div>
+            <div style={{ fontSize: 13, color: t.muted }}>{order.order_number} · {timeSince(order.created_at, now)}</div>
+          </div>
+        </div>
+        <Badge cfg={cfg} />
+      </div>
+      <div style={{ padding: "14px 18px", flex: 1 }}>
+        {order.displayItems.map((item, idx) => (
+          <div key={item.id || idx} style={{ display: "flex", gap: 10, marginBottom: idx < order.displayItems.length - 1 ? 10 : 0 }}>
+            <span style={{ color: t.gold, fontWeight: 800, fontSize: 17, minWidth: 30 }}>{item.qty}x</span>
+            <div>
+              <span style={{ fontSize: 16, fontWeight: 600, color: t.text }}>{item.item_name}</span>
+              {item.modifiers && (
+                <div style={{ fontSize: 13, color: t.gold, fontStyle: "italic", marginTop: 2 }}>{item.modifiers}</div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ padding: "12px 18px", borderTop: `1px solid ${t.border}` }}>
+        <button
+          onClick={() => onUpdate(order.id, nextStatus)}
+          disabled={busy}
+          style={{
+            width: "100%", padding: "14px 20px", borderRadius: 8, border: "none",
+            background: nextStatus === "ready" ? "#22c55e" : t.gold,
+            color: nextStatus === "ready" ? "#fff" : t.onGold,
+            fontSize: 16, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer",
+            opacity: busy ? 0.6 : 1, fontFamily: "inherit",
+          }}
+        >
+          {busy ? "Updating..." : nextLabel}
+        </button>
+      </div>
     </div>
   );
 }
