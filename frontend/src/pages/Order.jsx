@@ -14,10 +14,11 @@ const FOOD_CATEGORY_ORDER = [
 
 const SOUPS = [
   "Efo Riro", "Edika-Ikong", "Egusi", "Mixed Okro",
-  "Fisherman Soup", "Seafood", "Banga", "Ofe Nsala", "Miyan Kuka", "Ewedu",
+  "Fisherman Soup", "Seafood Okro", "Banga", "Ofe Nsala", "Miyan Kuka", "Ewedu",
+  "Oha/Bitterleaf Soup",
 ];
 
-const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo"];
+const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo", "Poundo"];
 
 const SIDES = ["Rice", "Potato Wedges", "Yam Chips"];
 
