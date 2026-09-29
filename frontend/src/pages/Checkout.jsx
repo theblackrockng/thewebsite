@@ -154,9 +154,9 @@ export default function Checkout() {
 
   // Bank account details (whatsappNumber is hardcoded above, never from DB)
   const [bankAccount, setBankAccount] = useState({
-    accountName: "BlackRock Restaurant",
-    accountNumber: "0012345678",
-    bankName: "Moniepoint MFB",
+    accountName: "Squad BlackRock Restaurant Loungebar",
+    accountNumber: "9006080442",
+    bankName: "Guarantee Trust Bank",
   });
   const [copied, setCopied] = useState(false);
 
