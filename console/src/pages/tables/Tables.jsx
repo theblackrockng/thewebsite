@@ -6,7 +6,7 @@ import { supabase } from "../../lib/supabase";
 
 const API_BASE = "/api/tables";
 
-const BR_LOGO_SVG = `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><rect width="80" height="80" rx="12" fill="#0f0d0a"/><text x="50%" y="56%" text-anchor="middle" dominant-baseline="middle" font-family="Georgia,serif" font-weight="700" font-size="28" fill="#c8a96e" letter-spacing="1">BR</text></svg>`)}`;
+const BR_LOGO_SVG = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4MCA4MCI+PHJlY3Qgd2lkdGg9IjgwIiBoZWlnaHQ9IjgwIiByeD0iMTIiIGZpbGw9IiMwZjBkMGEiLz48dGV4dCB4PSI1MCUiIHk9IjU2JSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiIGZvbnQtc2l6ZT0iMjgiIGZpbGw9IiNjOGE5NmUiIGxldHRlci1zcGFjaW5nPSIxIj5CUjwvdGV4dD48L3N2Zz4=";
 
 function makeQR(url, size = 240) {
   return new QRCodeStyling({
@@ -30,7 +30,6 @@ function makeQR(url, size = 240) {
     },
     image: BR_LOGO_SVG,
     imageOptions: {
-      crossOrigin: "anonymous",
       margin: 4,
       imageSize: 0.28,
     },
