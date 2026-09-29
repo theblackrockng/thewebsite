@@ -58,20 +58,23 @@ export default function Order() {
   const scrollingProgrammatically = useRef(false);
   const tabsRef = useRef(null);
 
-  // Validate table query param once on mount
+  // Set table from URL param immediately — server validates on order submit.
+  // Also confirm against DB (best-effort; RLS may block anon reads, which is fine).
   useEffect(() => {
     const tableParam = searchParams.get("table");
     if (!tableParam) return;
     const n = parseInt(tableParam, 10);
-    if (isNaN(n)) return;
-    if (tableValid && tableNumber === n) return; // already validated this session
+    if (isNaN(n) || n < 1) return;
+    if (tableValid && tableNumber === n) return;
+    setTable(n);
     supabase
       .from("tables")
       .select("id, table_number, active")
       .eq("table_number", n)
       .eq("active", true)
       .maybeSingle()
-      .then(({ data }) => { if (data) setTable(data.table_number); });
+      .then(({ data }) => { if (data) setTable(data.table_number); })
+      .catch(() => {});
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
