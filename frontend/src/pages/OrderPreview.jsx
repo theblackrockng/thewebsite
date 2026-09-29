@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ShoppingBag,
@@ -8,6 +9,7 @@ import {
 import { supabase } from "../lib/supabase";
 import { MENU, BRAND } from "../lib/data";
 import { useCart } from "../context/CartContext";
+import { useTable } from "../context/TableContext";
 import SEO from "../components/SEO";
 
 const PER_PAGE = 5;
@@ -129,6 +131,19 @@ function buildStaticFood() {
 
 export default function OrderPreview() {
   const { items: cartItems, addItem, setQty, totalItems, subtotal, setDrawerOpen } = useCart();
+  const { tableNumber, tableValid, setTable } = useTable();
+  const [searchParams] = useSearchParams();
+
+  // Set table from URL param immediately on mount so CartDrawer shows dine-in flow
+  useEffect(() => {
+    const tableParam = searchParams.get("table");
+    if (!tableParam) return;
+    const n = parseInt(tableParam, 10);
+    if (isNaN(n) || n < 1) return;
+    if (tableValid && tableNumber === n) return;
+    setTable(n);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [menuType, setMenuType] = useState("food"); // "food" | "drink"
   const [foodData, setFoodData] = useState(null);
   const [activeTab, setActiveTab] = useState(FOOD_CATEGORY_ORDER[0]);
