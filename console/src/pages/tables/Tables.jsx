@@ -76,24 +76,26 @@ const btn = (variant = "primary") => ({
 /* ── QR preview modal ── */
 function QRModal({ table, onClose, onUpdated }) {
   const containerRef = useRef(null);
-  const qrRef = useRef(null);
   const fileRef = useRef(null);
   const url = getTableUrl(table);
   const [customUrl, setCustomUrl] = useState(table.custom_qr_url || "");
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [qrSrc, setQrSrc] = useState("");
 
   useEffect(() => {
-    qrRef.current = makeQR(url, 240);
-    if (containerRef.current) {
-      containerRef.current.innerHTML = "";
-      qrRef.current.append(containerRef.current);
-    }
+    let cancelled = false;
+    setQrSrc("");
+    makeQR(url, 240).getRawData("png").then((blob) => {
+      if (cancelled || !blob) return;
+      const objUrl = URL.createObjectURL(blob);
+      setQrSrc(objUrl);
+    }).catch(() => {});
+    return () => { cancelled = true; };
   }, [url]);
 
   async function download() {
-    if (!qrRef.current) return;
     const hires = makeQR(url, 1200);
     await hires.getRawData("png").then((blob) => {
       const a = document.createElement("a");
@@ -188,8 +190,12 @@ function QRModal({ table, onClose, onUpdated }) {
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ds-muted)", alignSelf: "flex-start" }}>
             BLACKROCK Generated QR
           </div>
-          <div style={{ borderRadius: 12, overflow: "hidden", border: "2px solid #2e2820" }}>
-            <div ref={containerRef} />
+          <div style={{ borderRadius: 12, overflow: "hidden", border: "2px solid #2e2820", width: 240, height: 240, background: "#0f0d0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {qrSrc ? (
+              <img src={qrSrc} alt={`Table ${table.table_number} QR`} style={{ width: 240, height: 240, display: "block" }} />
+            ) : (
+              <div style={{ color: "#3e3426", fontSize: 11 }}>Generating…</div>
+            )}
           </div>
           <div style={{ fontSize: 10.5, color: "var(--ds-muted)", textAlign: "center", wordBreak: "break-all", maxWidth: 300 }}>
             {url}
