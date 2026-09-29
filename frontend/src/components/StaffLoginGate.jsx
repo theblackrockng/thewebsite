@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useRef } from "react";
-import { LogOut } from "lucide-react";
+import { LogOut, Eye, EyeOff } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { loginStaff, loadStaffProfile, signOutStaff } from "../lib/staffAuth";
 import IdleLock from "./IdleLock";
@@ -121,6 +121,7 @@ export default function StaffLoginGate({ children, allowedRoles, title, idleMinu
 }
 
 function LoginForm({ title, email, setEmail, password, setPassword, error, signingIn, onSubmit }) {
+  const [showPw, setShowPw] = useState(false);
   return (
     <div style={{ minHeight: "100vh", background: "#0f0d0a", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
       <form onSubmit={onSubmit} style={{ background: "#1a1612", border: "1px solid #2e2820", borderRadius: 14, padding: "40px 36px", width: "100%", maxWidth: 400, display: "flex", flexDirection: "column" }}>
@@ -136,11 +137,21 @@ function LoginForm({ title, email, setEmail, password, setPassword, error, signi
         />
 
         <label style={{ fontSize: 11, fontWeight: 600, color: "#9C8E7A", letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 6 }}>Password</label>
-        <input
-          type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-          placeholder="••••••••" required
-          style={{ background: "#251f19", border: "1px solid #3e3426", borderRadius: 7, padding: "12px 14px", fontSize: 14, color: "#F5F0E8", outline: "none", marginBottom: error ? 14 : 24, fontFamily: "inherit" }}
-        />
+        <div style={{ position: "relative", marginBottom: error ? 14 : 24 }}>
+          <input
+            type={showPw ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••" required
+            style={{ width: "100%", boxSizing: "border-box", background: "#251f19", border: "1px solid #3e3426", borderRadius: 7, padding: "12px 44px 12px 14px", fontSize: 14, color: "#F5F0E8", outline: "none", fontFamily: "inherit" }}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPw((v) => !v)}
+            style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", color: "#9C8E7A", display: "flex", padding: 0 }}
+            tabIndex={-1}
+          >
+            {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+          </button>
+        </div>
 
         {error && (
           <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", borderRadius: 7, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#ef4444", lineHeight: 1.5 }}>
