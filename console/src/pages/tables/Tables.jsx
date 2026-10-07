@@ -1,33 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { QrCode, Plus, Pencil, Trash2, Download, Check, X, RefreshCw, ToggleLeft, ToggleRight, UploadCloud, ImagePlus } from "lucide-react";
-import QRCodeStyling from "qr-code-styling";
+import { QrCode, Plus, Pencil, Trash2, Check, X, RefreshCw, ToggleLeft, ToggleRight, UploadCloud, ImagePlus } from "lucide-react";
 import { authHeader } from "../../lib/authHeader";
 import { supabase } from "../../lib/supabase";
 
 const API_BASE = "/api/tables";
-
-function makeQR(url, size = 240) {
-  return new QRCodeStyling({
-    width: size,
-    height: size,
-    type: "canvas",
-    data: url,
-    dotsOptions: {
-      color: "#c8a96e",
-      type: "rounded",
-    },
-    cornersSquareOptions: {
-      type: "extra-rounded",
-      color: "#c8a96e",
-    },
-    cornersDotOptions: {
-      color: "#c8a96e",
-    },
-    backgroundOptions: {
-      color: "#0f0d0a",
-    },
-  });
-}
 
 function getTableUrl(table) {
   return `https://www.blackrockrestaurantng.com/order?table=${table.table_number}`;
@@ -68,36 +44,11 @@ const btn = (variant = "primary") => ({
 
 /* ── QR preview modal ── */
 function QRModal({ table, onClose, onUpdated }) {
-  const containerRef = useRef(null);
   const fileRef = useRef(null);
-  const url = getTableUrl(table);
   const [customUrl, setCustomUrl] = useState(table.custom_qr_url || "");
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [uploadError, setUploadError] = useState("");
-  const [qrSrc, setQrSrc] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-    setQrSrc("");
-    makeQR(url, 240).getRawData("png").then((blob) => {
-      if (cancelled || !blob) return;
-      const objUrl = URL.createObjectURL(blob);
-      setQrSrc(objUrl);
-    }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [url]);
-
-  async function download() {
-    const hires = makeQR(url, 1200);
-    await hires.getRawData("png").then((blob) => {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = `blackrock-table-${table.table_number}.png`;
-      a.click();
-      URL.revokeObjectURL(a.href);
-    });
-  }
 
   async function handleUpload(file) {
     if (!file || !file.type.startsWith("image/")) { setUploadError("Please select an image file."); return; }
@@ -178,41 +129,14 @@ function QRModal({ table, onClose, onUpdated }) {
           </button>
         </div>
 
-        {/* ── Generated QR ── */}
-        <div style={{ padding: "0 24px 20px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ds-muted)", alignSelf: "flex-start" }}>
-            BLACKROCK Generated QR
-          </div>
-          <div style={{ borderRadius: 12, overflow: "hidden", border: "2px solid #2e2820", width: 240, height: 240, background: "#0f0d0a", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            {qrSrc ? (
-              <img src={qrSrc} alt={`Table ${table.table_number} QR`} style={{ width: 240, height: 240, display: "block" }} />
-            ) : (
-              <div style={{ color: "#3e3426", fontSize: 11 }}>Generating…</div>
-            )}
-          </div>
-          <div style={{ fontSize: 10.5, color: "var(--ds-muted)", textAlign: "center", wordBreak: "break-all", maxWidth: 300 }}>
-            {url}
-          </div>
-          <button onClick={download} style={{ ...btn("ghost"), width: "100%", justifyContent: "center" }}>
-            <Download size={13} /> Download PNG (High-Res)
-          </button>
-        </div>
-
-        {/* Divider */}
-        <div style={{ borderTop: "1px solid var(--ds-border)", margin: "0 24px" }} />
-
         {/* ── Custom QR upload ── */}
-        <div style={{ padding: "18px 24px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "var(--ds-muted)" }}>
-            Your Custom QR Code
-          </div>
-
+        <div style={{ padding: "0 24px 24px", display: "flex", flexDirection: "column", gap: 12 }}>
           {customUrl ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, alignItems: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, alignItems: "center" }}>
               <img
                 src={customUrl}
-                alt={`Custom QR Table ${table.table_number}`}
-                style={{ width: 160, height: 160, objectFit: "contain", borderRadius: 10, border: "2px solid #c8a96e", background: "#fff" }}
+                alt={`QR Table ${table.table_number}`}
+                style={{ width: 240, height: 240, objectFit: "contain", borderRadius: 10, border: "2px solid #c8a96e", background: "#fff" }}
               />
               <div style={{ display: "flex", gap: 8, width: "100%" }}>
                 <button
@@ -433,24 +357,7 @@ function DeleteConfirm({ table, onClose, onDeleted }) {
 
 /* ── TableRow ── */
 function TableRow({ table, onEdit, onDelete, onQR }) {
-  const [thumbSrc, setThumbSrc] = useState("");
-
-  useEffect(() => {
-    if (table.custom_qr_url) { setThumbSrc(""); return; }
-    let cancelled = false;
-    makeQR(getTableUrl(table), 80)
-      .getRawData("png")
-      .then((blob) => {
-        if (cancelled || !blob) return;
-        const reader = new FileReader();
-        reader.onloadend = () => { if (!cancelled) setThumbSrc(reader.result); };
-        reader.readAsDataURL(blob);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [table.qr_slug, table.custom_qr_url]);
-
-  const thumbUrl = table.custom_qr_url || thumbSrc;
+  const thumbUrl = table.custom_qr_url || "";
 
   return (
     <div style={{
