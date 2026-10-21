@@ -687,6 +687,12 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
           waiterName={waiterName}
           onClose={() => setConfirmOpen(false)}
           onPlaceOrder={placeOrder}
+          onCancelOrder={() => {
+            if (!window.confirm("Cancel this order? All items will be cleared.")) return;
+            setCart([]);
+            setSubmitError("");
+            setConfirmOpen(false);
+          }}
         />
       )}
 
@@ -912,7 +918,7 @@ function WaiterSidePickerModal({ dish, onClose, onConfirm }) {
 }
 
 /* ── Confirm overlay ────────────────────────────────────────────────── */
-function WaiterConfirmOverlay({ cart, cartTotal, tables, selectedTable, setSelectedTable, tableFlash, submitting, submitError, waiterName, onClose, onPlaceOrder }) {
+function WaiterConfirmOverlay({ cart, cartTotal, tables, selectedTable, setSelectedTable, tableFlash, submitting, submitError, waiterName, onClose, onPlaceOrder, onCancelOrder }) {
   const selectedTableObj = tables.find(t => String(t.id) === String(selectedTable));
 
   return (
@@ -990,19 +996,28 @@ function WaiterConfirmOverlay({ cart, cartTotal, tables, selectedTable, setSelec
         </div>
 
         {/* Footer buttons */}
-        <div style={{ padding: "16px 24px", borderTop: "1px solid #2e2820", display: "flex", gap: 12, flexShrink: 0 }}>
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #2e2820", display: "flex", flexDirection: "column", gap: 10, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              onClick={onClose}
+              style={{ flex: 1, padding: "13px", borderRadius: 7, border: "1px solid #2e2820", background: "transparent", color: "#9C8E7A", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              Edit Order
+            </button>
+            <button
+              onClick={onPlaceOrder}
+              disabled={submitting}
+              style={{ flex: 2, padding: "13px", borderRadius: 7, border: "none", background: submitting ? "#2e2820" : "#7a1c1c", color: submitting ? "#5a4e46" : "#F5F0E8", fontSize: 13, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit", letterSpacing: "0.02em" }}
+            >
+              {submitting ? "Placing Order…" : "Place Order →"}
+            </button>
+          </div>
           <button
-            onClick={onClose}
-            style={{ flex: 1, padding: "13px", borderRadius: 7, border: "1px solid #2e2820", background: "transparent", color: "#9C8E7A", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
-          >
-            Edit Order
-          </button>
-          <button
-            onClick={onPlaceOrder}
+            onClick={onCancelOrder}
             disabled={submitting}
-            style={{ flex: 2, padding: "13px", borderRadius: 7, border: "none", background: submitting ? "#2e2820" : "#7a1c1c", color: submitting ? "#5a4e46" : "#F5F0E8", fontSize: 13, fontWeight: 700, cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit", letterSpacing: "0.02em" }}
+            style={{ width: "100%", padding: "10px", borderRadius: 7, border: "1px solid rgba(239,68,68,0.3)", background: "transparent", color: "#ef4444", fontSize: 12.5, fontWeight: 600, cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit", opacity: submitting ? 0.5 : 1 }}
           >
-            {submitting ? "Placing Order…" : "Place Order →"}
+            Cancel Order
           </button>
         </div>
       </div>
