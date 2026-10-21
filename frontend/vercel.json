@@ -11,6 +11,10 @@
     { "source": "/api/register-device",         "destination": "/api/staff-login?action=register-device" },
     { "source": "/api/verify-void-pin",         "destination": "/api/staff-login?action=verify-void-pin" },
     { "source": "/api/set-void-pin",            "destination": "/api/staff-login?action=set-void-pin" },
+    { "source": "/api/verify-guesthouse-pin",   "destination": "/api/staff-login?action=verify-guesthouse-pin" },
+    { "source": "/api/set-guesthouse-pin",      "destination": "/api/staff-login?action=set-guesthouse-pin" },
+    { "source": "/api/front-desk-guesthouse-rooms",    "destination": "/api/front-desk?resource=guesthouse-rooms" },
+    { "source": "/api/front-desk-guesthouse-bookings", "destination": "/api/front-desk?resource=guesthouse-bookings" },
     { "source": "/:path*",                       "destination": "/index.html" }
   ],
   "headers": [

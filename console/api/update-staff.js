@@ -6,7 +6,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL |
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
 
 const KNOWN_ROLES = [
-  "staff", "waiter", "kitchen", "bar", "front_desk",
+  "staff", "waiter", "kitchen", "bar", "front_desk", "guesthouse",
   "manager", "content_creator", "social_media_manager", "super_admin",
 ];
 
@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   const db = getDb();
   if (!db) return res.status(500).json({ error: "Server misconfiguration" });
 
-  const { userId, role, permissions, active, status, can_void_orders, void_pin } = req.body || {};
+  const { userId, role, permissions, active, status, can_void_orders, void_pin, can_manage_guesthouse, guesthouse_pin } = req.body || {};
   if (!userId) return res.status(400).json({ error: "userId is required." });
 
   if (role !== undefined && !KNOWN_ROLES.includes(role)) {
@@ -39,6 +39,10 @@ export default async function handler(req, res) {
 
   if (void_pin !== undefined && void_pin !== null && !/^\d{4,8}$/.test(String(void_pin))) {
     return res.status(400).json({ error: "void_pin must be 4-8 digits." });
+  }
+
+  if (guesthouse_pin !== undefined && guesthouse_pin !== null && !/^\d{4,8}$/.test(String(guesthouse_pin))) {
+    return res.status(400).json({ error: "guesthouse_pin must be 4-8 digits." });
   }
 
   if (role !== undefined && userId === staff.user.id) {
@@ -82,6 +86,18 @@ export default async function handler(req, res) {
       const salt = randomBytes(16).toString("hex");
       updates.void_pin_salt = salt;
       updates.void_pin_hash = createHash("sha256").update(salt + String(void_pin)).digest("hex");
+    }
+  }
+  if (can_manage_guesthouse !== undefined) updates.can_manage_guesthouse = !!can_manage_guesthouse;
+  if (guesthouse_pin !== undefined) {
+    if (guesthouse_pin === null) {
+      updates.guesthouse_pin_hash = null;
+      updates.guesthouse_pin_salt = null;
+    } else {
+      const { createHash, randomBytes } = await import("crypto");
+      const salt = randomBytes(16).toString("hex");
+      updates.guesthouse_pin_salt = salt;
+      updates.guesthouse_pin_hash = createHash("sha256").update(salt + String(guesthouse_pin)).digest("hex");
     }
   }
 

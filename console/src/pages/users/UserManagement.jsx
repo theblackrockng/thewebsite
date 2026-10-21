@@ -22,10 +22,10 @@ const DEFAULT_PERMS = {
   menu: false, media: false, content: false, users: false, settings: false,
 };
 
-const ROLE_OPTIONS = ["waiter", "kitchen", "bar", "front_desk", "staff", "manager", "content_creator", "social_media_manager", "super_admin"];
+const ROLE_OPTIONS = ["waiter", "kitchen", "bar", "front_desk", "guesthouse", "staff", "manager", "content_creator", "social_media_manager", "super_admin"];
 
 // Roles that only sign in on a staff-facing display/tablet, not the console.
-const OPERATIONS_ROLES = ["waiter", "kitchen", "bar", "front_desk"];
+const OPERATIONS_ROLES = ["waiter", "kitchen", "bar", "front_desk", "guesthouse"];
 
 const ROLE_COLORS = {
   super_admin:          { bg: "rgba(200,169,110,0.15)", text: "var(--ds-gold)",  label: "Super Admin" },
@@ -34,6 +34,7 @@ const ROLE_COLORS = {
   kitchen:              { bg: "rgba(34,197,94,0.13)",   text: "#22c55e",         label: "Kitchen" },
   bar:                  { bg: "rgba(56,189,248,0.13)",  text: "#38bdf8",         label: "Bar" },
   front_desk:           { bg: "rgba(200,169,110,0.13)", text: "#c8a96e",         label: "Front Desk" },
+  guesthouse:           { bg: "rgba(217,119,6,0.13)",   text: "#d97706",         label: "Guest House" },
   content_creator:      { bg: "rgba(139,92,246,0.15)",  text: "#a78bfa",         label: "Content Creator" },
   social_media_manager: { bg: "rgba(236,72,153,0.13)",  text: "#f472b6",         label: "Social Media Manager" },
   staff:                { bg: "rgba(160,174,192,0.12)", text: "var(--ds-muted)", label: "Staff" },
@@ -48,6 +49,7 @@ const ROLE_PRESETS = {
   kitchen:              OPERATIONS_PERMS,
   bar:                  OPERATIONS_PERMS,
   front_desk:           OPERATIONS_PERMS,
+  guesthouse:           OPERATIONS_PERMS,
   content_creator:      CONTENT_ONLY_PERMS,
   social_media_manager: CONTENT_ONLY_PERMS,
 };
@@ -260,6 +262,8 @@ function EditModal({ staff, onClose, onSave }) {
   const [perms, setPerms]   = useState({ ...DEFAULT_PERMS, ...staff.permissions });
   const [canVoid, setCanVoid] = useState(!!staff.can_void_orders);
   const [voidPin, setVoidPin] = useState("");
+  const [canGuesthouse, setCanGuesthouse] = useState(!!staff.can_manage_guesthouse);
+  const [guesthousePin, setGuesthousePin] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState("");
 
@@ -273,6 +277,11 @@ function EditModal({ staff, onClose, onSave }) {
       setError("Void PIN must be 4-8 digits.");
       return;
     }
+    if (guesthousePin && !/^\d{4,8}$/.test(guesthousePin)) {
+      setSaving(false);
+      setError("Guest house PIN must be 4-8 digits.");
+      return;
+    }
     const updates = {
       userId: staff.id,
       role,
@@ -280,8 +289,10 @@ function EditModal({ staff, onClose, onSave }) {
         ? Object.fromEntries(PERMISSIONS.map(p => [p.key, true]))
         : perms,
       can_void_orders: canVoid,
+      can_manage_guesthouse: canGuesthouse,
     };
     if (voidPin) updates.void_pin = voidPin;
+    if (guesthousePin) updates.guesthouse_pin = guesthousePin;
     const res = await fetch("/api/update-staff", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(await authHeader()) },
@@ -387,6 +398,43 @@ function EditModal({ staff, onClose, onSave }) {
                 value={voidPin}
                 onChange={(e) => setVoidPin(e.target.value.replace(/\D/g, ""))}
                 placeholder={staff.void_pin_hash ? "Enter new PIN to change (leave blank to keep)" : "Set 4-8 digit void PIN"}
+                style={{ width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "var(--ds-text)", outline: "none", letterSpacing: 2 }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ds-muted)", display: "block", marginBottom: 10 }}>Guest House Authorization</label>
+            <label style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "10px 12px", borderRadius: 7, cursor: "pointer",
+              background: canGuesthouse ? "rgba(200,169,110,0.08)" : "var(--ds-input-bg)",
+              border: `1px solid ${canGuesthouse ? "var(--ds-gold)" : "var(--ds-border)"}`,
+            }}>
+              <input type="checkbox" checked={canGuesthouse} onChange={() => setCanGuesthouse(v => !v)} style={{ display: "none" }} />
+              <div style={{
+                width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                background: canGuesthouse ? "var(--ds-gold)" : "transparent",
+                border: `1.5px solid ${canGuesthouse ? "var(--ds-gold)" : "var(--ds-border)"}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {canGuesthouse && <Check size={9} color="#000" strokeWidth={3} />}
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--ds-text)", lineHeight: 1.4 }}>
+                Can authorize check-ins / key encoding
+                <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 2 }}>
+                  Super Admin, Manager and Front Desk are always authorized.
+                </div>
+              </div>
+            </label>
+            <div style={{ marginTop: 10 }}>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={8}
+                value={guesthousePin}
+                onChange={(e) => setGuesthousePin(e.target.value.replace(/\D/g, ""))}
+                placeholder={staff.guesthouse_pin_hash ? "Enter new PIN to change (leave blank to keep)" : "Set 4-8 digit guest house PIN"}
                 style={{ width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "var(--ds-text)", outline: "none", letterSpacing: 2 }}
               />
             </div>

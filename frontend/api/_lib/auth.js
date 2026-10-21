@@ -30,6 +30,27 @@ function verifyVoidToken(token) {
   }
 }
 
+function signGuesthouseToken(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', SERVICE_ROLE_KEY || 'guesthouse').update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+function verifyGuesthouseToken(token) {
+  if (typeof token !== 'string' || token.indexOf('.') === -1) return null;
+  const [body, sig] = token.split('.');
+  const expected = crypto.createHmac('sha256', SERVICE_ROLE_KEY || 'guesthouse').update(body).digest('base64url');
+  if (expected.length !== sig.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    if (!payload || typeof payload.exp !== 'number' || payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 let _admin = null;
 function getAdmin() {
   if (_admin) return _admin;
@@ -88,4 +109,4 @@ async function requireStaff(req, res, allowedRoles) {
   return { user: userData.user, profile };
 }
 
-module.exports = { requireStaff, signVoidToken, verifyVoidToken };
+module.exports = { requireStaff, signVoidToken, verifyVoidToken, signGuesthouseToken, verifyGuesthouseToken };

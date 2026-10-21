@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search, Lock, Trash2, Edit2 } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search, Lock, Trash2, Edit2, BedDouble, KeyRound, LogIn as LogInIcon } from "lucide-react";
 import { MENU } from "../lib/data";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
@@ -558,7 +558,7 @@ function FrontDeskMain({ onSessionLost }) {
   }
 
   const [view, setView] = useState(() => {
-    try { const v = localStorage.getItem("blackrock-frontdesk-view"); return ["orders","bar","reservations"].includes(v) ? v : "orders"; } catch { return "orders"; }
+    try { const v = localStorage.getItem("blackrock-frontdesk-view"); return ["orders","bar","reservations","guesthouse"].includes(v) ? v : "orders"; } catch { return "orders"; }
   });
 
   function changeView(v) {
@@ -582,6 +582,15 @@ function FrontDeskMain({ onSessionLost }) {
   const [statusFilter, setStatusFilter] = useState(null);
   const [eodPrintStatus, setEodPrintStatus] = useState(null);
   const [testPrintStatus, setTestPrintStatus] = useState(null);
+
+  const [guesthouseRooms, setGuesthouseRooms] = useState([]);
+  const [guesthouseLoaded, setGuesthouseLoaded] = useState(false);
+  const [guesthouseActionIds, setGuesthouseActionIds] = useState(() => new Set());
+  const [guesthouseError, setGuesthouseError] = useState("");
+  const guesthouseActiveCount = useMemo(
+    () => guesthouseRooms.filter((r) => r.active_booking).length,
+    [guesthouseRooms],
+  );
 
   const knownResIdsRef = useRef(null);
   const resInFlightRef = useRef(false);
@@ -832,6 +841,142 @@ function FrontDeskMain({ onSessionLost }) {
     } catch {}
   }, []);
 
+  const fetchGuesthouseRooms = useCallback(async () => {
+    try {
+      const res = await apiRequest("/api/front-desk?resource=guesthouse-rooms", "GET");
+      if (!mountedRef.current) return;
+      if (res === "lost") { lostRef.current(); return; }
+      if (res === "offline" || !res.ok) return;
+      const json = await res.json();
+      setGuesthouseRooms(json.rooms || []);
+      setGuesthouseLoaded(true);
+      setGuesthouseError("");
+    } catch {}
+  }, []);
+
+  async function promptGuesthousePin(forAction) {
+    const pin = window.prompt(`Enter guest house PIN to ${forAction}:`);
+    if (!pin) return null;
+    try {
+      const res = await apiRequest("/api/staff-login?action=verify-guesthouse-pin", "POST", { pin });
+      if (!res || res === "lost" || res === "offline") {
+        setGuesthouseError("Could not verify PIN. Please try again.");
+        return null;
+      }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.token) {
+        setGuesthouseError(json.error || "Invalid PIN.");
+        return null;
+      }
+      return { token: json.token, authorized_by: json.authorized_by };
+    } catch {
+      setGuesthouseError("Could not verify PIN. Please try again.");
+      return null;
+    }
+  }
+
+  async function checkInGuest(room, form) {
+    const nights = Math.max(1, Math.min(365, parseInt(form.nights, 10) || 1));
+    const discount = Math.max(0, parseInt(form.discount, 10) || 0);
+    const guest_name = String(form.guest_name || "").trim();
+    if (!guest_name) { setGuesthouseError("Guest name is required."); return; }
+    const auth = await promptGuesthousePin("check in");
+    if (!auth) return;
+    setGuesthouseActionIds((prev) => new Set(prev).add(room.id));
+    setGuesthouseError("");
+    try {
+      const res = await fetch("/api/front-desk?resource=guesthouse-bookings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-guesthouse-token": auth.token, ...(await authHeader()) },
+        body: JSON.stringify({
+          room_id: room.id,
+          guest_name,
+          guest_phone: form.guest_phone || null,
+          guest_email: form.guest_email || null,
+          nights,
+          discount,
+          payment_method: form.payment_method || null,
+          notes: form.notes || null,
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setGuesthouseError(json.error || "Could not check in guest."); return; }
+      await fetchGuesthouseRooms();
+    } catch {
+      setGuesthouseError("Could not reach the server. Please try again.");
+    } finally {
+      setGuesthouseActionIds((prev) => { const n = new Set(prev); n.delete(room.id); return n; });
+    }
+  }
+
+  async function checkOutGuest(room) {
+    if (!room.active_booking) return;
+    if (!window.confirm(`Check out ${room.active_booking.guest_name} from room ${room.room_number}?`)) return;
+    const auth = await promptGuesthousePin("check out");
+    if (!auth) return;
+    setGuesthouseActionIds((prev) => new Set(prev).add(room.id));
+    setGuesthouseError("");
+    try {
+      const res = await fetch("/api/front-desk?resource=guesthouse-bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-guesthouse-token": auth.token, ...(await authHeader()) },
+        body: JSON.stringify({ id: room.active_booking.id, action: "check-out" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setGuesthouseError(json.error || "Could not check out guest."); return; }
+      await fetchGuesthouseRooms();
+    } catch {
+      setGuesthouseError("Could not reach the server. Please try again.");
+    } finally {
+      setGuesthouseActionIds((prev) => { const n = new Set(prev); n.delete(room.id); return n; });
+    }
+  }
+
+  async function encodeRoomKey(room) {
+    if (!room.active_booking) return;
+    const auth = await promptGuesthousePin("encode a key card");
+    if (!auth) return;
+    setGuesthouseActionIds((prev) => new Set(prev).add(room.id));
+    setGuesthouseError("");
+    try {
+      const res = await fetch("/api/front-desk?resource=guesthouse-bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-guesthouse-token": auth.token, ...(await authHeader()) },
+        body: JSON.stringify({ id: room.active_booking.id, action: "log-key-encoded" }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setGuesthouseError(json.error || "Could not log key encoding."); return; }
+      await fetchGuesthouseRooms();
+      window.alert(`Key encoding logged for room ${room.room_number}. Use the PCLMS reader to write the card.`);
+    } catch {
+      setGuesthouseError("Could not reach the server. Please try again.");
+    } finally {
+      setGuesthouseActionIds((prev) => { const n = new Set(prev); n.delete(room.id); return n; });
+    }
+  }
+
+  async function markBookingPaid(room, method) {
+    if (!room.active_booking) return;
+    const auth = await promptGuesthousePin("mark as paid");
+    if (!auth) return;
+    setGuesthouseActionIds((prev) => new Set(prev).add(room.id));
+    setGuesthouseError("");
+    try {
+      const res = await fetch("/api/front-desk?resource=guesthouse-bookings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-guesthouse-token": auth.token, ...(await authHeader()) },
+        body: JSON.stringify({ id: room.active_booking.id, action: "mark-paid", payment_method: method || null }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setGuesthouseError(json.error || "Could not mark as paid."); return; }
+      await fetchGuesthouseRooms();
+    } catch {
+      setGuesthouseError("Could not reach the server. Please try again.");
+    } finally {
+      setGuesthouseActionIds((prev) => { const n = new Set(prev); n.delete(room.id); return n; });
+    }
+  }
+
   const subscribe = useCallback(() => {
     if (channelRef.current) supabase.removeChannel(channelRef.current);
     const channel = supabase
@@ -909,6 +1054,12 @@ function FrontDeskMain({ onSessionLost }) {
     const id = setInterval(fetchWaiterCalls, POLL_MS);
     return () => clearInterval(id);
   }, [fetchWaiterCalls]);
+
+  useEffect(() => {
+    fetchGuesthouseRooms();
+    const id = setInterval(fetchGuesthouseRooms, POLL_MS * 2);
+    return () => clearInterval(id);
+  }, [fetchGuesthouseRooms]);
 
   useEffect(() => {
     if (tab === "completed") fetchOrders();
@@ -1298,12 +1449,13 @@ function FrontDeskMain({ onSessionLost }) {
             <div style={{ fontSize: 15, color: t.muted, letterSpacing: "0.18em", textTransform: "uppercase", fontWeight: 700, marginTop: 6 }}>Front Desk</div>
           </div>
 
-          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
             {[
-              { v: "orders",       label: "Front Desk",   icon: <UtensilsCrossed size={26} />, badge: counts.new,         ariaDesc: "new orders" },
-              { v: "bar",          label: "Bar",          icon: <Wine size={26} />,            badge: barOrders.length,   ariaDesc: "drink orders" },
-              { v: "reservations", label: "Reservations", icon: <CalendarDays size={26} />,    badge: resCounts.pending,  ariaDesc: "pending reservations" },
-            ].map(({ v, label, icon, badge, ariaDesc }) => {
+              { v: "orders",       label: "Front Desk",   icon: <UtensilsCrossed size={26} />, badge: counts.new,         ariaDesc: "new orders", separated: false },
+              { v: "bar",          label: "Bar",          icon: <Wine size={26} />,            badge: barOrders.length,   ariaDesc: "drink orders", separated: false },
+              { v: "reservations", label: "Reservations", icon: <CalendarDays size={26} />,    badge: resCounts.pending,  ariaDesc: "pending reservations", separated: false },
+              { v: "guesthouse",   label: "Guest House",  icon: <BedDouble size={26} />,       badge: guesthouseActiveCount, ariaDesc: "occupied rooms", separated: true },
+            ].map(({ v, label, icon, badge, ariaDesc, separated }) => {
               const active = view === v;
               return (
                 <button
@@ -1314,6 +1466,7 @@ function FrontDeskMain({ onSessionLost }) {
                     background: active ? t.gold : "transparent", color: active ? t.onGold : t.gold,
                     border: `2px solid ${t.gold}`, cursor: "pointer",
                     fontSize: 22, fontWeight: 800, fontFamily: "inherit",
+                    marginLeft: separated ? 64 : 0,
                   }}
                 >
                   {icon}
@@ -1432,6 +1585,19 @@ function FrontDeskMain({ onSessionLost }) {
         />
       ) : view === "bar" ? (
         <BarView t={t} now={now} orders={barOrders} actionIds={actionIds} onUpdateStatus={updateBarStatus} />
+      ) : view === "guesthouse" ? (
+        <GuestHouseView
+          t={t}
+          rooms={guesthouseRooms}
+          loaded={guesthouseLoaded}
+          error={guesthouseError}
+          actionIds={guesthouseActionIds}
+          onCheckIn={checkInGuest}
+          onCheckOut={checkOutGuest}
+          onEncodeKey={encodeRoomKey}
+          onMarkPaid={markBookingPaid}
+          onRefresh={fetchGuesthouseRooms}
+        />
       ) : (
       <>
       {/* Stat cards */}
@@ -2680,6 +2846,252 @@ function BarDeskCard({ order, t, now, busy, onUpdate }) {
           {busy ? "Updating..." : nextLabel}
         </button>
       </div>
+    </div>
+  );
+}
+
+function GuestHouseView({ t, rooms, loaded, error, actionIds, onCheckIn, onCheckOut, onEncodeKey, onMarkPaid, onRefresh }) {
+  const [checkInRoom, setCheckInRoom] = useState(null);
+  const fmtN = (n) => "₦" + Number(n || 0).toLocaleString("en-NG");
+
+  if (!loaded) {
+    return <div style={{ textAlign: "center", color: t.muted, padding: "80px 0", fontSize: 20 }}>Loading rooms…</div>;
+  }
+
+  return (
+    <>
+      {error ? (
+        <div style={{ margin: "20px 0 4px", padding: "14px 18px", borderRadius: 10, background: "rgba(220,38,38,0.1)", border: "1px solid rgba(220,38,38,0.4)", color: t.accent, fontSize: 15, fontWeight: 600 }}>
+          {error}
+        </div>
+      ) : null}
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "24px 0 16px" }}>
+        <div style={{ fontSize: 22, fontWeight: 800, color: t.text, display: "flex", alignItems: "center", gap: 12 }}>
+          <BedDouble size={26} style={{ color: t.gold }} /> Guest House
+        </div>
+        <button
+          onClick={onRefresh}
+          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.card, color: t.text, cursor: "pointer", fontFamily: "inherit", fontSize: 15, fontWeight: 600 }}
+        >
+          <RefreshCw size={16} /> Refresh
+        </button>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 20 }}>
+        {rooms.map((room) => {
+          const b = room.active_booking;
+          const busy = actionIds.has(room.id);
+          const occupied = !!b;
+          const borderColor = occupied ? t.accent : "rgba(22,163,74,0.6)";
+          return (
+            <div key={room.id} style={{ background: t.card, borderRadius: 14, border: `2px solid ${borderColor}`, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+              <div style={{ background: t.cardHead, padding: "16px 20px", display: "flex", alignItems: "center", justifyContent: "space-between", borderBottom: `1px solid ${t.border}` }}>
+                <div>
+                  <div style={{ fontSize: 24, fontWeight: 800, color: t.text }}>Room {room.room_number}</div>
+                  <div style={{ fontSize: 14, color: t.muted, marginTop: 4 }}>{room.room_type}</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: t.gold, fontVariantNumeric: "tabular-nums" }}>{fmtN(room.price)}</div>
+                  <div style={{ fontSize: 13, color: t.muted }}>per night</div>
+                </div>
+              </div>
+
+              <div style={{ padding: "16px 20px", flex: 1 }}>
+                {occupied ? (
+                  <>
+                    <div style={{ fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase", color: t.accent, fontWeight: 700, marginBottom: 8 }}>Occupied</div>
+                    <div style={{ fontSize: 18, fontWeight: 700, color: t.text }}>{b.guest_name}</div>
+                    {b.guest_phone ? <div style={{ fontSize: 14, color: t.muted, marginTop: 4 }}>{b.guest_phone}</div> : null}
+                    <div style={{ marginTop: 12, display: "flex", flexWrap: "wrap", gap: 10, fontSize: 14, color: t.text }}>
+                      <span><strong>{b.nights}</strong> night{b.nights !== 1 ? "s" : ""}</span>
+                      {b.discount > 0 ? <span>· Discount {fmtN(b.discount)}</span> : null}
+                      <span>· Total <strong style={{ color: t.gold }}>{fmtN(b.total_amount)}</strong></span>
+                    </div>
+                    <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      <span style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, background: b.payment_status === "paid" ? "#16a34a" : "#d97706", color: "#fff" }}>
+                        {b.payment_status === "paid" ? "Paid" : "Unpaid"}
+                      </span>
+                      {b.key_encoded_at ? (
+                        <span style={{ padding: "4px 10px", borderRadius: 6, fontSize: 12, fontWeight: 700, background: "rgba(200,169,110,0.2)", color: t.gold, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          <KeyRound size={12} /> Key encoded
+                        </span>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ fontSize: 13, letterSpacing: "0.14em", textTransform: "uppercase", color: "#16a34a", fontWeight: 700 }}>Available</div>
+                )}
+              </div>
+
+              <div style={{ padding: "14px 20px", borderTop: `1px solid ${t.border}`, display: "flex", flexWrap: "wrap", gap: 10 }}>
+                {occupied ? (
+                  <>
+                    <button
+                      onClick={() => onEncodeKey(room)}
+                      disabled={busy}
+                      style={{ flex: 1, minWidth: 140, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 14px", borderRadius: 8, border: `1px solid ${t.gold}`, background: "transparent", color: t.gold, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.5 : 1, fontFamily: "inherit", fontSize: 14 }}
+                    >
+                      <KeyRound size={16} /> Encode key
+                    </button>
+                    {b.payment_status !== "paid" ? (
+                      <button
+                        onClick={() => onMarkPaid(room, "cash")}
+                        disabled={busy}
+                        style={{ flex: 1, minWidth: 120, padding: "12px 14px", borderRadius: 8, border: "none", background: t.gold, color: t.onGold, fontWeight: 700, cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.5 : 1, fontFamily: "inherit", fontSize: 14 }}
+                      >
+                        Mark paid
+                      </button>
+                    ) : null}
+                    <button
+                      onClick={() => onCheckOut(room)}
+                      disabled={busy}
+                      style={{ flex: 1, minWidth: 120, padding: "12px 14px", borderRadius: 8, border: "none", background: t.accent, color: "#fff", fontWeight: 700, cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.5 : 1, fontFamily: "inherit", fontSize: 14 }}
+                    >
+                      Check out
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => setCheckInRoom(room)}
+                    disabled={busy}
+                    style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "14px", borderRadius: 8, border: "none", background: t.gold, color: t.onGold, fontWeight: 800, cursor: busy ? "not-allowed" : "pointer", opacity: busy ? 0.5 : 1, fontFamily: "inherit", fontSize: 16 }}
+                  >
+                    <LogInIcon size={18} /> Check in guest
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {checkInRoom ? (
+        <CheckInModal
+          t={t}
+          room={checkInRoom}
+          onClose={() => setCheckInRoom(null)}
+          onSubmit={async (form) => { await onCheckIn(checkInRoom, form); setCheckInRoom(null); }}
+        />
+      ) : null}
+    </>
+  );
+}
+
+function CheckInModal({ t, room, onClose, onSubmit }) {
+  const [guest_name, setGuestName] = useState("");
+  const [guest_phone, setGuestPhone] = useState("");
+  const [guest_email, setGuestEmail] = useState("");
+  const [nights, setNights] = useState(1);
+  const [discount, setDiscount] = useState(0);
+  const [payment_method, setPaymentMethod] = useState("");
+  const [notes, setNotes] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const base = (Number(room.price) || 0) * Math.max(1, Number(nights) || 1);
+  const total = Math.max(0, base - (Number(discount) || 0));
+  const fmtN = (n) => "₦" + Number(n || 0).toLocaleString("en-NG");
+
+  const inputStyle = { width: "100%", padding: "12px 14px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.input, color: t.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box" };
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await onSubmit({ guest_name, guest_phone, guest_email, nights, discount, payment_method, notes });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1500 }}
+      onClick={onClose}
+    >
+      <form
+        onSubmit={handleSubmit}
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: t.card, borderRadius: 14, maxWidth: 520, width: "100%", maxHeight: "92vh", overflowY: "auto", border: `2px solid ${t.gold}` }}
+      >
+        <div style={{ padding: "18px 22px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: t.text }}>Check in · Room {room.room_number}</div>
+            <div style={{ fontSize: 14, color: t.muted, marginTop: 2 }}>{room.room_type} · {fmtN(room.price)}/night</div>
+          </div>
+          <button type="button" onClick={onClose} style={{ background: "transparent", border: "none", color: t.muted, cursor: "pointer", padding: 6 }}>
+            <X size={22} />
+          </button>
+        </div>
+
+        <div style={{ padding: 22, display: "grid", gap: 14 }}>
+          <label>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em" }}>Guest name *</div>
+            <input required value={guest_name} onChange={(e) => setGuestName(e.target.value)} style={inputStyle} />
+          </label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <label>
+              <div style={{ fontSize: 13, fontWeight: 700, color: t.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em" }}>Phone</div>
+              <input value={guest_phone} onChange={(e) => setGuestPhone(e.target.value)} style={inputStyle} />
+            </label>
+            <label>
+              <div style={{ fontSize: 13, fontWeight: 700, color: t.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em" }}>Email</div>
+              <input type="email" value={guest_email} onChange={(e) => setGuestEmail(e.target.value)} style={inputStyle} />
+            </label>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <label>
+              <div style={{ fontSize: 13, fontWeight: 700, color: t.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em" }}>Nights *</div>
+              <input type="number" min={1} max={365} value={nights} onChange={(e) => setNights(e.target.value)} style={inputStyle} required />
+            </label>
+            <label>
+              <div style={{ fontSize: 13, fontWeight: 700, color: t.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em" }}>Discount (₦)</div>
+              <input type="number" min={0} step={500} value={discount} onChange={(e) => setDiscount(e.target.value)} style={inputStyle} />
+            </label>
+          </div>
+          <label>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em" }}>Payment method</div>
+            <select value={payment_method} onChange={(e) => setPaymentMethod(e.target.value)} style={inputStyle}>
+              <option value="">Pay later</option>
+              <option value="cash">Cash</option>
+              <option value="transfer">Bank transfer</option>
+              <option value="pos">POS</option>
+            </select>
+          </label>
+          <label>
+            <div style={{ fontSize: 13, fontWeight: 700, color: t.muted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.1em" }}>Notes</div>
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} style={{ ...inputStyle, resize: "vertical" }} />
+          </label>
+
+          <div style={{ background: t.cardHead, padding: "14px 16px", borderRadius: 10, display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: t.muted }}>
+              <span>Base ({nights || 0} × {fmtN(room.price)})</span>
+              <span style={{ color: t.text, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{fmtN(base)}</span>
+            </div>
+            {Number(discount) > 0 ? (
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: t.muted }}>
+                <span>Discount</span>
+                <span style={{ color: t.accent, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>− {fmtN(discount)}</span>
+              </div>
+            ) : null}
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, fontWeight: 800, color: t.gold, marginTop: 4, fontVariantNumeric: "tabular-nums" }}>
+              <span>Total</span>
+              <span>{fmtN(total)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ padding: "16px 22px", borderTop: `1px solid ${t.border}`, display: "flex", gap: 12, justifyContent: "flex-end" }}>
+          <button type="button" onClick={onClose} style={{ padding: "12px 20px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.text, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", fontSize: 15 }}>
+            Cancel
+          </button>
+          <button type="submit" disabled={submitting} style={{ padding: "12px 24px", borderRadius: 8, border: "none", background: t.gold, color: t.onGold, fontWeight: 800, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.6 : 1, fontFamily: "inherit", fontSize: 15 }}>
+            {submitting ? "Checking in…" : "Confirm check-in"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

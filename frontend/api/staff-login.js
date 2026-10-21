@@ -43,7 +43,17 @@ function getDb() {
   return _db;
 }
 
-const { requireStaff, signVoidToken } = require('./_lib/auth');
+const { requireStaff, signVoidToken, signGuesthouseToken } = require('./_lib/auth');
+
+const GUESTHOUSE_ATTEMPTS = new Map();
+function guesthousePinRateCheck(ip) {
+  const now = Date.now();
+  let rec = GUESTHOUSE_ATTEMPTS.get(ip);
+  if (!rec || now > rec.resetAt) rec = { count: 0, resetAt: now + 60_000 };
+  rec.count += 1;
+  GUESTHOUSE_ATTEMPTS.set(ip, rec);
+  return rec.count <= 5;
+}
 
 module.exports = async function handler(req, res) {
   applySecurityHeaders(res);
@@ -143,6 +153,99 @@ module.exports = async function handler(req, res) {
       .eq('id', staff.profile.id);
     if (error) {
       console.error('[set-void-pin] update error:', error);
+      return res.status(500).json({ error: 'Failed to save PIN.' });
+    }
+    return res.status(200).json({ ok: true });
+  }
+
+  // POST ?action=verify-guesthouse-pin — PIN check for guest house check-in / key encoding.
+  // Any authenticated staff may call this. PIN must belong to a profile with
+  // can_manage_guesthouse=true, or role super_admin/manager/front_desk.
+  if (req.method === 'POST' && req.query?.action === 'verify-guesthouse-pin') {
+    const staff = await requireStaff(req, res, 'any');
+    if (!staff) return;
+
+    const ip = getIP(req);
+    if (!guesthousePinRateCheck(ip)) {
+      return res.status(429).json({ ok: false, error: 'Too many attempts. Wait a minute.' });
+    }
+
+    const { pin } = req.body || {};
+    if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
+      return res.status(400).json({ ok: false, error: 'PIN must be 4-8 digits.' });
+    }
+
+    const db = getDb();
+    if (!db) return res.status(500).json({ ok: false, error: 'Server misconfiguration.' });
+
+    const { data: candidates } = await db
+      .from('staff_profiles')
+      .select('id, full_name, role, active, can_manage_guesthouse, guesthouse_pin_hash, guesthouse_pin_salt')
+      .eq('active', true)
+      .not('guesthouse_pin_hash', 'is', null)
+      .not('guesthouse_pin_salt', 'is', null);
+
+    const authorized = (candidates || []).find((p) => {
+      if (!p.guesthouse_pin_hash || !p.guesthouse_pin_salt) return false;
+      const permitted = p.role === 'super_admin' || p.role === 'manager' || p.role === 'front_desk' || p.role === 'guesthouse' || p.can_manage_guesthouse === true;
+      if (!permitted) return false;
+      return sha256Hex(p.guesthouse_pin_salt, pin) === p.guesthouse_pin_hash;
+    });
+
+    if (!authorized) {
+      await logAndAlert({
+        eventType: 'guesthouse_pin_failed',
+        severity: 'medium',
+        ip,
+        endpoint: '/api/staff-login?action=verify-guesthouse-pin',
+        payload: `by=${staff.profile.full_name || staff.profile.id}`,
+        userAgent: req.headers['user-agent'],
+      });
+      return res.status(401).json({ ok: false, error: 'Invalid PIN.' });
+    }
+
+    const payload = {
+      by_id: authorized.id,
+      by_name: authorized.full_name,
+      exp: Date.now() + VOID_TOKEN_TTL_MS,
+    };
+    return res.status(200).json({
+      ok: true,
+      token: signGuesthouseToken(payload),
+      authorized_by: { id: authorized.id, name: authorized.full_name },
+      expires_at: payload.exp,
+    });
+  }
+
+  // POST ?action=set-guesthouse-pin — set/update caller's own guesthouse PIN.
+  if (req.method === 'POST' && req.query?.action === 'set-guesthouse-pin') {
+    const staff = await requireStaff(req, res, 'any');
+    if (!staff) return;
+
+    const { pin } = req.body || {};
+    if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN must be 4-8 digits.' });
+    }
+
+    const db = getDb();
+    if (!db) return res.status(500).json({ error: 'Server misconfiguration.' });
+
+    const { data: profile } = await db
+      .from('staff_profiles')
+      .select('role, can_manage_guesthouse')
+      .eq('id', staff.profile.id)
+      .maybeSingle();
+
+    const permitted = profile && (profile.role === 'super_admin' || profile.role === 'manager' || profile.role === 'front_desk' || profile.role === 'guesthouse' || profile.can_manage_guesthouse === true);
+    if (!permitted) return res.status(403).json({ error: 'You are not authorized to set a guesthouse PIN.' });
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const { error } = await db
+      .from('staff_profiles')
+      .update({ guesthouse_pin_hash: sha256Hex(salt, pin), guesthouse_pin_salt: salt })
+      .eq('id', staff.profile.id);
+    if (error) {
+      console.error('[set-guesthouse-pin] update error:', error);
       return res.status(500).json({ error: 'Failed to save PIN.' });
     }
     return res.status(200).json({ ok: true });

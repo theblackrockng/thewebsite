@@ -13,12 +13,13 @@ const {
   checkUserAgent,
   checkCors,
 } = require('./_lib/security');
-const { requireStaff, verifyVoidToken } = require('./_lib/auth');
+const { requireStaff, verifyVoidToken, verifyGuesthouseToken } = require('./_lib/auth');
 
 const ORDER_ROLES        = ['front_desk', 'manager'];
 const RESERVATION_ROLES  = ['front_desk', 'manager', 'super_admin'];
 const WAITER_CALL_ROLES  = ['bar', 'front_desk', 'manager', 'super_admin'];
 const ORDER_ITEM_ROLES   = ['front_desk', 'manager'];
+const GUESTHOUSE_ROLES   = ['front_desk', 'manager', 'super_admin'];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -849,6 +850,247 @@ async function addItemsHandler(req, res) {
   return res.status(200).json(response);
 }
 
+// ── Guest House: rooms + bookings ──────────────────────────────────────
+
+async function guesthouseRoomsHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, GUESTHOUSE_ROLES);
+  if (!staff) return;
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const { data: rooms, error: roomsErr } = await db
+    .from('guest_rooms')
+    .select('id, room_number, room_type, price, status, notes')
+    .order('room_number');
+  if (roomsErr) {
+    console.error('[guesthouse-rooms] fetch error:', roomsErr);
+    return res.status(500).json({ error: 'Failed to load rooms.' });
+  }
+
+  const roomIds = (rooms || []).map((r) => r.id);
+  const { data: activeBookings } = roomIds.length
+    ? await db
+        .from('guest_room_bookings')
+        .select('id, room_id, guest_name, guest_phone, check_in_at, nights, total_amount, key_encoded_at, payment_status, checked_in_by_name')
+        .in('room_id', roomIds)
+        .eq('status', 'active')
+    : { data: [] };
+
+  const byRoom = new Map();
+  for (const b of activeBookings || []) byRoom.set(b.room_id, b);
+
+  const withBooking = (rooms || []).map((r) => ({ ...r, active_booking: byRoom.get(r.id) || null }));
+  return res.status(200).json({ ok: true, rooms: withBooking });
+}
+
+async function guesthouseBookingsHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Guesthouse-Token');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  const staff = await requireStaff(req, res, GUESTHOUSE_ROLES);
+  if (!staff) return;
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const ip = getIP(req);
+  const { blocked } = checkUserAgent(req);
+  if (blocked) return res.status(400).json({ error: 'Bad request.' });
+
+  // GET → list bookings. Optional ?from=YYYY-MM-DD&to=YYYY-MM-DD; defaults to today's.
+  if (req.method === 'GET') {
+    const { limited } = checkInMemoryRateLimit(ip, 'front-desk-guesthouse-list', 200, 60 * 60 * 1000);
+    if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+    const from = typeof req.query.from === 'string' ? req.query.from : null;
+    const to   = typeof req.query.to === 'string'   ? req.query.to   : null;
+    const status = typeof req.query.status === 'string' ? req.query.status : null;
+
+    let q = db.from('guest_room_bookings')
+      .select('*')
+      .order('check_in_at', { ascending: false })
+      .limit(300);
+    if (from) q = q.gte('check_in_at', `${from}T00:00:00`);
+    if (to)   q = q.lte('check_in_at', `${to}T23:59:59`);
+    if (status) q = q.eq('status', status);
+    const { data, error } = await q;
+    if (error) {
+      console.error('[guesthouse-bookings] list error:', error);
+      return res.status(500).json({ error: 'Failed to load bookings.' });
+    }
+    return res.status(200).json({ ok: true, bookings: data || [] });
+  }
+
+  // POST → check-in (requires guesthouse PIN token).
+  // Body: { room_id, guest_name, guest_phone?, guest_email?, nights, discount?, payment_method?, notes? }
+  if (req.method === 'POST') {
+    const token = req.headers['x-guesthouse-token'] || req.headers['X-Guesthouse-Token'] || '';
+    const authz = verifyGuesthouseToken(token);
+    if (!authz) return res.status(401).json({ error: 'Guesthouse PIN required. Verify and try again.' });
+
+    const { limited } = checkInMemoryRateLimit(ip, 'front-desk-guesthouse-write', 60, 60 * 60 * 1000);
+    if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return res.status(400).json({ error: 'Invalid request body.' });
+    }
+    const { room_id, guest_name, guest_phone, guest_email, nights, discount, payment_method, notes } = body;
+    if (typeof room_id !== 'string' || !UUID_RE.test(room_id)) return res.status(400).json({ error: 'Missing or invalid room id.' });
+    if (typeof guest_name !== 'string' || !guest_name.trim()) return res.status(400).json({ error: 'Guest name is required.' });
+    const nightsN = Number.parseInt(nights, 10);
+    if (!Number.isInteger(nightsN) || nightsN < 1 || nightsN > 365) return res.status(400).json({ error: 'Nights must be between 1 and 365.' });
+    const discountN = Number.parseInt(discount, 10) || 0;
+    if (discountN < 0) return res.status(400).json({ error: 'Discount cannot be negative.' });
+
+    const { data: room, error: roomErr } = await db
+      .from('guest_rooms')
+      .select('id, room_number, room_type, price')
+      .eq('id', room_id)
+      .maybeSingle();
+    if (roomErr || !room) return res.status(404).json({ error: 'Room not found.' });
+
+    const { data: existing } = await db
+      .from('guest_room_bookings')
+      .select('id')
+      .eq('room_id', room_id)
+      .eq('status', 'active')
+      .limit(1);
+    if (existing && existing.length > 0) return res.status(409).json({ error: 'Room is already occupied. Check out the current guest first.' });
+
+    const baseAmount = room.price * nightsN;
+    const totalAmount = Math.max(0, baseAmount - discountN);
+
+    const { data: inserted, error: insErr } = await db
+      .from('guest_room_bookings')
+      .insert({
+        room_id,
+        room_number: room.room_number,
+        guest_name: guest_name.trim(),
+        guest_phone: guest_phone?.trim() || null,
+        guest_email: guest_email?.trim() || null,
+        nights: nightsN,
+        base_amount: baseAmount,
+        discount: discountN,
+        total_amount: totalAmount,
+        payment_method: payment_method || null,
+        notes: notes || null,
+        checked_in_by_id: staff.profile.id,
+        checked_in_by_name: staff.profile.full_name || staff.profile.email || 'Front Desk',
+      })
+      .select('*')
+      .single();
+    if (insErr) {
+      console.error('[guesthouse-bookings] insert error:', insErr);
+      return res.status(500).json({ error: 'Failed to create booking.' });
+    }
+
+    await db.from('guest_rooms').update({ status: 'occupied' }).eq('id', room_id);
+
+    const msg = [
+      `🛏️ <b>Guest House check-in</b>`,
+      `Room <b>${escapeHtml(room.room_number)}</b> (${escapeHtml(room.room_type)}) — ${nightsN} night${nightsN === 1 ? '' : 's'}`,
+      `Guest: <b>${escapeHtml(guest_name)}</b>${guest_phone ? ` · ${escapeHtml(guest_phone)}` : ''}`,
+      discountN > 0 ? `Discount: ₦${discountN.toLocaleString('en-NG')}` : '',
+      `Total: ₦${totalAmount.toLocaleString('en-NG')}`,
+      `By ${escapeHtml(staff.profile.full_name || 'Front Desk')} (PIN: ${escapeHtml(authz.by_name || '—')})`,
+    ].filter(Boolean).join('\n');
+    await notifyTelegram('guesthouse-checkin', msg);
+
+    return res.status(200).json({ ok: true, booking: inserted });
+  }
+
+  // PATCH → check-out, mark payment, or log key encoded.
+  // Body: { id, action: 'check-out' | 'mark-paid' | 'log-key-encoded', payment_method?, notes? }
+  if (req.method === 'PATCH') {
+    const { limited } = checkInMemoryRateLimit(ip, 'front-desk-guesthouse-write', 60, 60 * 60 * 1000);
+    if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+    const token = req.headers['x-guesthouse-token'] || req.headers['X-Guesthouse-Token'] || '';
+    const authz = verifyGuesthouseToken(token);
+    if (!authz) return res.status(401).json({ error: 'Guesthouse PIN required. Verify and try again.' });
+
+    const body = req.body || {};
+    const { id, action, payment_method, notes } = body;
+    if (typeof id !== 'string' || !UUID_RE.test(id)) return res.status(400).json({ error: 'Missing or invalid booking id.' });
+
+    const { data: booking, error: bErr } = await db
+      .from('guest_room_bookings')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    if (bErr || !booking) return res.status(404).json({ error: 'Booking not found.' });
+
+    if (action === 'check-out') {
+      if (booking.status !== 'active') return res.status(400).json({ error: 'Booking is not active.' });
+      const now = new Date().toISOString();
+      const { error: upErr } = await db
+        .from('guest_room_bookings')
+        .update({
+          status: 'checked_out',
+          check_out_at: now,
+          checked_out_by_id: staff.profile.id,
+          checked_out_by_name: staff.profile.full_name || 'Front Desk',
+          updated_at: now,
+        })
+        .eq('id', id);
+      if (upErr) return res.status(500).json({ error: 'Failed to check out.' });
+      await db.from('guest_rooms').update({ status: 'cleaning' }).eq('id', booking.room_id);
+      await notifyTelegram('guesthouse-checkout', `🚪 Room ${escapeHtml(booking.room_number)} checked out by ${escapeHtml(staff.profile.full_name || 'Front Desk')}. Guest: ${escapeHtml(booking.guest_name)}.`);
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'mark-paid') {
+      const { error: upErr } = await db
+        .from('guest_room_bookings')
+        .update({
+          payment_status: 'paid',
+          payment_method: payment_method || booking.payment_method,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id);
+      if (upErr) return res.status(500).json({ error: 'Failed to mark paid.' });
+      return res.status(200).json({ ok: true });
+    }
+
+    if (action === 'log-key-encoded') {
+      const now = new Date().toISOString();
+      const { error: upErr } = await db
+        .from('guest_room_bookings')
+        .update({
+          key_encoded_by_id: staff.profile.id,
+          key_encoded_by_name: staff.profile.full_name || 'Front Desk',
+          key_encoded_at: now,
+          notes: notes || booking.notes,
+          updated_at: now,
+        })
+        .eq('id', id);
+      if (upErr) return res.status(500).json({ error: 'Failed to log key encoded.' });
+      await notifyTelegram('guesthouse-key', `🔑 Room ${escapeHtml(booking.room_number)} key encoded by ${escapeHtml(staff.profile.full_name || 'Front Desk')} for ${escapeHtml(booking.guest_name)}.`);
+      return res.status(200).json({ ok: true });
+    }
+
+    return res.status(400).json({ error: 'Unknown action.' });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed.' });
+}
+
 module.exports = function handler(req, res) {
   const resource = req.query && req.query.resource;
   if (resource === 'orders') return ordersHandler(req, res);
@@ -856,6 +1098,8 @@ module.exports = function handler(req, res) {
   if (resource === 'waiter-calls') return waiterCallsHandler(req, res);
   if (resource === 'order-items') return orderItemsHandler(req, res);
   if (resource === 'add-items') return addItemsHandler(req, res);
+  if (resource === 'guesthouse-rooms') return guesthouseRoomsHandler(req, res);
+  if (resource === 'guesthouse-bookings') return guesthouseBookingsHandler(req, res);
   applySecurityHeaders(res);
   return res.status(400).json({ error: 'Unknown resource.' });
 };
