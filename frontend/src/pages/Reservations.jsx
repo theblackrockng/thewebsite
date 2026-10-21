@@ -890,7 +890,7 @@ export default function Reservations() {
                           const imgSrc = MEAL_CATEGORY_IMAGES[activeCatFinal];
                           const isNational    = activeCatFinal === "National Dishes";
                           const isTraditional = activeCatFinal === "Traditional Specials";
-                          const isGrill       = activeCatFinal === "Charcoal Grills" || activeCatFinal === "Continental";
+                          const isGrill       = activeCatFinal === "Charcoal Grills" || activeCatFinal === "Continental" || activeCatFinal === "Bush Bar Kitchen";
                           const needsPicker   = isNational || isTraditional || isGrill;
 
                           return (
@@ -1198,9 +1198,9 @@ export default function Reservations() {
                   <SidePickerModal
                     dish={sideModal}
                     onClose={() => setSideModal(null)}
-                    onConfirm={(side) => {
-                      const key = `${sideModal.id}|${side}`;
-                      addToCart(key, sideModal.id, sideModal.name, sideModal.price, sideModal.category, side);
+                    onConfirm={(side, sidePrice) => {
+                      const key = side ? `${sideModal.id}|${side}` : sideModal.id;
+                      addToCart(key, sideModal.id, sideModal.name, Number(sideModal.price || 0) + Number(sidePrice || 0), sideModal.category, side || null);
                       setSideModal(null);
                     }}
                   />

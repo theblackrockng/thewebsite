@@ -20,7 +20,11 @@ const SOUPS = [
 
 const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo", "Poundo"];
 
-const SIDES = ["Rice", "Potato Wedges", "Yam Chips"];
+const SIDES = [
+  { name: "White Rice", price: 5000 },
+  { name: "Yam Fries", price: 3000 },
+  { name: "Potato Fries", price: 3000 },
+];
 
 const DRINK_CATEGORY_ORDER = [
   "Beer & Cider", "Cocktails", "Mocktails",
@@ -365,7 +369,7 @@ export default function Order() {
                 {foodData[cat].map((dish) => {
                   const isNational = cat === "National Dishes";
                   const isTraditional = cat === "Traditional Specials";
-                  const isGrill = cat === "Charcoal Grills" || cat === "Continental";
+                  const isGrill = cat === "Charcoal Grills" || cat === "Continental" || cat === "Bush Bar Kitchen";
                   const needsPicker = isNational || isTraditional || isGrill;
                   return (
                     <DishCard
@@ -463,21 +467,21 @@ export default function Order() {
         />
       )}
 
-      {/* Side picker modal — Charcoal Grills & Continental */}
+      {/* Side picker modal — Charcoal Grills, Continental & Bush Bar Kitchen */}
       {sideModal && (
         <SidePickerModal
           dish={sideModal}
           onClose={() => setSideModal(null)}
-          onConfirm={(side) => {
-            const cartId = `${sideModal.id}|${side}`;
+          onConfirm={(side, sidePrice) => {
+            const cartId = side ? `${sideModal.id}|${side}` : sideModal.id;
             addItem({
               id: cartId,
               baseId: sideModal.id,
               name: sideModal.name,
-              price: sideModal.price,
+              price: Number(sideModal.price || 0) + Number(sidePrice || 0),
               category: sideModal.category,
               menuType: "food",
-              side,
+              side: side || undefined,
             });
             setSideModal(null);
           }}
@@ -821,37 +825,47 @@ function DishCard({ dish, cartItem, nationalCartItems, onAdd, onSetQty }) {
 }
 
 function SidePickerModal({ dish, onClose, onConfirm }) {
-  const [side, setSide] = useState("");
+  const [choice, setChoice] = useState("none");
+
+  const picked = choice === "none" ? null : SIDES.find(s => s.name === choice);
+  const sidePrice = picked ? picked.price : 0;
+  const totalPrice = Number(dish.price || 0) + sidePrice;
+
+  const chip = (active) => ({
+    padding: "10px 14px", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.15s",
+    background: active ? "#c8a96e" : "transparent",
+    color: active ? "#0f0d0a" : "#F5F0E8",
+    border: `1px solid ${active ? "#c8a96e" : "#3e3426"}`,
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%",
+    textAlign: "left",
+  });
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", padding: 16 }}>
       <div style={{ background: "#1a1612", border: "1px solid #3e3426", borderRadius: 12, width: "100%", maxWidth: 480 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px 16px", borderBottom: "1px solid #2e2820" }}>
           <div>
-            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: "0.2em", textTransform: "uppercase", color: "#c8a96e" }}>Choose your side</p>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: "0.2em", textTransform: "uppercase", color: "#c8a96e" }}>Add a side (optional)</p>
             <h3 style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 700, color: "#F5F0E8", fontFamily: "'Cormorant Garamond', serif" }}>{dish.name}</h3>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9C8E7A", display: "flex" }}><X size={20} /></button>
         </div>
         <div style={{ padding: "20px 24px" }}>
-          <p style={{ margin: "0 0 12px", fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#F5F0E8" }}>
-            Side <span style={{ color: "#ef4444" }}>*</span>
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <button onClick={() => setChoice("none")} style={chip(choice === "none")}>
+              <span>No side</span>
+              <span style={{ fontSize: 12, color: choice === "none" ? "#0f0d0a" : "#9C8E7A" }}>—</span>
+            </button>
             {SIDES.map((s) => (
-              <button
-                key={s}
-                onClick={() => setSide(s)}
-                style={{
-                  padding: "8px 16px", borderRadius: 99, fontSize: 13, fontWeight: 500, cursor: "pointer", transition: "all 0.15s",
-                  background: side === s ? "#c8a96e" : "transparent",
-                  color: side === s ? "#0f0d0a" : "#9C8E7A",
-                  border: `1px solid ${side === s ? "#c8a96e" : "#3e3426"}`,
-                }}
-              >
-                {s}
+              <button key={s.name} onClick={() => setChoice(s.name)} style={chip(choice === s.name)}>
+                <span>{s.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: choice === s.name ? "#0f0d0a" : "#c8a96e" }}>+₦{s.price.toLocaleString("en-NG")}</span>
               </button>
             ))}
+          </div>
+          <div style={{ marginTop: 14, padding: "10px 14px", background: "#120f0b", border: "1px solid #2e2820", borderRadius: 8, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+            <span style={{ color: "#9C8E7A" }}>Total</span>
+            <span style={{ color: "#c8a96e", fontWeight: 700 }}>₦{totalPrice.toLocaleString("en-NG")}</span>
           </div>
         </div>
         <div style={{ padding: "16px 24px", borderTop: "1px solid #2e2820", display: "flex", gap: 10 }}>
@@ -859,9 +873,8 @@ function SidePickerModal({ dish, onClose, onConfirm }) {
             Cancel
           </button>
           <button
-            onClick={() => side && onConfirm(side)}
-            disabled={!side}
-            style={{ flex: 2, padding: "12px", borderRadius: 6, border: "none", background: side ? "#c8a96e" : "#2e2820", color: side ? "#0f0d0a" : "#5a4e46", fontSize: 13, fontWeight: 700, cursor: side ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, letterSpacing: "0.05em", textTransform: "uppercase" }}
+            onClick={() => onConfirm(picked ? picked.name : null, sidePrice)}
+            style={{ flex: 2, padding: "12px", borderRadius: 6, border: "none", background: "#c8a96e", color: "#0f0d0a", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, letterSpacing: "0.05em", textTransform: "uppercase" }}
           >
             <Check size={14} /> Add to Cart
           </button>

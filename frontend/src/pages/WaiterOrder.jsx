@@ -13,7 +13,7 @@ const FOOD_CATEGORY_ORDER = [
   "Starters", "Salads", "Rice", "Pasta",
   "Bush Bar Kitchen", "Continental", "Sauces",
   "Charcoal Grills", "National Dishes", "Traditional Specials",
-  "BLACKROCK EXPERIENCE",
+  "BLACKROCK EXPERIENCE", "Buffet",
 ];
 
 const DRINK_CATEGORY_ORDER = [
@@ -29,7 +29,11 @@ const SOUPS = [
   "Oha/Bitterleaf Soup",
 ];
 const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo", "Poundo"];
-const SIDES = ["Rice", "Potato Wedges", "Yam Chips"];
+const SIDES = [
+  { name: "White Rice", price: 5000 },
+  { name: "Yam Fries", price: 3000 },
+  { name: "Potato Fries", price: 3000 },
+];
 
 const CATEGORY_IMAGES = {
   "Starters":             "/images/menu/starters.jpg",
@@ -43,6 +47,7 @@ const CATEGORY_IMAGES = {
   "National Dishes":      "/images/menu/national.jpg",
   "Traditional Specials": "/images/menu/traditional.jpg",
   "BLACKROCK EXPERIENCE": "/images/menu/continental.jpg",
+  "Buffet":               "/images/menu/national.jpg",
   "Wines":                "/images/menu/wines.jpg",
   "Spirits":              "/images/menu/spirits.jpg",
   "Beer & Cider":         "/images/menu/beer.jpg",
@@ -65,6 +70,7 @@ const CATEGORY_TAGLINES = {
   "National Dishes":      "Roots. Culture.\nFlavour.",
   "Traditional Specials": "The taste of home.\nThe pride of origin.",
   "BLACKROCK EXPERIENCE": "The finest.\nOnly at BLACKROCK.",
+  "Buffet":               "Event dining.\nPriced per plate.",
   "Wines":                "For the\ndiscerning palate.",
   "Spirits":              "Neat. On ice.\nYour call.",
   "Beer & Cider":         "Cold, crisp\nand refreshing.",
@@ -87,6 +93,7 @@ const CATEGORY_DESCRIPTIONS = {
   "National Dishes":      "Classic Nigerian plates,\nprepared with pride.",
   "Traditional Specials": "Heritage dishes from\nacross Nigeria.",
   "BLACKROCK EXPERIENCE": "Signature dishes exclusive\nto BLACKROCK.",
+  "Buffet":               "For events — enter date,\nprice per plate and quantity.",
   "Wines":                "Reds, whites and rosés\ncurated for BLACKROCK.",
   "Spirits":              "Premium bottles from\naround the world.",
   "Beer & Cider":         "Local and imported\nbrews on ice.",
@@ -142,6 +149,15 @@ function slugify(str) {
 
 const STATIC_CAT_REMAP = { "Noodles": "Pasta", "Pepper Soup & Specials": "Bush Bar Kitchen" };
 
+const BUFFET_PLACEHOLDER = {
+  id: "buffet-event",
+  name: "Buffet Event",
+  description: "Enter date, price per plate and quantity",
+  price: 0,
+  category: "Buffet",
+  available: true,
+};
+
 function buildStaticFood() {
   const food = {};
   for (const [rawCat, dishes] of Object.entries(MENU)) {
@@ -172,6 +188,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
   const [soupModal, setSoupModal] = useState(null);
   const [traditionalModal, setTraditionalModal] = useState(null);
   const [sideModal, setSideModal] = useState(null);
+  const [buffetModal, setBuffetModal] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [doneOrder, setDoneOrder] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -240,6 +257,10 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
             catType[c] = DRINK_CATEGORY_ORDER.includes(c) ? "drink" : "food";
           }
         }
+        if (!food["Buffet"] || food["Buffet"].length === 0) {
+          food["Buffet"] = [BUFFET_PLACEHOLDER];
+          catType["Buffet"] = "food";
+        }
         setFoodData(food);
         setCategoryMenuType(catType);
         const first = ALL_CATEGORY_ORDER.find(c => food[c]?.length > 0)
@@ -251,6 +272,8 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
         for (const c of Object.keys(fallback)) {
           fallbackTypes[c] = DRINK_CATEGORY_ORDER.includes(c) ? "drink" : "food";
         }
+        fallback["Buffet"] = [BUFFET_PLACEHOLDER];
+        fallbackTypes["Buffet"] = "food";
         setFoodData(fallback);
         setCategoryMenuType(fallbackTypes);
       }
@@ -467,7 +490,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
           specialInstructions: null,
           scheduledTime: null,
           paymentMethod: "pay_on_arrival",
-          items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, menuType: i.menuType || "food", modifiers: [i.soup, i.swallow, i.side].filter(Boolean).join(", ") || null })),
+          items: cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty, menuType: i.menuType || "food", modifiers: [i.soup, i.swallow, i.side, i.buffetDate ? `Date: ${i.buffetDate}` : null].filter(Boolean).join(", ") || null })),
         }),
       });
       const data = await res.json();
@@ -675,8 +698,9 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
                     renderDish={(dish, idx, chunk) => {
                       const isNational    = cat === "National Dishes";
                       const isTraditional = cat === "Traditional Specials";
-                      const isGrill       = cat === "Charcoal Grills" || cat === "Continental";
-                      const needsPicker   = isNational || isTraditional || isGrill;
+                      const isGrill       = cat === "Charcoal Grills" || cat === "Continental" || cat === "Bush Bar Kitchen";
+                      const isBuffet      = cat === "Buffet";
+                      const needsPicker   = isNational || isTraditional || isGrill || isBuffet;
                       const cartItem      = needsPicker ? null : getCartItem(dish.id);
                       const natItems      = needsPicker ? getNationalCartItems(dish.id) : null;
                       const natQty        = natItems ? natItems.reduce((s, i) => s + i.qty, 0) : 0;
@@ -695,10 +719,10 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
                             {dish.description && <p style={{ fontSize: 13, color: "#9C8E7A", margin: 0, lineHeight: 1.6 }}>{dish.description}</p>}
                           </div>
                           <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
-                            <span style={{ fontSize: 15, fontWeight: 700, color: "#C9A84C", whiteSpace: "nowrap" }}>{fmtPrice(dish.price)}</span>
+                            <span style={{ fontSize: 15, fontWeight: 700, color: "#C9A84C", whiteSpace: "nowrap" }}>{isBuffet ? "Set at order" : fmtPrice(dish.price)}</span>
                             {needsPicker ? (
                               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
-                                <WoCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : setSideModal(dish)} />
+                                <WoCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : isBuffet ? setBuffetModal(dish) : setSideModal(dish)} />
                                 {natQty > 0 && <span style={{ fontSize: 10, color: "#C9A84C", fontWeight: 700, lineHeight: 1 }}>{natQty}</span>}
                               </div>
                             ) : cartItem ? (
@@ -773,9 +797,32 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
         <WaiterSidePickerModal
           dish={sideModal}
           onClose={() => setSideModal(null)}
-          onConfirm={(side) => {
-            addItem({ id: `${sideModal.id}|${side}`, baseId: sideModal.id, name: sideModal.name, price: sideModal.price, category: sideModal.category, menuType: "food", side });
+          onConfirm={(side, sidePrice) => {
+            const cartId = side ? `${sideModal.id}|${side}` : sideModal.id;
+            addItem({ id: cartId, baseId: sideModal.id, name: sideModal.name, price: Number(sideModal.price || 0) + Number(sidePrice || 0), category: sideModal.category, menuType: "food", side: side || undefined });
             setSideModal(null);
+          }}
+        />
+      )}
+      {buffetModal && (
+        <WaiterBuffetPickerModal
+          dish={buffetModal}
+          onClose={() => setBuffetModal(null)}
+          onConfirm={({ date, price, qty }) => {
+            setCart(prev => [
+              ...prev,
+              {
+                id: `${buffetModal.id}|${date}|${Date.now()}`,
+                baseId: buffetModal.id,
+                name: buffetModal.name,
+                price: Number(price),
+                qty: Number(qty),
+                category: "Buffet",
+                menuType: "food",
+                buffetDate: date,
+              },
+            ]);
+            setBuffetModal(null);
           }}
         />
       )}
@@ -930,34 +977,103 @@ function WaiterPickerModal({ dish, showSoup = true, onClose, onConfirm }) {
 
 /* ── Side picker modal ──────────────────────────────────────────────── */
 function WaiterSidePickerModal({ dish, onClose, onConfirm }) {
-  const [side, setSide] = useState("");
-  const chip = (active) => ({
-    padding: "8px 16px", borderRadius: 99, fontSize: 13, fontWeight: 500, cursor: "pointer",
-    background: active ? "#c8a96e" : "transparent", color: active ? "#0f0d0a" : "#9C8E7A",
+  const [choice, setChoice] = useState("none");
+  const picked = choice === "none" ? null : SIDES.find(s => s.name === choice);
+  const sidePrice = picked ? picked.price : 0;
+  const totalPrice = Number(dish.price || 0) + sidePrice;
+  const row = (active) => ({
+    padding: "10px 14px", borderRadius: 10, fontSize: 13, fontWeight: 500, cursor: "pointer",
+    background: active ? "#c8a96e" : "transparent", color: active ? "#0f0d0a" : "#F5F0E8",
     border: `1px solid ${active ? "#c8a96e" : "#3e3426"}`, transition: "all 0.15s", fontFamily: "inherit",
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, width: "100%", textAlign: "left",
   });
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)", padding: 16 }}>
       <div style={{ background: "#1a1612", border: "1px solid #3e3426", borderRadius: 12, width: "100%", maxWidth: 480 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px 16px", borderBottom: "1px solid #2e2820" }}>
           <div>
-            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: "0.2em", textTransform: "uppercase", color: "#c8a96e" }}>Choose side</p>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: "0.2em", textTransform: "uppercase", color: "#c8a96e" }}>Add a side (optional)</p>
             <h3 style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 700, color: "#F5F0E8", fontFamily: "'Cormorant Garamond', serif" }}>{dish.name}</h3>
           </div>
           <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9C8E7A", display: "flex" }}><X size={20} /></button>
         </div>
         <div style={{ padding: "20px 24px" }}>
-          <p style={{ margin: "0 0 12px", fontSize: 12, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#F5F0E8" }}>Side <span style={{ color: "#ef4444" }}>*</span></p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {SIDES.map(s => <button key={s} onClick={() => setSide(s)} style={chip(side === s)}>{s}</button>)}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <button onClick={() => setChoice("none")} style={row(choice === "none")}>
+              <span>No side</span>
+              <span style={{ fontSize: 12, color: choice === "none" ? "#0f0d0a" : "#9C8E7A" }}>—</span>
+            </button>
+            {SIDES.map((s) => (
+              <button key={s.name} onClick={() => setChoice(s.name)} style={row(choice === s.name)}>
+                <span>{s.name}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: choice === s.name ? "#0f0d0a" : "#c8a96e" }}>+₦{s.price.toLocaleString("en-NG")}</span>
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 14, padding: "10px 14px", background: "#120f0b", border: "1px solid #2e2820", borderRadius: 8, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+            <span style={{ color: "#9C8E7A" }}>Total</span>
+            <span style={{ color: "#c8a96e", fontWeight: 700 }}>₦{totalPrice.toLocaleString("en-NG")}</span>
           </div>
         </div>
         <div style={{ padding: "16px 24px", borderTop: "1px solid #2e2820", display: "flex", gap: 10 }}>
           <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 6, border: "1px solid #3e3426", background: "transparent", color: "#9C8E7A", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
           <button
-            onClick={() => side && onConfirm(side)}
-            disabled={!side}
-            style={{ flex: 2, padding: "12px", borderRadius: 6, border: "none", background: side ? "#c8a96e" : "#2e2820", color: side ? "#0f0d0a" : "#5a4e46", fontSize: 13, fontWeight: 700, cursor: side ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: "inherit" }}
+            onClick={() => onConfirm(picked ? picked.name : null, sidePrice)}
+            style={{ flex: 2, padding: "12px", borderRadius: 6, border: "none", background: "#c8a96e", color: "#0f0d0a", fontSize: 13, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: "inherit" }}
+          >
+            <Check size={14} /> Add to Order
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Buffet picker modal ────────────────────────────────────────────── */
+function WaiterBuffetPickerModal({ dish, onClose, onConfirm }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [price, setPrice] = useState("");
+  const [qty, setQty] = useState("");
+  const priceNum = Number(price);
+  const qtyNum = parseInt(qty, 10);
+  const ready = date && priceNum > 0 && qtyNum > 0;
+  const total = ready ? priceNum * qtyNum : 0;
+  const fieldStyle = { width: "100%", padding: "12px 14px", background: "#120f0b", border: "1px solid #3e3426", borderRadius: 8, color: "#F5F0E8", fontSize: 14, outline: "none", fontFamily: "inherit" };
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.75)", padding: 16 }}>
+      <div style={{ background: "#1a1612", border: "1px solid #3e3426", borderRadius: 12, width: "100%", maxWidth: 480 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px 16px", borderBottom: "1px solid #2e2820" }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 600, letterSpacing: "0.2em", textTransform: "uppercase", color: "#c8a96e" }}>Buffet event</p>
+            <h3 style={{ margin: "4px 0 0", fontSize: 18, fontWeight: 700, color: "#F5F0E8", fontFamily: "'Cormorant Garamond', serif" }}>{dish.name}</h3>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9C8E7A", display: "flex" }}><X size={20} /></button>
+        </div>
+        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9C8E7A", marginBottom: 6 }}>Event Date</label>
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={fieldStyle} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9C8E7A", marginBottom: 6 }}>Price per plate (₦)</label>
+            <input type="number" inputMode="numeric" min="0" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^\d]/g, ""))} placeholder="e.g. 15000" style={fieldStyle} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9C8E7A", marginBottom: 6 }}>Quantity (plates)</label>
+            <input type="number" inputMode="numeric" min="1" value={qty} onChange={(e) => setQty(e.target.value.replace(/[^\d]/g, ""))} placeholder="e.g. 25" style={fieldStyle} />
+          </div>
+          <div style={{ marginTop: 4, padding: "10px 14px", background: "#120f0b", border: "1px solid #2e2820", borderRadius: 8, display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+            <span style={{ color: "#9C8E7A" }}>Total</span>
+            <span style={{ color: "#c8a96e", fontWeight: 700 }}>₦{total.toLocaleString("en-NG")}</span>
+          </div>
+        </div>
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #2e2820", display: "flex", gap: 10 }}>
+          <button onClick={onClose} style={{ flex: 1, padding: "12px", borderRadius: 6, border: "1px solid #3e3426", background: "transparent", color: "#9C8E7A", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+          <button
+            onClick={() => ready && onConfirm({ date, price: priceNum, qty: qtyNum })}
+            disabled={!ready}
+            style={{ flex: 2, padding: "12px", borderRadius: 6, border: "none", background: ready ? "#c8a96e" : "#2e2820", color: ready ? "#0f0d0a" : "#5a4e46", fontSize: 13, fontWeight: 700, cursor: ready ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, letterSpacing: "0.05em", textTransform: "uppercase", fontFamily: "inherit" }}
           >
             <Check size={14} /> Add to Order
           </button>
@@ -1025,9 +1141,9 @@ function WaiterConfirmOverlay({ cart, cartTotal, tables, activeTableNumbers, sel
               <div key={item.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "13px 18px", borderBottom: idx < cart.length - 1 ? "1px solid #1e1a16" : "none", gap: 12 }}>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, color: "#F5F0E8" }}>{item.name}</div>
-                  {(item.soup || item.swallow || item.side) && (
+                  {(item.soup || item.swallow || item.side || item.buffetDate) && (
                     <div style={{ fontSize: 11, color: "#9C8E7A", marginTop: 2 }}>
-                      {[item.soup, item.swallow, item.side].filter(Boolean).join(" · ")}
+                      {[item.soup, item.swallow, item.side, item.buffetDate ? `Date: ${item.buffetDate}` : null].filter(Boolean).join(" · ")}
                     </div>
                   )}
                   <div style={{ fontSize: 12, color: "#9C8E7A", marginTop: 2 }}>{fmtPrice(item.price)} × {item.qty}</div>
