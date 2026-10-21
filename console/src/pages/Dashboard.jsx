@@ -123,11 +123,12 @@ function StatCard({ label, value, trend, iconEl, loading, onClick, active }) {
 }
 
 /* ─── Reservation row ─── */
-function ReservationRow({ r }) {
+function ReservationRow({ r, onClick }) {
   const partyDisplay = r.party === "other" ? (r.party_other ?? "—") : (r.party ?? "—");
   return (
     <div
-      style={{ display: "grid", gridTemplateColumns: "minmax(140px,1.9fr) 62px 72px 40px minmax(90px,1fr) 88px", padding: "12px 20px", borderBottom: "1px solid var(--ds-border)", alignItems: "center" }}
+      onClick={onClick}
+      style={{ display: "grid", gridTemplateColumns: "minmax(140px,1.9fr) 62px 72px 40px minmax(90px,1fr) 88px", padding: "12px 20px", borderBottom: "1px solid var(--ds-border)", alignItems: "center", cursor: onClick ? "pointer" : "default" }}
       onMouseEnter={(e) => { e.currentTarget.style.background = "var(--ds-input-bg)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
     >
@@ -196,7 +197,7 @@ function PanelHeader({ title, to, toLabel = "View all →" }) {
 /* ─── Upcoming This Week ─── */
 const DAY_ABBR = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
 
-function UpcomingPanel({ upcoming, loading }) {
+function UpcomingPanel({ upcoming, loading, onSelect }) {
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px", color: "var(--ds-muted)", fontSize: 13 }}>Loading…</div>
   );
@@ -211,7 +212,7 @@ function UpcomingPanel({ upcoming, loading }) {
   const dates = Object.keys(grouped).sort();
 
   if (dates.length === 0) return (
-    <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--ds-muted)", fontSize: 13 }}>No upcoming reservations.</div>
+    <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--ds-muted)", fontSize: 13 }}>No upcoming reservations in the next 30 days.</div>
   );
 
   return (
@@ -233,7 +234,13 @@ function UpcomingPanel({ upcoming, loading }) {
               {rows.map((r) => {
                 const guests = r.party === "other" ? (r.party_other ?? "?") : (r.party ?? "?");
                 return (
-                  <div key={r.id}>
+                  <div
+                    key={r.id}
+                    onClick={() => onSelect?.(r)}
+                    style={{ cursor: onSelect ? "pointer" : "default", padding: "2px 6px", margin: "-2px -6px", borderRadius: 6 }}
+                    onMouseEnter={(e) => { if (onSelect) e.currentTarget.style.background = "var(--ds-input-bg)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
                     <div style={{ fontSize: 13, fontWeight: 500, color: "var(--ds-text)" }}>{r.name}</div>
                     <div style={{ fontSize: 11.5, color: "var(--ds-muted)" }}>{r.time || "—"} · {guests} guest{guests !== "1" ? "s" : ""}</div>
                   </div>
@@ -256,7 +263,7 @@ const ACTIVITY_DOT = {
   enquiry:     "#ef4444",
 };
 
-function ActivityPanel({ recentRes, recentEnq, loading }) {
+function ActivityPanel({ recentRes, recentEnq, loading, onSelectReservation }) {
   if (loading) return (
     <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px", color: "var(--ds-muted)", fontSize: 13 }}>Loading…</div>
   );
@@ -265,6 +272,7 @@ function ActivityPanel({ recentRes, recentEnq, loading }) {
   const items = [
     ...recentRes.map((r) => ({
       id: "r" + r.id,
+      resId: r.id,
       text: r.status === "confirmed"
         ? `Reservation confirmed — ${r.name}`
         : r.status === "cancelled"
@@ -287,19 +295,27 @@ function ActivityPanel({ recentRes, recentEnq, loading }) {
 
   return (
     <div style={{ padding: "8px 0 4px" }}>
-      {items.map((item, i) => (
-        <div key={item.id} style={{ display: "flex", gap: 12, padding: "10px 20px", alignItems: "flex-start" }}>
-          {/* Dot + line */}
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 4, flexShrink: 0 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: ACTIVITY_DOT[item.type] ?? "var(--ds-muted)", flexShrink: 0 }} />
-            {i < items.length - 1 && <div style={{ width: 1, flex: 1, background: "var(--ds-border)", marginTop: 4, minHeight: 20 }} />}
+      {items.map((item, i) => {
+        const clickable = item.resId && onSelectReservation;
+        return (
+          <div
+            key={item.id}
+            onClick={() => clickable && onSelectReservation(item.resId)}
+            style={{ display: "flex", gap: 12, padding: "10px 20px", alignItems: "flex-start", cursor: clickable ? "pointer" : "default", transition: "background 0.1s" }}
+            onMouseEnter={(e) => { if (clickable) e.currentTarget.style.background = "var(--ds-input-bg)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+          >
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 4, flexShrink: 0 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: ACTIVITY_DOT[item.type] ?? "var(--ds-muted)", flexShrink: 0 }} />
+              {i < items.length - 1 && <div style={{ width: 1, flex: 1, background: "var(--ds-border)", marginTop: 4, minHeight: 20 }} />}
+            </div>
+            <div style={{ flex: 1, paddingBottom: i < items.length - 1 ? 8 : 0 }}>
+              <div style={{ fontSize: 12.5, color: "var(--ds-text)", lineHeight: 1.4 }}>{item.text}</div>
+              <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 2 }}>{timeAgo(item.ts)}</div>
+            </div>
           </div>
-          <div style={{ flex: 1, paddingBottom: i < items.length - 1 ? 8 : 0 }}>
-            <div style={{ fontSize: 12.5, color: "var(--ds-text)", lineHeight: 1.4 }}>{item.text}</div>
-            <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 2 }}>{timeAgo(item.ts)}</div>
-          </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -454,53 +470,93 @@ function TodayOrdersPanel({ orders, loading, tab, setTab, navigate }) {
   );
 }
 
+/* ─── Reservation detail modal (shared across dashboard panels) ─── */
+function ReservationDetailModal({ reservation, onClose }) {
+  const r = reservation;
+  const partyDisplay = r.party === "other" ? (r.party_other ?? "—") : (r.party ?? "—");
+  const dateFmt = r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "—";
+  const row = (label, value) => (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "10px 0", borderBottom: "1px solid var(--ds-border)" }}>
+      <span style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ds-muted)" }}>{label}</span>
+      <span style={{ fontSize: 13, color: "var(--ds-text)", textAlign: "right", wordBreak: "break-word" }}>{value || "—"}</span>
+    </div>
+  );
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.5)" }} />
+      <div style={{ position: "relative", width: "100%", maxWidth: 460, background: "var(--ds-surface)", border: "1px solid var(--ds-border)", borderRadius: 14, boxShadow: "0 24px 64px rgba(0,0,0,0.22)", overflow: "hidden", maxHeight: "90vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--ds-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--ds-muted)" }}>Reservation</div>
+            <h3 style={{ margin: "2px 0 0", fontSize: 20, fontWeight: 600, fontFamily: "'Cormorant Garamond', serif", color: "var(--ds-text)" }}>{r.name}</h3>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)", fontSize: 20, lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: "6px 22px 18px", overflowY: "auto", fontFamily: "'DM Sans', sans-serif" }}>
+          {row("Status", <StatusPill status={r.status} />)}
+          {row("Date", dateFmt)}
+          {row("Time", r.time || "—")}
+          {row("Party", `${partyDisplay} guest${partyDisplay !== "1" ? "s" : ""}`)}
+          {row("Occasion", r.occasion || "—")}
+          {row("Email", r.email || "—")}
+          {row("Phone", r.phone || "—")}
+          {row("Notes", r.notes || "—")}
+          {r.created_at && row("Created", new Date(r.created_at).toLocaleString("en-GB"))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ─── Dashboard ─── */
+/* Module-level cache so re-entering the Dashboard route (tab switch, nav back)
+   shows the previous snapshot instantly instead of a loading screen. The cache
+   is refreshed in the background on every mount. */
+const DASH_CACHE = {
+  stats: null,
+  recentRes: null,
+  recentEnq: null,
+  upcoming: null,
+  todayOrders: null,
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [stats,     setStats]     = useState({ today: null, todayDelta: null, pending: null, total: null, totalDelta: null, enquiries: null, enquiriesDelta: null });
-  const [recentRes, setRecentRes] = useState([]);
-  const [recentEnq, setRecentEnq] = useState([]);
-  const [upcoming,  setUpcoming]  = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [todayOrders,    setTodayOrders]    = useState([]);
+  const [stats,     setStats]     = useState(DASH_CACHE.stats ?? { today: null, todayDelta: null, pending: null, total: null, totalDelta: null, enquiries: null, enquiriesDelta: null });
+  const [recentRes, setRecentRes] = useState(DASH_CACHE.recentRes ?? []);
+  const [recentEnq, setRecentEnq] = useState(DASH_CACHE.recentEnq ?? []);
+  const [upcoming,  setUpcoming]  = useState(DASH_CACHE.upcoming ?? []);
+  const [loading,   setLoading]   = useState(DASH_CACHE.stats === null);
+  const [todayOrders,    setTodayOrders]    = useState(DASH_CACHE.todayOrders ?? []);
   const [showOrdersPanel, setShowOrdersPanel] = useState(false);
   const [ordersTab,      setOrdersTab]      = useState("all");
-  const [ordersLoading,  setOrdersLoading]  = useState(true);
+  const [ordersLoading,  setOrdersLoading]  = useState(DASH_CACHE.todayOrders === null);
 
   const load = async () => {
-    setLoading(true);
+    const hasCache = DASH_CACHE.stats !== null;
+    if (!hasCache) setLoading(true);
     const today     = new Date();
     const todayStr  = today.toISOString().split("T")[0];
     const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
     const yStr      = yesterday.toISOString().split("T")[0];
     const yStartISO = yStr + "T00:00:00.000Z";
-    const weekEnd   = new Date(today); weekEnd.setDate(today.getDate() + 6);
-    const weekEndStr = weekEnd.toISOString().split("T")[0];
+    const horizonEnd = new Date(today); horizonEnd.setDate(today.getDate() + 30);
+    const horizonEndStr = horizonEnd.toISOString().split("T")[0];
 
     const [r1, r2, r3, r4, r5, r6, r7, r8, r9, r10] = await Promise.all([
-      // Today's reservations by date
       supabase.from("reservations").select("id", { count: "exact", head: true }).eq("date", todayStr),
-      // Yesterday's reservations by date (delta)
       supabase.from("reservations").select("id", { count: "exact", head: true }).eq("date", yStr),
-      // Pending
       supabase.from("reservations").select("id", { count: "exact", head: true }).eq("status", "pending"),
-      // Total all time
       supabase.from("reservations").select("id", { count: "exact", head: true }),
-      // New enquiries
       supabase.from("enquiries").select("id", { count: "exact", head: true }).eq("status", "new"),
-      // Recent reservations (8)
-      supabase.from("reservations").select("id,name,date,time,party,party_other,occasion,status,created_at").order("created_at", { ascending: false }).limit(8),
-      // Recent enquiries (5)
+      supabase.from("reservations").select("id,name,email,phone,date,time,party,party_other,occasion,status,notes,created_at").order("created_at", { ascending: false }).limit(8),
       supabase.from("enquiries").select("id,name,message,status,created_at").order("created_at", { ascending: false }).limit(5),
-      // Upcoming this week
-      supabase.from("reservations").select("id,name,date,time,party,party_other").gte("date", todayStr).lte("date", weekEndStr).order("date").order("time").limit(25),
-      // New reservations since yesterday (total delta)
+      supabase.from("reservations").select("id,name,email,phone,date,time,party,party_other,occasion,status,notes").gte("date", todayStr).lte("date", horizonEndStr).neq("status", "cancelled").order("date").order("time").limit(50),
       supabase.from("reservations").select("id", { count: "exact", head: true }).gte("created_at", yStartISO),
-      // New enquiries since yesterday (enquiry delta)
       supabase.from("enquiries").select("id", { count: "exact", head: true }).gte("created_at", yStartISO),
     ]);
 
-    setStats({
+    const nextStats = {
       today:          r1.count,
       todayDelta:     (r1.count ?? 0) - (r2.count ?? 0),
       pending:        r3.count,
@@ -508,24 +564,36 @@ export default function Dashboard() {
       totalDelta:     r9.count ?? 0,
       enquiries:      r5.count,
       enquiriesDelta: r10.count ?? 0,
-    });
-    setRecentRes(r6.data ?? []);
-    setRecentEnq(r7.data ?? []);
-    setUpcoming(r8.data ?? []);
+    };
+    const nextRecentRes = r6.data ?? [];
+    const nextRecentEnq = r7.data ?? [];
+    const nextUpcoming  = r8.data ?? [];
+
+    setStats(nextStats);
+    setRecentRes(nextRecentRes);
+    setRecentEnq(nextRecentEnq);
+    setUpcoming(nextUpcoming);
     setLoading(false);
 
-    setOrdersLoading(true);
+    DASH_CACHE.stats = nextStats;
+    DASH_CACHE.recentRes = nextRecentRes;
+    DASH_CACHE.recentEnq = nextRecentEnq;
+    DASH_CACHE.upcoming = nextUpcoming;
+
+    if (DASH_CACHE.todayOrders === null) setOrdersLoading(true);
     try {
       const res = await fetch("/api/orders");
       const json = await res.json();
       const todayStr2 = new Date().toISOString().split("T")[0];
       const todays = (json.data || []).filter(o => (o.created_at || "").startsWith(todayStr2));
       setTodayOrders(todays);
+      DASH_CACHE.todayOrders = todays;
     } catch {}
     setOrdersLoading(false);
   };
 
   useEffect(() => { load(); }, []);
+  const [detailRes, setDetailRes] = useState(null);
 
   const now = new Date();
   const dayName = now.toLocaleDateString("en-GB", { weekday: "long" });
@@ -630,12 +698,12 @@ export default function Dashboard() {
             ))}
           </div>
           <div style={{ overflowX: "auto" }}>
-            {loading ? (
+            {loading && recentRes.length === 0 ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px", color: "var(--ds-muted)", fontSize: 13, minHeight: 200 }}>Loading…</div>
             ) : recentRes.length === 0 ? (
               <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--ds-muted)", fontSize: 13 }}>No reservations yet.</div>
             ) : (
-              recentRes.map((r) => <ReservationRow key={r.id} r={r} />)
+              recentRes.map((r) => <ReservationRow key={r.id} r={r} onClick={() => setDetailRes(r)} />)
             )}
           </div>
         </Panel>
@@ -643,7 +711,7 @@ export default function Dashboard() {
         {/* Recent Enquiries */}
         <Panel>
           <PanelHeader title="Recent Enquiries" to="/enquiries" />
-          {loading ? (
+          {loading && recentEnq.length === 0 ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px", color: "var(--ds-muted)", fontSize: 13, minHeight: 200 }}>Loading…</div>
           ) : recentEnq.length === 0 ? (
             <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--ds-muted)", fontSize: 13 }}>No enquiries yet.</div>
@@ -691,18 +759,23 @@ export default function Dashboard() {
           </div>
         </Panel>
 
-        {/* Upcoming This Week */}
+        {/* Upcoming (next 30 days) */}
         <Panel>
-          <PanelHeader title="Upcoming This Week" to="/reservations" toLabel="View all →" />
-          <UpcomingPanel upcoming={upcoming} loading={loading} />
+          <PanelHeader title="Upcoming Reservations" to="/reservations" toLabel="View all →" />
+          <UpcomingPanel upcoming={upcoming} loading={loading && !upcoming.length} onSelect={setDetailRes} />
         </Panel>
 
         {/* Recent Activity */}
         <Panel>
           <PanelHeader title="Recent Activity" />
-          <ActivityPanel recentRes={recentRes.slice(0, 4)} recentEnq={recentEnq.slice(0, 3)} loading={loading} />
+          <ActivityPanel recentRes={recentRes.slice(0, 4)} recentEnq={recentEnq.slice(0, 3)} loading={loading && !recentRes.length && !recentEnq.length} onSelectReservation={(id) => {
+            const r = recentRes.find((x) => x.id === id);
+            if (r) setDetailRes(r);
+          }} />
         </Panel>
       </div>
+
+      {detailRes && <ReservationDetailModal reservation={detailRes} onClose={() => setDetailRes(null)} />}
 
       {/* Responsive grid styles */}
       <style>{`

@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "../../lib/supabase";
 import { authHeader } from "../../lib/authHeader";
 import { useStaff } from "../../context/StaffContext";
@@ -116,22 +117,32 @@ function AvatarCircle({ name }) {
 }
 
 /* ─── Summary pill ─── */
-function SummaryPill({ label, count, dotColor }) {
+function SummaryPill({ label, count, dotColor, active, onClick }) {
   return (
-    <div style={{
-      background: "var(--ds-surface)",
-      border: "1px solid var(--ds-border)",
-      borderRadius: 10,
-      padding: "13px 16px",
-      display: "flex", alignItems: "center", justifyContent: "space-between",
-      boxShadow: "var(--ds-shadow)",
-    }}>
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        background: active ? "rgba(200,169,110,0.08)" : "var(--ds-surface)",
+        border: `1px solid ${active ? "var(--ds-gold)" : "var(--ds-border)"}`,
+        borderRadius: 10,
+        padding: "13px 16px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        boxShadow: "var(--ds-shadow)",
+        cursor: onClick ? "pointer" : "default",
+        width: "100%",
+        fontFamily: "'DM Sans', sans-serif",
+        transition: "border-color 0.12s, background 0.12s",
+      }}
+      onMouseEnter={(e) => { if (onClick && !active) e.currentTarget.style.borderColor = "var(--ds-gold)"; }}
+      onMouseLeave={(e) => { if (onClick && !active) e.currentTarget.style.borderColor = "var(--ds-border)"; }}
+    >
       <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
         <div style={{ width: 7, height: 7, borderRadius: "50%", background: dotColor, flexShrink: 0 }} />
         <span style={{ fontSize: 11.5, fontWeight: 500, color: "var(--ds-muted)", textTransform: "uppercase", letterSpacing: "0.5px" }}>{label}</span>
       </div>
       <span style={{ fontSize: 22, fontWeight: 700, color: "var(--ds-text)", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{count}</span>
-    </div>
+    </button>
   );
 }
 
@@ -232,6 +243,68 @@ function reservationEmailBody(r) {
   return `Dear ${r.name},\n\nThank you for your reservation at BLACKROCK Restaurant & Lounge.\n\n` +
     `Your table is confirmed for ${fmtDate(r.date)}${r.time ? ` at ${fmtTime(r.time)}` : ""}, party of ${r.party === "other" ? (r.party_other ?? "—") : (r.party ?? "—")}.\n\n` +
     `\n\nWarm regards,\nBLACKROCK Restaurant & Lounge\nIkeja, Lagos`;
+}
+
+/* ─── Reservation detail modal ─── */
+function ReservationDetailModal({ reservation, onClose, onConfirm, onReschedule, onCancel, onEmail, onViewMeals }) {
+  const r = reservation;
+  const partyDisplay = r.party === "other" ? (r.party_other ?? "—") : (r.party ?? "—");
+  const dateFmt = r.date ? new Date(r.date + "T00:00:00").toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "—";
+  const row = (label, value) => (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 16, padding: "11px 0", borderBottom: "1px solid var(--ds-border)" }}>
+      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ds-muted)" }}>{label}</span>
+      <span style={{ fontSize: 13, color: "var(--ds-text)", textAlign: "right", wordBreak: "break-word", maxWidth: "70%" }}>{value || "—"}</span>
+    </div>
+  );
+  const btn = {
+    display: "inline-flex", alignItems: "center", gap: 6, padding: "8px 12px",
+    borderRadius: 7, border: "1px solid var(--ds-border)",
+    background: "transparent", color: "var(--ds-text)",
+    fontSize: 12.5, fontWeight: 500, cursor: "pointer",
+    fontFamily: "'DM Sans', sans-serif",
+  };
+  return (
+    <ModalBackdrop onClose={onClose}>
+      <div style={{ ...MODAL_CARD, width: "100%", maxWidth: 500, display: "flex", flexDirection: "column", maxHeight: "90vh" }}>
+        <div style={{ padding: "18px 22px", borderBottom: "1px solid var(--ds-border)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--ds-muted)" }}>Reservation</div>
+            <h3 style={{ margin: "2px 0 0", fontSize: 22, fontWeight: 600, fontFamily: "'Cormorant Garamond', serif", color: "var(--ds-text)" }}>{r.name}</h3>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--ds-muted)" }}><X size={18} /></button>
+        </div>
+        <div style={{ padding: "6px 22px 16px", overflowY: "auto", fontFamily: "'DM Sans', sans-serif" }}>
+          {row("Status", <StatusBadge status={r.status} />)}
+          {row("Date", dateFmt)}
+          {row("Time", r.time ? fmtTime(r.time) : "—")}
+          {row("Party", `${partyDisplay} guest${partyDisplay !== "1" ? "s" : ""}`)}
+          {row("Occasion", fmtOccasion(r.occasion))}
+          {row("Email", r.email || "—")}
+          {row("Phone", r.phone || "—")}
+          {row("Notes", r.notes || "—")}
+          {r.is_concierge && row("Concierge", "Yes")}
+          {r.created_at && row("Created", new Date(r.created_at).toLocaleString("en-GB"))}
+        </div>
+        <div style={{ padding: "12px 22px", borderTop: "1px solid var(--ds-border)", display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "flex-end" }}>
+          {r.status !== "cancelled" && r.status !== "confirmed" && onConfirm && (
+            <button style={btn} onClick={onConfirm}><Check size={13} /> Confirm</button>
+          )}
+          {r.status !== "cancelled" && onReschedule && (
+            <button style={btn} onClick={onReschedule}><CalendarDays size={13} /> Reschedule</button>
+          )}
+          {r.status !== "cancelled" && onCancel && (
+            <button style={btn} onClick={onCancel}><X size={13} /> Cancel</button>
+          )}
+          {r.email && onEmail && (
+            <button style={btn} onClick={onEmail}><Mail size={13} /> Email</button>
+          )}
+          {r.pre_selected_meals?.length > 0 && onViewMeals && (
+            <button style={btn} onClick={onViewMeals}><UtensilsCrossed size={13} /> Meals</button>
+          )}
+        </div>
+      </div>
+    </ModalBackdrop>
+  );
 }
 
 function EmailModal({ reservation, onClose }) {
@@ -408,16 +481,18 @@ function MealSelectionsPanel({ reservation, onClose }) {
 }
 
 /* ─── Table row ─── */
-function TableRow({ r, idx, working, onConfirm, onReschedule, onCancel, onEmail, onViewMeals }) {
+function TableRow({ r, idx, working, onConfirm, onReschedule, onCancel, onEmail, onViewMeals, onOpenDetail }) {
   const partyDisplay = r.party === "other" ? (r.party_other ?? "—") : (r.party ?? "—");
   const isWorking = working === r.id;
   const evenBg = "transparent";
   const oddBg  = "rgba(250,248,245,0.55)";
   const rowBg  = idx % 2 === 0 ? evenBg : oddBg;
+  const stop = (e) => e.stopPropagation();
 
   return (
     <tr
-      style={{ background: rowBg, transition: "background 0.1s" }}
+      onClick={() => onOpenDetail?.(r)}
+      style={{ background: rowBg, transition: "background 0.1s", cursor: onOpenDetail ? "pointer" : "default" }}
       onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(200,169,110,0.055)"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = rowBg; }}
     >
@@ -465,7 +540,7 @@ function TableRow({ r, idx, working, onConfirm, onReschedule, onCancel, onEmail,
       </td>
 
       {/* Actions */}
-      <td style={{ padding: "13px 16px" }}>
+      <td style={{ padding: "13px 16px" }} onClick={stop}>
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           {r.status !== "confirmed" && r.status !== "cancelled" && (
             <ActionBtn
@@ -849,10 +924,19 @@ function NewReservationModal({ onSave, onClose }) {
 /* ─── Main component ─── */
 export default function Reservations() {
   const { profile: staffProfile } = useStaff();
+  const [searchParams] = useSearchParams();
+  const urlQuery = searchParams.get("q") || "";
   const [rows, setRows]               = useState([]);
   const [loading, setLoading]         = useState(true);
   const [filter, setFilter]           = useState("all");
-  const [search, setSearch]           = useState("");
+  const [todayOnly, setTodayOnly]     = useState(false);
+  const [detailTarget, setDetailTarget] = useState(null);
+  const [search, setSearch]           = useState(urlQuery);
+  const [lastUrlQuery, setLastUrlQuery] = useState(urlQuery);
+  if (urlQuery !== lastUrlQuery) {
+    setLastUrlQuery(urlQuery);
+    setSearch(urlQuery);
+  }
   const [working, setWorking]         = useState(null);
   const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [cancelTarget,     setCancelTarget]     = useState(null);
@@ -916,12 +1000,13 @@ export default function Reservations() {
   /* ── Filtered display rows ── */
   const filtered = rows.filter((r) => {
     const matchTab = filter === "all" || r.status === filter;
+    const matchToday = !todayOnly || r.date === todayStr;
     const q = search.toLowerCase().trim();
     const matchSearch = !q
       || r.name?.toLowerCase().includes(q)
       || r.email?.toLowerCase().includes(q)
       || r.phone?.includes(q);
-    return matchTab && matchSearch;
+    return matchTab && matchToday && matchSearch;
   });
 
   /* ── Confirm ── */
@@ -1024,10 +1109,34 @@ export default function Reservations() {
 
       {/* ── Summary pills ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }} className="ds-res-summary">
-        <SummaryPill label="Today"     count={todayCount}     dotColor="var(--ds-gold)" />
-        <SummaryPill label="Pending"   count={pendingCount}   dotColor="#d97706" />
-        <SummaryPill label="Confirmed" count={confirmedCount} dotColor="#16a34a" />
-        <SummaryPill label="Cancelled" count={cancelledCount} dotColor="#dc2626" />
+        <SummaryPill
+          label="Today"
+          count={todayCount}
+          dotColor="var(--ds-gold)"
+          active={todayOnly}
+          onClick={() => { setTodayOnly((v) => !v); setFilter("all"); }}
+        />
+        <SummaryPill
+          label="Pending"
+          count={pendingCount}
+          dotColor="#d97706"
+          active={filter === "pending" && !todayOnly}
+          onClick={() => { setFilter(filter === "pending" ? "all" : "pending"); setTodayOnly(false); }}
+        />
+        <SummaryPill
+          label="Confirmed"
+          count={confirmedCount}
+          dotColor="#16a34a"
+          active={filter === "confirmed" && !todayOnly}
+          onClick={() => { setFilter(filter === "confirmed" ? "all" : "confirmed"); setTodayOnly(false); }}
+        />
+        <SummaryPill
+          label="Cancelled"
+          count={cancelledCount}
+          dotColor="#dc2626"
+          active={filter === "cancelled" && !todayOnly}
+          onClick={() => { setFilter(filter === "cancelled" ? "all" : "cancelled"); setTodayOnly(false); }}
+        />
       </div>
 
       {/* ── Search + filter card ── */}
@@ -1132,6 +1241,7 @@ export default function Reservations() {
                     onCancel={setCancelTarget}
                     onEmail={setEmailTarget}
                     onViewMeals={setMealTarget}
+                    onOpenDetail={setDetailTarget}
                   />
                 ))}
               </tbody>
@@ -1179,6 +1289,18 @@ export default function Reservations() {
             key="meals"
             reservation={mealTarget}
             onClose={() => setMealTarget(null)}
+          />
+        )}
+        {detailTarget && (
+          <ReservationDetailModal
+            key="detail"
+            reservation={detailTarget}
+            onClose={() => setDetailTarget(null)}
+            onConfirm={() => { handleConfirm(detailTarget); setDetailTarget(null); }}
+            onReschedule={() => { setRescheduleTarget(detailTarget); setDetailTarget(null); }}
+            onCancel={() => { setCancelTarget(detailTarget); setDetailTarget(null); }}
+            onEmail={() => { setEmailTarget(detailTarget); setDetailTarget(null); }}
+            onViewMeals={() => { setMealTarget(detailTarget); setDetailTarget(null); }}
           />
         )}
       </AnimatePresence>

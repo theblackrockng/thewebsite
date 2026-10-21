@@ -260,6 +260,14 @@ export default function Layout({ children }) {
   const [showPinModal, setShowPinModal] = useState(false);
   const pageName = useCurrentPage();
   const notifRef = useRef(null);
+  const [globalSearch, setGlobalSearch] = useState("");
+
+  function submitSearch(e) {
+    e?.preventDefault?.();
+    const q = globalSearch.trim();
+    if (!q) return;
+    navigate(`/reservations?q=${encodeURIComponent(q)}`);
+  }
 
   useEffect(() => {
     async function fetchCounts() {
@@ -392,11 +400,13 @@ export default function Layout({ children }) {
           </div>
 
           {/* Search */}
-          <div style={{ flex: 1, maxWidth: 380, margin: "0 auto", position: "relative" }}>
+          <form onSubmit={submitSearch} style={{ flex: 1, maxWidth: 380, margin: "0 auto", position: "relative" }}>
             <Search size={13} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--ds-muted)", pointerEvents: "none" }} />
             <input
               type="text"
-              placeholder="Search reservations, guests, menu…"
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              placeholder="Search reservations by name, email or phone…"
               style={{
                 width: "100%", background: "var(--ds-input-bg)",
                 border: "1px solid var(--ds-border)", borderRadius: 7,
@@ -404,7 +414,7 @@ export default function Layout({ children }) {
                 color: "var(--ds-text)", fontFamily: "'DM Sans', sans-serif", outline: "none",
               }}
             />
-          </div>
+          </form>
 
           {/* Right controls */}
           <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0, marginLeft: "auto" }}>
