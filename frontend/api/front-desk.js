@@ -683,9 +683,31 @@ async function orderItemsHandler(req, res) {
 }
 
 // ── Append items to an existing table order (Front Desk "Add Items") ───
-// POST { order_id, items: [{ id, name, price, qty, menuType, modifiers? }] }
+// POST { order_id, request_id?, items: [{ id, name, price, qty, menuType, modifiers? }] }
 // Inserts into order_items, recomputes totals, notifies kitchen. No PIN
-// required — additive, not destructive.
+// required — additive, not destructive. request_id dedups duplicate submits
+// from the same modal session.
+
+const ADD_ITEMS_IDEMPOTENCY = new Map();
+const ADD_ITEMS_TTL_MS = 2 * 60 * 1000;
+function rememberAddItems(key, response) {
+  ADD_ITEMS_IDEMPOTENCY.set(key, { ts: Date.now(), response });
+  if (ADD_ITEMS_IDEMPOTENCY.size > 500) {
+    const cutoff = Date.now() - ADD_ITEMS_TTL_MS;
+    for (const [k, v] of ADD_ITEMS_IDEMPOTENCY.entries()) {
+      if (v.ts < cutoff) ADD_ITEMS_IDEMPOTENCY.delete(k);
+    }
+  }
+}
+function recallAddItems(key) {
+  const hit = ADD_ITEMS_IDEMPOTENCY.get(key);
+  if (!hit) return null;
+  if (Date.now() - hit.ts > ADD_ITEMS_TTL_MS) {
+    ADD_ITEMS_IDEMPOTENCY.delete(key);
+    return null;
+  }
+  return hit.response;
+}
 
 async function addItemsHandler(req, res) {
   applySecurityHeaders(res);
@@ -712,12 +734,20 @@ async function addItemsHandler(req, res) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return res.status(400).json({ error: 'Invalid request body.' });
   }
-  const { order_id: orderId, items } = body;
+  const { order_id: orderId, items, request_id: requestId } = body;
   if (typeof orderId !== 'string' || !UUID_RE.test(orderId)) {
     return res.status(400).json({ error: 'Missing or invalid order id.' });
   }
   if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
     return res.status(400).json({ error: 'items must be a non-empty array (max 50).' });
+  }
+
+  const idemKey = typeof requestId === 'string' && requestId.length >= 8 && requestId.length <= 128
+    ? `${orderId}:${requestId}`
+    : null;
+  if (idemKey) {
+    const cached = recallAddItems(idemKey);
+    if (cached) return res.status(200).json({ ...cached, deduped: true });
   }
 
   const db = getDb();
@@ -793,7 +823,9 @@ async function addItemsHandler(req, res) {
     await notifyKitchenTelegram('front-desk-add-items', telegramMsg);
   }
 
-  return res.status(200).json({ ok: true, added: rows.length, ...(totals || {}) });
+  const response = { ok: true, added: rows.length, ...(totals || {}) };
+  if (idemKey) rememberAddItems(idemKey, response);
+  return res.status(200).json(response);
 }
 
 module.exports = function handler(req, res) {

@@ -1919,6 +1919,11 @@ function AddItemsModal({ order, t, staffName, onClose }) {
   const [activeCat, setActiveCat] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const requestIdRef = useRef(null);
+  if (!requestIdRef.current) {
+    requestIdRef.current = (crypto.randomUUID && crypto.randomUUID()) ||
+      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1987,6 +1992,7 @@ function AddItemsModal({ order, t, staffName, onClose }) {
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({
           order_id: order.id,
+          request_id: requestIdRef.current,
           items: cart.map(c => ({
             id: c.id,
             name: c.name,
