@@ -166,6 +166,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
   const [tableFlash, setTableFlash] = useState(false);
   const [menuType, setMenuType] = useState("food");
   const [foodData, setFoodData] = useState(null);
+  const [categoryMenuType, setCategoryMenuType] = useState({});
   const [activeTab, setActiveTab] = useState(FOOD_CATEGORY_ORDER[0]);
   const [dbCategoryImages, setDbCategoryImages] = useState({});
   const [soupModal, setSoupModal] = useState(null);
@@ -219,35 +220,66 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
           .from("menu_items").select("*").eq("available", true)
           .order("sort_order", { ascending: true, nullsFirst: false });
         const food = {};
+        const catType = {};
         if (!error && data?.length > 0) {
           for (const item of data) {
             const rawCat = item.category || "Other";
             const cat = ALL_CATEGORY_ORDER.find(c => c.toLowerCase() === rawCat.toLowerCase()) || rawCat;
             if (!food[cat]) food[cat] = [];
             food[cat].push(item);
+            if (!catType[cat]) {
+              catType[cat] = item.menu_type === "drink" ? "drink"
+                : DRINK_CATEGORY_ORDER.includes(cat) ? "drink"
+                : "food";
+            }
           }
         }
-        if (Object.keys(food).length === 0) Object.assign(food, buildStaticFood());
+        if (Object.keys(food).length === 0) {
+          Object.assign(food, buildStaticFood());
+          for (const c of Object.keys(food)) {
+            catType[c] = DRINK_CATEGORY_ORDER.includes(c) ? "drink" : "food";
+          }
+        }
         setFoodData(food);
-        const first = ALL_CATEGORY_ORDER.find(c => food[c]?.length > 0);
+        setCategoryMenuType(catType);
+        const first = ALL_CATEGORY_ORDER.find(c => food[c]?.length > 0)
+          || Object.keys(food).find(c => catType[c] === "food");
         if (first) setActiveTab(first);
       } catch {
-        setFoodData(buildStaticFood());
+        const fallback = buildStaticFood();
+        const fallbackTypes = {};
+        for (const c of Object.keys(fallback)) {
+          fallbackTypes[c] = DRINK_CATEGORY_ORDER.includes(c) ? "drink" : "food";
+        }
+        setFoodData(fallback);
+        setCategoryMenuType(fallbackTypes);
       }
     }
     loadMenu();
   }, []);
 
   const categories = useMemo(() => {
+    if (!foodData) return [];
     const order = menuType === "food" ? FOOD_CATEGORY_ORDER : DRINK_CATEGORY_ORDER;
-    return foodData ? order.filter(c => foodData[c]?.length > 0) : [];
-  }, [menuType, foodData]);
+    const inOrder = order.filter(c => foodData[c]?.length > 0);
+    const extras = Object.keys(foodData).filter(c =>
+      !order.includes(c) &&
+      foodData[c]?.length > 0 &&
+      (categoryMenuType[c] || "food") === menuType
+    );
+    return [...inOrder, ...extras];
+  }, [menuType, foodData, categoryMenuType]);
 
   const switchMenuType = (type) => {
     setMenuType(type);
     const order = type === "food" ? FOOD_CATEGORY_ORDER : DRINK_CATEGORY_ORDER;
     if (foodData) {
-      const first = order.find(c => foodData[c]?.length > 0);
+      const first = order.find(c => foodData[c]?.length > 0)
+        || Object.keys(foodData).find(c =>
+          !order.includes(c) &&
+          foodData[c]?.length > 0 &&
+          (categoryMenuType[c] || "food") === type
+        );
       if (first) setActiveTab(first);
     }
     if (tabsRef.current) {

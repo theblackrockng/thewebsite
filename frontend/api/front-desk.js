@@ -674,12 +674,127 @@ async function orderItemsHandler(req, res) {
   }
 }
 
+// ── Append items to an existing table order (Front Desk "Add Items") ───
+// POST { order_id, items: [{ id, name, price, qty, menuType, modifiers? }] }
+// Inserts into order_items, recomputes totals, notifies kitchen. No PIN
+// required — additive, not destructive.
+
+async function addItemsHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, ORDER_ITEM_ROLES);
+  if (!staff) return;
+
+  const ip = getIP(req);
+  const { blocked } = checkUserAgent(req);
+  if (blocked) return res.status(400).json({ error: 'Bad request.' });
+  const { allowed } = checkCors(req);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden.' });
+  const { limited } = checkInMemoryRateLimit(ip, 'front-desk-add-items', 200, 60 * 60 * 1000);
+  if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Invalid request body.' });
+  }
+  const { order_id: orderId, items } = body;
+  if (typeof orderId !== 'string' || !UUID_RE.test(orderId)) {
+    return res.status(400).json({ error: 'Missing or invalid order id.' });
+  }
+  if (!Array.isArray(items) || items.length === 0 || items.length > 50) {
+    return res.status(400).json({ error: 'items must be a non-empty array (max 50).' });
+  }
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const { data: order, error: orderErr } = await db
+    .from('orders')
+    .select('id, order_number, order_status, table_number, order_type')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (orderErr || !order) return res.status(404).json({ error: 'Order not found.' });
+  if (!EDITABLE_ORDER_STATUSES.includes(order.order_status)) {
+    return res.status(400).json({ error: `Cannot add items to an order that is '${order.order_status}'.` });
+  }
+
+  const rows = [];
+  for (const it of items) {
+    const qty = Number(it.qty);
+    const price = Number(it.price);
+    if (!Number.isFinite(qty) || qty < 1 || qty > 99) {
+      return res.status(400).json({ error: 'Each item needs a qty between 1 and 99.' });
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      return res.status(400).json({ error: 'Each item needs a non-negative price.' });
+    }
+    if (!it.name || typeof it.name !== 'string') {
+      return res.status(400).json({ error: 'Each item needs a name.' });
+    }
+    rows.push({
+      order_id: orderId,
+      item_id: it.id || null,
+      item_name: String(it.name).slice(0, 200),
+      unit_price: price,
+      qty,
+      line_total: price * qty,
+      category: it.menuType === 'drink' ? 'drink' : 'food',
+      modifiers: it.modifiers ? String(it.modifiers).slice(0, 240) : null,
+    });
+  }
+
+  const { error: insertErr } = await db.from('order_items').insert(rows);
+  if (insertErr) {
+    console.error('[front-desk-add-items] insert error:', insertErr);
+    return res.status(500).json({ error: 'Failed to add items.', detail: insertErr.message });
+  }
+
+  let totals;
+  try {
+    totals = await recomputeOrderTotals(db, orderId);
+  } catch (err) {
+    console.error('[front-desk-add-items] recompute error:', err);
+    totals = null;
+  }
+
+  const staffName = staff.profile.full_name || staff.profile.email || 'Front Desk';
+  const ref = order.order_number || orderId.slice(0, 8);
+  const itemsText = rows
+    .map((r) => `  ${r.qty}× ${r.item_name}${r.modifiers ? ` (${r.modifiers})` : ''} — ₦${(r.line_total).toLocaleString('en-NG')}`)
+    .join('\n');
+  const location = order.table_number ? `Table ${order.table_number}` : (order.order_type || 'order');
+  const telegramMsg = [
+    `➕ <b>Items added to ${escapeHtml(ref)}</b> (${escapeHtml(location)})`,
+    `By <b>${escapeHtml(staffName)}</b>`,
+    '',
+    'Added:',
+    escapeHtml(itemsText),
+    totals ? `\nNew total: ₦${totals.total.toLocaleString('en-NG')}` : '',
+  ].filter(Boolean).join('\n');
+  await notifyTelegram('front-desk-add-items', telegramMsg);
+
+  const hasFood = rows.some((r) => r.category !== 'drink');
+  if (hasFood) {
+    await notifyKitchenTelegram('front-desk-add-items', telegramMsg);
+  }
+
+  return res.status(200).json({ ok: true, added: rows.length, ...(totals || {}) });
+}
+
 module.exports = function handler(req, res) {
   const resource = req.query && req.query.resource;
   if (resource === 'orders') return ordersHandler(req, res);
   if (resource === 'reservations') return reservationsHandler(req, res);
   if (resource === 'waiter-calls') return waiterCallsHandler(req, res);
   if (resource === 'order-items') return orderItemsHandler(req, res);
+  if (resource === 'add-items') return addItemsHandler(req, res);
   applySecurityHeaders(res);
   return res.status(400).json({ error: 'Unknown resource.' });
 };

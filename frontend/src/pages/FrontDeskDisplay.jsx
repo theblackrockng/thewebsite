@@ -1936,7 +1936,7 @@ function AddItemsModal({ order, t, staffName, onClose }) {
             name: it.name,
             price: Number(it.price || 0),
             category: it.category || "Other",
-            menuType: /drink|cocktail|wine|beer|spirit|bar/i.test(it.category || "") ? "drink" : "food",
+            menuType: it.menu_type === "drink" ? "drink" : "food",
           })));
         } else {
           setMenu(buildFallbackMenu());
@@ -1982,20 +1982,11 @@ function AddItemsModal({ order, t, staffName, onClose }) {
     if (!cart.length || submitting) return;
     setSubmitting(true); setError("");
     try {
-      const res = await fetch("/api/orders", {
+      const res = await fetch("/api/front-desk?resource=add-items", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({
-          orderType: "dine-in",
-          tableNumber: order.table_number,
-          orderSource: "waiter",
-          placedBy: staffName,
-          guestName: order.guest_name || `Table ${order.table_number}`,
-          guestPhone: order.guest_phone || "0000000000",
-          guestEmail: null,
-          specialInstructions: `Added to Table ${order.table_number} tab`,
-          scheduledTime: null,
-          paymentMethod: "pay_on_arrival",
+          order_id: order.id,
           items: cart.map(c => ({
             id: c.id,
             name: c.name,
@@ -2128,7 +2119,7 @@ function AddItemsModal({ order, t, staffName, onClose }) {
               disabled={!cart.length || submitting}
               style={{ padding: "12px 22px", borderRadius: 10, border: "none", background: !cart.length || submitting ? t.border : t.gold, color: !cart.length || submitting ? t.muted : t.onGold, fontSize: 14, fontWeight: 800, cursor: !cart.length || submitting ? "not-allowed" : "pointer", fontFamily: "inherit" }}
             >
-              {submitting ? "Sending to kitchen…" : "Send to kitchen →"}
+              {submitting ? "Adding…" : "Add Items →"}
             </button>
           </div>
         </div>
