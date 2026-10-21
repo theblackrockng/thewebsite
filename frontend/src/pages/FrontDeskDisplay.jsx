@@ -2599,7 +2599,7 @@ function EditOrderModal({ order, t, onClose, onAddItems }) {
             <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between", gap: 10 }}>
               {onAddItems ? (
                 <button onClick={onAddItems} style={{ padding: "10px 16px", borderRadius: 8, border: `1px dashed ${t.gold}`, background: "transparent", color: t.gold, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
-                  <Plus size={14} /> Add Replacement
+                  <Plus size={14} /> Add
                 </button>
               ) : <div />}
               <button onClick={onClose} style={{ padding: "10px 20px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>
