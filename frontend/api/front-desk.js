@@ -616,30 +616,51 @@ async function orderItemsHandler(req, res) {
     return res.status(400).json({ error: `Cannot edit items on an order that is '${order.order_status}'.` });
   }
 
-  const { data: item, error: itemErr } = await db
+  let item;
+  let itemErr;
+  ({ data: item, error: itemErr } = await db
     .from('order_items')
     .select('id, order_id, item_name, unit_price, qty, voided')
     .eq('id', itemId)
-    .maybeSingle();
+    .maybeSingle());
+  const voidedColumnMissing = itemErr && isMissingColumn(itemErr);
+  if (voidedColumnMissing) {
+    ({ data: item, error: itemErr } = await db
+      .from('order_items')
+      .select('id, order_id, item_name, unit_price, qty')
+      .eq('id', itemId)
+      .maybeSingle());
+  }
   if (itemErr || !item || item.order_id !== orderId) return res.status(404).json({ error: 'Item not found on this order.' });
   if (item.voided) return res.status(400).json({ error: 'Item is already voided.' });
 
   try {
     if (req.method === 'POST') {
       const reason = typeof body.reason === 'string' ? body.reason.slice(0, 240) : null;
-      const { error: voidErr } = await db
-        .from('order_items')
-        .update({
-          voided: true,
-          voided_by: authz.by_name || staff.profile.full_name,
-          voided_at: new Date().toISOString(),
-          void_reason: reason,
-        })
-        .eq('id', itemId)
-        .eq('voided', false);
-      if (voidErr) {
-        console.error('[front-desk-order-items] void error:', voidErr);
-        return res.status(500).json({ error: 'Failed to void item.' });
+      if (voidedColumnMissing) {
+        const { error: delErr } = await db
+          .from('order_items')
+          .delete()
+          .eq('id', itemId);
+        if (delErr) {
+          console.error('[front-desk-order-items] delete fallback error:', delErr);
+          return res.status(500).json({ error: 'Failed to void item.' });
+        }
+      } else {
+        const { error: voidErr } = await db
+          .from('order_items')
+          .update({
+            voided: true,
+            voided_by: authz.by_name || staff.profile.full_name,
+            voided_at: new Date().toISOString(),
+            void_reason: reason,
+          })
+          .eq('id', itemId)
+          .eq('voided', false);
+        if (voidErr) {
+          console.error('[front-desk-order-items] void error:', voidErr);
+          return res.status(500).json({ error: 'Failed to void item.' });
+        }
       }
       const totals = await recomputeOrderTotals(db, orderId);
       const ref = order.order_number || orderId.slice(0, 8);
@@ -660,11 +681,11 @@ async function orderItemsHandler(req, res) {
       line_total: Number(item.unit_price || 0) * nextQty,
     };
     if (nextNote !== undefined) updates.modifiers = nextNote;
-    const { error: patchErr } = await db
+    const patchQuery = db
       .from('order_items')
       .update(updates)
-      .eq('id', itemId)
-      .eq('voided', false);
+      .eq('id', itemId);
+    const { error: patchErr } = await (voidedColumnMissing ? patchQuery : patchQuery.eq('voided', false));
     if (patchErr) {
       console.error('[front-desk-order-items] patch error:', patchErr);
       return res.status(500).json({ error: 'Failed to update item.' });
