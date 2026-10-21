@@ -541,11 +541,19 @@ async function waiterCallsHandler(req, res) {
 const EDITABLE_ORDER_STATUSES = ['new', 'confirmed', 'preparing', 'ready'];
 
 async function recomputeOrderTotals(db, orderId) {
-  const { data: rows, error } = await db
+  let rows;
+  let err;
+  ({ data: rows, error: err } = await db
     .from('order_items')
     .select('line_total, voided')
-    .eq('order_id', orderId);
-  if (error) throw error;
+    .eq('order_id', orderId));
+  if (err && isMissingColumn(err)) {
+    ({ data: rows, error: err } = await db
+      .from('order_items')
+      .select('line_total')
+      .eq('order_id', orderId));
+  }
+  if (err) throw err;
   const subtotal = (rows || [])
     .filter((r) => !r.voided)
     .reduce((sum, r) => sum + Number(r.line_total || 0), 0);
