@@ -266,7 +266,8 @@ export default function Layout({ children }) {
     e?.preventDefault?.();
     const q = globalSearch.trim();
     if (!q) return;
-    navigate(`/reservations?q=${encodeURIComponent(q)}`);
+    navigate(`/search?q=${encodeURIComponent(q)}`);
+    setGlobalSearch("");
   }
 
   useEffect(() => {
@@ -406,7 +407,7 @@ export default function Layout({ children }) {
               type="text"
               value={globalSearch}
               onChange={(e) => setGlobalSearch(e.target.value)}
-              placeholder="Search reservations by name, email or phone…"
+              placeholder="Search reservations, enquiries, orders, menu, staff…"
               style={{
                 width: "100%", background: "var(--ds-input-bg)",
                 border: "1px solid var(--ds-border)", borderRadius: 7,

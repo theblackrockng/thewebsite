@@ -26,6 +26,7 @@ import GalleryManager from "./pages/gallery/GalleryManager";
 import SiteImages from "./pages/images/SiteImages";
 import Tables from "./pages/tables/Tables";
 import Analytics from "./pages/analytics/Analytics";
+import Search from "./pages/search/Search";
 
 function NotSetUpScreen() {
   const { signOut } = useAuth();
@@ -174,6 +175,7 @@ function AppRoutes() {
       <Route path="/images"             element={<ProtectedRoute><SiteImages /></ProtectedRoute>} />
       <Route path="/tables"             element={<ProtectedRoute><Tables /></ProtectedRoute>} />
       <Route path="/analytics"          element={<AnalyticsRoute><Analytics /></AnalyticsRoute>} />
+      <Route path="/search"             element={<ProtectedRoute><Search /></ProtectedRoute>} />
       <Route path="/console-internal-br2026" element={<SuperAdminRoute><FeatureControl /></SuperAdminRoute>} />
       <Route path="*"                   element={<Navigate to="/" replace />} />
     </Routes>
