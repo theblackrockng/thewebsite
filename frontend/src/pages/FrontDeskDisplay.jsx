@@ -2389,13 +2389,14 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
           order={order}
           t={t}
           onClose={() => setShowEditOrder(false)}
+          onAddItems={() => { setShowEditOrder(false); setShowAddItems(true); }}
         />
       )}
     </div>
   );
 }
 
-function EditOrderModal({ order, t, onClose }) {
+function EditOrderModal({ order, t, onClose, onAddItems }) {
   const [stage, setStage] = useState("pin");
   const [pin, setPin] = useState("");
   const [verifying, setVerifying] = useState(false);
@@ -2405,6 +2406,8 @@ function EditOrderModal({ order, t, onClose }) {
   const [error, setError] = useState("");
   const [busyItemId, setBusyItemId] = useState("");
   const [items, setItems] = useState(() => (order.order_items || []).filter((i) => !i.voided));
+  const [voidingItem, setVoidingItem] = useState(null);
+  const [voidReason, setVoidReason] = useState("");
 
   async function verifyPin() {
     if (!/^\d{4,8}$/.test(pin)) { setError("Enter 4-8 digits."); return; }
@@ -2445,13 +2448,22 @@ function EditOrderModal({ order, t, onClose }) {
     return data;
   }
 
-  async function voidItem(it) {
-    const reason = window.prompt(`Void "${it.item_name}" — reason? (optional)`, "") || null;
-    if (reason === null && !window.confirm(`Void "${it.item_name}" from the order?`)) return;
+  function askVoid(it) {
+    setVoidingItem(it);
+    setVoidReason("");
+    setError("");
+  }
+
+  async function confirmVoid() {
+    const it = voidingItem;
+    if (!it) return;
+    const reason = voidReason.trim() ? voidReason.trim() : null;
     setBusyItemId(it.id); setError("");
     try {
       await callOrderItems("POST", { order_id: order.id, item_id: it.id, reason });
       setItems((prev) => prev.filter((x) => x.id !== it.id));
+      setVoidingItem(null);
+      setVoidReason("");
     } catch (e) {
       setError(e.message);
       if (/pin/i.test(e.message)) setStage("pin");
@@ -2551,17 +2563,45 @@ function EditOrderModal({ order, t, onClose }) {
                         <Plus size={12} />
                       </button>
                     </div>
-                    <button onClick={() => voidItem(it)} disabled={busyItemId === it.id} style={{ padding: "6px 10px", border: `1px solid ${t.accent}`, background: "transparent", color: t.accent, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+                    <button onClick={() => askVoid(it)} disabled={busyItemId === it.id} style={{ padding: "6px 10px", border: `1px solid ${t.accent}`, background: "transparent", color: t.accent, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
                       <Trash2 size={12} /> Void
                     </button>
                   </div>
                 ))}
               </div>
             )}
+            {voidingItem && (
+              <div style={{ marginTop: 14, padding: 14, border: `1px solid ${t.accent}`, borderRadius: 8, background: "rgba(220,38,38,0.08)" }}>
+                <div style={{ fontSize: 13, color: t.text, marginBottom: 8 }}>
+                  Void <strong>{voidingItem.item_name}</strong> from this order?
+                </div>
+                <input
+                  type="text"
+                  value={voidReason}
+                  onChange={(e) => setVoidReason(e.target.value.slice(0, 240))}
+                  placeholder="Reason (optional)"
+                  autoFocus
+                  style={{ width: "100%", padding: "8px 10px", background: t.input, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 13, outline: "none", marginBottom: 10 }}
+                />
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button onClick={() => { setVoidingItem(null); setVoidReason(""); }} disabled={!!busyItemId} style={{ padding: "8px 14px", borderRadius: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, cursor: "pointer", fontSize: 12.5 }}>
+                    Cancel
+                  </button>
+                  <button onClick={confirmVoid} disabled={busyItemId === voidingItem.id} style={{ padding: "8px 14px", borderRadius: 6, border: "none", background: t.accent, color: "#fff", cursor: "pointer", fontSize: 12.5, fontWeight: 700, opacity: busyItemId === voidingItem.id ? 0.6 : 1 }}>
+                    {busyItemId === voidingItem.id ? "Voiding…" : "Confirm Void"}
+                  </button>
+                </div>
+              </div>
+            )}
             {error && (
               <div style={{ marginTop: 12, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
             )}
-            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between", gap: 10 }}>
+              {onAddItems ? (
+                <button onClick={onAddItems} style={{ padding: "10px 16px", borderRadius: 8, border: `1px dashed ${t.gold}`, background: "transparent", color: t.gold, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                  <Plus size={14} /> Add Replacement
+                </button>
+              ) : <div />}
               <button onClick={onClose} style={{ padding: "10px 20px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>
                 Done
               </button>
