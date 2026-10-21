@@ -1442,7 +1442,7 @@ function FrontDeskMain({ onSessionLost }) {
       )}
 
       {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16, paddingBottom: 20, borderBottom: `1px solid ${t.border}` }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 16, paddingBottom: 20, borderBottom: `1px solid ${t.border}` }}>
         <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 28 }}>
           <div>
             <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 30, fontWeight: 700, color: t.gold, letterSpacing: "4px", textTransform: "uppercase", lineHeight: 1 }}>BLACKROCK</div>
@@ -1451,11 +1451,10 @@ function FrontDeskMain({ onSessionLost }) {
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
             {[
-              { v: "orders",       label: "Front Desk",   icon: <UtensilsCrossed size={26} />, badge: counts.new,         ariaDesc: "new orders", separated: false },
-              { v: "bar",          label: "Bar",          icon: <Wine size={26} />,            badge: barOrders.length,   ariaDesc: "drink orders", separated: false },
-              { v: "reservations", label: "Reservations", icon: <CalendarDays size={26} />,    badge: resCounts.pending,  ariaDesc: "pending reservations", separated: false },
-              { v: "guesthouse",   label: "Guest House",  icon: <BedDouble size={26} />,       badge: guesthouseActiveCount, ariaDesc: "occupied rooms", separated: true },
-            ].map(({ v, label, icon, badge, ariaDesc, separated }) => {
+              { v: "orders",       label: "Front Desk",   icon: <UtensilsCrossed size={26} />, badge: counts.new,         ariaDesc: "new orders" },
+              { v: "bar",          label: "Bar",          icon: <Wine size={26} />,            badge: barOrders.length,   ariaDesc: "drink orders" },
+              { v: "reservations", label: "Reservations", icon: <CalendarDays size={26} />,    badge: resCounts.pending,  ariaDesc: "pending reservations" },
+            ].map(({ v, label, icon, badge, ariaDesc }) => {
               const active = view === v;
               return (
                 <button
@@ -1466,7 +1465,6 @@ function FrontDeskMain({ onSessionLost }) {
                     background: active ? t.gold : "transparent", color: active ? t.onGold : t.gold,
                     border: `2px solid ${t.gold}`, cursor: "pointer",
                     fontSize: 22, fontWeight: 800, fontFamily: "inherit",
-                    marginLeft: separated ? 64 : 0,
                   }}
                 >
                   {icon}
@@ -1488,7 +1486,38 @@ function FrontDeskMain({ onSessionLost }) {
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        {(() => {
+          const active = view === "guesthouse";
+          const badge = guesthouseActiveCount;
+          return (
+            <button
+              onClick={() => changeView("guesthouse")}
+              style={{
+                display: "flex", alignItems: "center", gap: 12, padding: "14px 24px", borderRadius: 12,
+                background: active ? t.gold : "transparent", color: active ? t.onGold : t.gold,
+                border: `2px solid ${t.gold}`, cursor: "pointer",
+                fontSize: 22, fontWeight: 800, fontFamily: "inherit",
+                marginLeft: "auto",
+              }}
+            >
+              <BedDouble size={26} />
+              Guest House
+              <span
+                aria-label={`${badge} occupied rooms`}
+                style={{
+                  minWidth: 36, height: 36, padding: "0 10px", borderRadius: 99, display: "inline-flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 18, fontWeight: 800, fontVariantNumeric: "tabular-nums",
+                  background: badge > 0 ? t.accent : (active ? "rgba(0,0,0,0.18)" : "rgba(200,169,110,0.18)"),
+                  color: badge > 0 ? "#ffffff" : (active ? t.onGold : t.gold),
+                }}
+              >
+                {badge}
+              </span>
+            </button>
+          );
+        })()}
+
+        <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 12, flexBasis: "100%", justifyContent: "flex-end" }}>
           <div
             title={linkOk ? "Live updates connected" : (onReservations ? "Could not reach the server, retrying every 15 seconds" : "Live updates lost, checking every 15 seconds")}
             style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 16px", borderRadius: 10, border: `1px solid ${linkOk ? "#16a34a" : t.accent}`, color: linkOk ? "#16a34a" : t.accent, fontSize: 15, fontWeight: 700 }}

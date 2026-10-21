@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-10-21 (Front Desk: Guest House MVP (Phase 1) landed — new "Guest House" button at the far right of the Front Desk/Bar/Reservations switch (same button size, 64px marginLeft gap) opens a room grid for the 5 rooms (101 Executive ₦45k, 102–105 Standard ₦35k). Check-in modal captures guest name/phone/email, nights, optional discount (₦), payment method, notes and shows a live base/discount/total breakdown. Guest house PIN gate (parallel to the void-PIN pattern — HMAC token, 5-min TTL, 5/min/IP rate limit) authorizes check-in, check-out, encode-key, mark-paid actions; PIN resolves to a staff profile with role super_admin/manager/front_desk/guesthouse OR `can_manage_guesthouse=true`. New `guesthouse` role added to `staff_profiles`; UserManagement EditModal gets a "Guest House Authorization" section (toggle + PIN input mirroring the void-PIN block). Key-card encoding records an audit row (`key_encoded_by_id/name/at`) and prompts the staff to use the PCLMS reader for the actual MIFARE write — we do not call PCLMS directly (no public SDK). SQL migration `006_guesthouse.sql` creates `guest_rooms` + `guest_room_bookings` + extends `staff_profiles` + extends `protect_staff_profile_columns` trigger — **still pending in Supabase SQL Editor**. Console: top-bar search is now a true global search — navigates to a dedicated `/search?q=` page that queries reservations, enquiries, orders, menu items, staff and blog posts in parallel and shows categorized results. Placeholder updated. Previously the top-bar input only navigated to the Reservations page; Dashboard caches its last snapshot at module scope so re-entering the route no longer flashes a loading screen; Upcoming Reservations window extended to 30 days (so Oct 24/31 and beyond now surface on the dashboard); Dashboard upcoming/activity/recent rows and Reservations table rows + summary pills (Today/Pending/Confirmed/Cancelled) are now clickable and open a full guest-detail modal. Picker-driven menu items (soup/swallow, side, buffet) now expose a minus button alongside the plus. Front Desk Void UI replaced native prompt/confirm with inline reason input + Add button for Electron compatibility. Sides on Charcoal Grills + Continental + Bush Bar Kitchen are now optional with per-side pricing. New Buffet category added for waiter. Buffet category wired into console menu categories list so items can be added through MenuManagement. Migrations 005 and 006 still pending in Supabase.)_
+_Last updated: 2026-10-21 (Front Desk: Guest House MVP (Phase 1) landed — new "Guest House" button pinned to the far right of the top header row (`marginLeft: auto`) sitting on the same line as Front Desk/Bar/Reservations, with the right-side controls (Connected, Refresh, Enable sound, Dark/Light, clock, Sign Out) wrapping onto a new line below (`flexBasis: 100%`, `justifyContent: flex-end`). Opens a room grid for the 5 rooms (101 Executive ₦45k, 102–105 Standard ₦35k). SQL migration `006_guesthouse.sql` ran successfully in Supabase. Check-in modal captures guest name/phone/email, nights, optional discount (₦), payment method, notes and shows a live base/discount/total breakdown. Guest house PIN gate (parallel to the void-PIN pattern — HMAC token, 5-min TTL, 5/min/IP rate limit) authorizes check-in, check-out, encode-key, mark-paid actions; PIN resolves to a staff profile with role super_admin/manager/front_desk/guesthouse OR `can_manage_guesthouse=true`. New `guesthouse` role added to `staff_profiles`; UserManagement EditModal gets a "Guest House Authorization" section (toggle + PIN input mirroring the void-PIN block). Key-card encoding records an audit row (`key_encoded_by_id/name/at`) and prompts the staff to use the PCLMS reader for the actual MIFARE write — we do not call PCLMS directly (no public SDK). SQL migration `006_guesthouse.sql` creates `guest_rooms` + `guest_room_bookings` + extends `staff_profiles` + extends `protect_staff_profile_columns` trigger (**ran 2026-10-21**). Console: top-bar search is now a true global search — navigates to a dedicated `/search?q=` page that queries reservations, enquiries, orders, menu items, staff and blog posts in parallel and shows categorized results. Placeholder updated. Previously the top-bar input only navigated to the Reservations page; Dashboard caches its last snapshot at module scope so re-entering the route no longer flashes a loading screen; Upcoming Reservations window extended to 30 days (so Oct 24/31 and beyond now surface on the dashboard); Dashboard upcoming/activity/recent rows and Reservations table rows + summary pills (Today/Pending/Confirmed/Cancelled) are now clickable and open a full guest-detail modal. Picker-driven menu items (soup/swallow, side, buffet) now expose a minus button alongside the plus. Front Desk Void UI replaced native prompt/confirm with inline reason input + Add button for Electron compatibility. Sides on Charcoal Grills + Continental + Bush Bar Kitchen are now optional with per-side pricing. New Buffet category added for waiter. Buffet category wired into console menu categories list so items can be added through MenuManagement. Migration 005 still pending in Supabase (006 ran 2026-10-21).)_
 
 ---
 
@@ -38,40 +38,6 @@ ALTER TABLE tables ADD COLUMN IF NOT EXISTS custom_qr_url TEXT;
 ```sql
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS modifiers TEXT;
 ```
-
----
-
-### Run before Guest House goes live (`006_guesthouse.sql`)
-
-```sql
-CREATE TABLE IF NOT EXISTS public.guest_rooms (
-  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  room_number   text        NOT NULL UNIQUE,
-  room_type     text        NOT NULL,
-  price         integer     NOT NULL,
-  status        text        NOT NULL DEFAULT 'available',
-  notes         text,
-  created_at    timestamptz NOT NULL DEFAULT now(),
-  updated_at    timestamptz NOT NULL DEFAULT now()
-);
-
-INSERT INTO public.guest_rooms (room_number, room_type, price)
-VALUES ('101','Executive Room',45000),
-       ('102','Standard Room',35000),
-       ('103','Standard Room',35000),
-       ('104','Standard Room',35000),
-       ('105','Standard Room',35000)
-ON CONFLICT (room_number) DO NOTHING;
-
-CREATE TABLE IF NOT EXISTS public.guest_room_bookings ( /* see 006_guesthouse.sql for columns */ );
-
-ALTER TABLE public.staff_profiles
-  ADD COLUMN IF NOT EXISTS can_manage_guesthouse BOOLEAN NOT NULL DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS guesthouse_pin_hash   TEXT,
-  ADD COLUMN IF NOT EXISTS guesthouse_pin_salt   TEXT;
-```
-
-Full statement in `supabase/migrations/006_guesthouse.sql` — also replaces `protect_staff_profile_columns()` so the new columns are service-role-only and enables RLS on both tables (no policies → anon/authenticated have no access; service_role bypasses). After running, open User Management → set guesthouse PINs for staff who should authorize check-ins / key encoding.
 
 ---
 
