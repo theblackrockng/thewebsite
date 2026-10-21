@@ -30,11 +30,15 @@ export default async function handler(req, res) {
   const db = getDb();
   if (!db) return res.status(500).json({ error: "Server misconfiguration" });
 
-  const { userId, role, permissions, active, status } = req.body || {};
+  const { userId, role, permissions, active, status, can_void_orders, void_pin } = req.body || {};
   if (!userId) return res.status(400).json({ error: "userId is required." });
 
   if (role !== undefined && !KNOWN_ROLES.includes(role)) {
     return res.status(400).json({ error: "Unknown role." });
+  }
+
+  if (void_pin !== undefined && void_pin !== null && !/^\d{4,8}$/.test(String(void_pin))) {
+    return res.status(400).json({ error: "void_pin must be 4-8 digits." });
   }
 
   if (role !== undefined && userId === staff.user.id) {
@@ -68,6 +72,18 @@ export default async function handler(req, res) {
   if (permissions !== undefined) updates.permissions = permissions;
   if (active !== undefined) updates.active = active;
   if (status !== undefined) updates.status = status;
+  if (can_void_orders !== undefined) updates.can_void_orders = !!can_void_orders;
+  if (void_pin !== undefined) {
+    if (void_pin === null) {
+      updates.void_pin_hash = null;
+      updates.void_pin_salt = null;
+    } else {
+      const { createHash, randomBytes } = await import("crypto");
+      const salt = randomBytes(16).toString("hex");
+      updates.void_pin_salt = salt;
+      updates.void_pin_hash = createHash("sha256").update(salt + String(void_pin)).digest("hex");
+    }
+  }
 
   if (Object.keys(updates).length === 0) {
     return res.status(400).json({ error: "No changes provided." });

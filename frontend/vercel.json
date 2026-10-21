@@ -5,9 +5,12 @@
   "rewrites": [
     { "source": "/api/front-desk-orders",       "destination": "/api/front-desk?resource=orders" },
     { "source": "/api/front-desk-reservations", "destination": "/api/front-desk?resource=reservations" },
+    { "source": "/api/front-desk-order-items",  "destination": "/api/front-desk?resource=order-items" },
     { "source": "/api/telegram-setup",          "destination": "/api/telegram-webhook?action=setup" },
     { "source": "/api/verify-waiter-pin",       "destination": "/api/waiter-profiles?action=verify" },
     { "source": "/api/register-device",         "destination": "/api/staff-login?action=register-device" },
+    { "source": "/api/verify-void-pin",         "destination": "/api/staff-login?action=verify-void-pin" },
+    { "source": "/api/set-void-pin",            "destination": "/api/staff-login?action=set-void-pin" },
     { "source": "/:path*",                       "destination": "/index.html" }
   ],
   "headers": [

@@ -13,11 +13,12 @@ const {
   checkUserAgent,
   checkCors,
 } = require('./_lib/security');
-const { requireStaff } = require('./_lib/auth');
+const { requireStaff, verifyVoidToken } = require('./_lib/auth');
 
 const ORDER_ROLES        = ['front_desk', 'manager'];
 const RESERVATION_ROLES  = ['front_desk', 'manager', 'super_admin'];
 const WAITER_CALL_ROLES  = ['bar', 'front_desk', 'manager', 'super_admin'];
+const ORDER_ITEM_ROLES   = ['front_desk', 'manager'];
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -531,11 +532,154 @@ async function waiterCallsHandler(req, res) {
   }
 }
 
+// ── Order items: void or edit a line on a confirmed order ──────────────
+// Requires a valid x-void-token header issued by /api/staff-login?action=verify-void-pin.
+// POST   { order_id, item_id, reason? }           → void (soft-delete) a line
+// PATCH  { order_id, item_id, qty, note? }        → edit qty / modifiers on a line
+// After either, recompute orders.subtotal and orders.total from non-voided rows.
+
+const EDITABLE_ORDER_STATUSES = ['new', 'confirmed', 'preparing', 'ready'];
+
+async function recomputeOrderTotals(db, orderId) {
+  const { data: rows, error } = await db
+    .from('order_items')
+    .select('line_total, voided')
+    .eq('order_id', orderId);
+  if (error) throw error;
+  const subtotal = (rows || [])
+    .filter((r) => !r.voided)
+    .reduce((sum, r) => sum + Number(r.line_total || 0), 0);
+  const { data: order } = await db
+    .from('orders')
+    .select('delivery_fee')
+    .eq('id', orderId)
+    .maybeSingle();
+  const deliveryFee = Number(order?.delivery_fee || 0);
+  await db
+    .from('orders')
+    .update({ subtotal, total: subtotal + deliveryFee })
+    .eq('id', orderId);
+  return { subtotal, total: subtotal + deliveryFee };
+}
+
+async function orderItemsHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'POST, PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Void-Token');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST' && req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, ORDER_ITEM_ROLES);
+  if (!staff) return;
+
+  const ip = getIP(req);
+  const { blocked } = checkUserAgent(req);
+  if (blocked) return res.status(400).json({ error: 'Bad request.' });
+  const { allowed } = checkCors(req);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden.' });
+  const { limited } = checkInMemoryRateLimit(ip, 'front-desk-order-items', 200, 60 * 60 * 1000);
+  if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+  const voidToken = req.headers['x-void-token'] || req.headers['X-Void-Token'] || '';
+  const authz = verifyVoidToken(voidToken);
+  if (!authz) return res.status(401).json({ error: 'Manager PIN required. Verify and try again.' });
+
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Invalid request body.' });
+  }
+  const { order_id: orderId, item_id: itemId } = body;
+  if (typeof orderId !== 'string' || !UUID_RE.test(orderId)) return res.status(400).json({ error: 'Missing or invalid order id.' });
+  if (typeof itemId !== 'string' || !UUID_RE.test(itemId)) return res.status(400).json({ error: 'Missing or invalid item id.' });
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const { data: order, error: orderErr } = await db
+    .from('orders')
+    .select('id, order_number, order_status')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (orderErr || !order) return res.status(404).json({ error: 'Order not found.' });
+  if (!EDITABLE_ORDER_STATUSES.includes(order.order_status)) {
+    return res.status(400).json({ error: `Cannot edit items on an order that is '${order.order_status}'.` });
+  }
+
+  const { data: item, error: itemErr } = await db
+    .from('order_items')
+    .select('id, order_id, item_name, unit_price, qty, voided')
+    .eq('id', itemId)
+    .maybeSingle();
+  if (itemErr || !item || item.order_id !== orderId) return res.status(404).json({ error: 'Item not found on this order.' });
+  if (item.voided) return res.status(400).json({ error: 'Item is already voided.' });
+
+  try {
+    if (req.method === 'POST') {
+      const reason = typeof body.reason === 'string' ? body.reason.slice(0, 240) : null;
+      const { error: voidErr } = await db
+        .from('order_items')
+        .update({
+          voided: true,
+          voided_by: authz.by_name || staff.profile.full_name,
+          voided_at: new Date().toISOString(),
+          void_reason: reason,
+        })
+        .eq('id', itemId)
+        .eq('voided', false);
+      if (voidErr) {
+        console.error('[front-desk-order-items] void error:', voidErr);
+        return res.status(500).json({ error: 'Failed to void item.' });
+      }
+      const totals = await recomputeOrderTotals(db, orderId);
+      const ref = order.order_number || orderId.slice(0, 8);
+      await notifyTelegram(
+        'front-desk-order-items',
+        `🗑️ Void on <b>${escapeHtml(ref)}</b>: ${escapeHtml(item.item_name)} ×${item.qty} — authorized by <b>${escapeHtml(authz.by_name || '?')}</b>${reason ? ` · ${escapeHtml(reason)}` : ''}`,
+      );
+      return res.status(200).json({ ok: true, action: 'void', ...totals });
+    }
+
+    const nextQty = body.qty;
+    if (!Number.isInteger(nextQty) || nextQty < 1 || nextQty > 99) {
+      return res.status(400).json({ error: 'qty must be an integer between 1 and 99.' });
+    }
+    const nextNote = body.note === undefined ? undefined : (body.note === null ? null : String(body.note).slice(0, 240));
+    const updates = {
+      qty: nextQty,
+      line_total: Number(item.unit_price || 0) * nextQty,
+    };
+    if (nextNote !== undefined) updates.modifiers = nextNote;
+    const { error: patchErr } = await db
+      .from('order_items')
+      .update(updates)
+      .eq('id', itemId)
+      .eq('voided', false);
+    if (patchErr) {
+      console.error('[front-desk-order-items] patch error:', patchErr);
+      return res.status(500).json({ error: 'Failed to update item.' });
+    }
+    const totals = await recomputeOrderTotals(db, orderId);
+    const ref = order.order_number || orderId.slice(0, 8);
+    await notifyTelegram(
+      'front-desk-order-items',
+      `✏️ Edit on <b>${escapeHtml(ref)}</b>: ${escapeHtml(item.item_name)} → ×${nextQty} — authorized by <b>${escapeHtml(authz.by_name || '?')}</b>`,
+    );
+    return res.status(200).json({ ok: true, action: 'edit', ...totals });
+  } catch (err) {
+    console.error('[front-desk-order-items] unexpected:', err);
+    return res.status(500).json({ error: 'An unexpected error occurred.' });
+  }
+}
+
 module.exports = function handler(req, res) {
   const resource = req.query && req.query.resource;
   if (resource === 'orders') return ordersHandler(req, res);
   if (resource === 'reservations') return reservationsHandler(req, res);
   if (resource === 'waiter-calls') return waiterCallsHandler(req, res);
+  if (resource === 'order-items') return orderItemsHandler(req, res);
   applySecurityHeaders(res);
   return res.status(400).json({ error: 'Unknown resource.' });
 };

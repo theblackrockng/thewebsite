@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 const {
   getIP,
@@ -15,6 +16,22 @@ const SUPABASE_URL = process.env.SUPABASE_URL;
 const ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const VOID_TOKEN_TTL_MS = 5 * 60 * 1000;
+const VOID_ATTEMPTS = new Map();
+
+function sha256Hex(salt, value) {
+  return crypto.createHash('sha256').update(salt + value).digest('hex');
+}
+
+function voidPinRateCheck(ip) {
+  const now = Date.now();
+  let rec = VOID_ATTEMPTS.get(ip);
+  if (!rec || now > rec.resetAt) rec = { count: 0, resetAt: now + 60_000 };
+  rec.count += 1;
+  VOID_ATTEMPTS.set(ip, rec);
+  return rec.count <= 5;
+}
+
 // register-device logic (merged from register-device.js)
 let _db = null;
 function getDb() {
@@ -26,7 +43,7 @@ function getDb() {
   return _db;
 }
 
-const { requireStaff } = require('./_lib/auth');
+const { requireStaff, signVoidToken } = require('./_lib/auth');
 
 module.exports = async function handler(req, res) {
   applySecurityHeaders(res);
@@ -34,6 +51,102 @@ module.exports = async function handler(req, res) {
   Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
 
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // POST ?action=verify-void-pin — manager PIN check for void/edit of confirmed orders.
+  // Any authenticated staff may call this (front_desk is the real caller) but the PIN
+  // itself must belong to a profile with can_void_orders=true, or role super_admin/manager.
+  // Returns a short-lived HMAC token the front-desk endpoint accepts for void/edit calls.
+  if (req.method === 'POST' && req.query?.action === 'verify-void-pin') {
+    const staff = await requireStaff(req, res, 'any');
+    if (!staff) return;
+
+    const ip = getIP(req);
+    if (!voidPinRateCheck(ip)) {
+      return res.status(429).json({ ok: false, error: 'Too many attempts. Wait a minute.' });
+    }
+
+    const { pin } = req.body || {};
+    if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
+      return res.status(400).json({ ok: false, error: 'PIN must be 4-8 digits.' });
+    }
+
+    const db = getDb();
+    if (!db) return res.status(500).json({ ok: false, error: 'Server misconfiguration.' });
+
+    const { data: candidates } = await db
+      .from('staff_profiles')
+      .select('id, full_name, role, active, can_void_orders, void_pin_hash, void_pin_salt')
+      .eq('active', true)
+      .not('void_pin_hash', 'is', null)
+      .not('void_pin_salt', 'is', null);
+
+    const authorized = (candidates || []).find((p) => {
+      if (!p.void_pin_hash || !p.void_pin_salt) return false;
+      const permitted = p.role === 'super_admin' || p.role === 'manager' || p.can_void_orders === true;
+      if (!permitted) return false;
+      return sha256Hex(p.void_pin_salt, pin) === p.void_pin_hash;
+    });
+
+    if (!authorized) {
+      await logAndAlert({
+        eventType: 'void_pin_failed',
+        severity: 'medium',
+        ip,
+        endpoint: '/api/staff-login?action=verify-void-pin',
+        payload: `by=${staff.profile.full_name || staff.profile.id}`,
+        userAgent: req.headers['user-agent'],
+      });
+      return res.status(401).json({ ok: false, error: 'Invalid PIN.' });
+    }
+
+    const payload = {
+      by_id: authorized.id,
+      by_name: authorized.full_name,
+      exp: Date.now() + VOID_TOKEN_TTL_MS,
+    };
+    return res.status(200).json({
+      ok: true,
+      token: signVoidToken(payload),
+      authorized_by: { id: authorized.id, name: authorized.full_name },
+      expires_at: payload.exp,
+    });
+  }
+
+  // POST ?action=set-void-pin — set/update the caller's own void PIN. Only super_admin,
+  // manager, or staff with can_void_orders=true may set a PIN; the console gates the UI
+  // separately but we enforce it here too.
+  if (req.method === 'POST' && req.query?.action === 'set-void-pin') {
+    const staff = await requireStaff(req, res, 'any');
+    if (!staff) return;
+
+    const { pin } = req.body || {};
+    if (typeof pin !== 'string' || !/^\d{4,8}$/.test(pin)) {
+      return res.status(400).json({ error: 'PIN must be 4-8 digits.' });
+    }
+
+    const db = getDb();
+    if (!db) return res.status(500).json({ error: 'Server misconfiguration.' });
+
+    const { data: profile } = await db
+      .from('staff_profiles')
+      .select('role, can_void_orders')
+      .eq('id', staff.profile.id)
+      .maybeSingle();
+
+    const permitted = profile && (profile.role === 'super_admin' || profile.role === 'manager' || profile.can_void_orders === true);
+    if (!permitted) return res.status(403).json({ error: 'You are not authorized to set a void PIN.' });
+
+    const salt = crypto.randomBytes(16).toString('hex');
+    const { error } = await db
+      .from('staff_profiles')
+      .update({ void_pin_hash: sha256Hex(salt, pin), void_pin_salt: salt })
+      .eq('id', staff.profile.id);
+    if (error) {
+      console.error('[set-void-pin] update error:', error);
+      return res.status(500).json({ error: 'Failed to save PIN.' });
+    }
+    return res.status(200).json({ ok: true });
+  }
 
   // POST ?action=register-device — FCM token upsert (merged from register-device.js)
   if (req.method === 'POST' && req.query?.action === 'register-device') {

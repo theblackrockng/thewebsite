@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search, Lock, Trash2, Edit2 } from "lucide-react";
 import { MENU } from "../lib/data";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
@@ -276,7 +276,7 @@ function buildReceiptHtml(orders) {
 
   let rows = '';
   for (const o of orders) {
-    const items = o.order_items || [];
+    const items = (o.order_items || []).filter((i) => !i.voided);
     if (isMulti) rows += `<tr class="tl"><td colspan="2">-- Table ${esc(String(o.table_number))} --</td></tr>`;
     for (const item of items) {
       rows += `<tr class="item"><td class="nm">${esc(item.qty)}x ${esc(item.item_name)}</td><td class="pr">${esc(fmtN(item.line_total))}</td></tr>`;
@@ -1239,7 +1239,7 @@ function FrontDeskMain({ onSessionLost }) {
   const barOrders = useMemo(() =>
     orders
       .filter((o) => ["new", "confirmed", "preparing"].includes(o.order_status))
-      .map((o) => ({ ...o, displayItems: (o.order_items || []).filter((i) => i.category === "drink") }))
+      .map((o) => ({ ...o, displayItems: (o.order_items || []).filter((i) => i.category === "drink" && !i.voided) }))
       .filter((o) => o.displayItems.length > 0)
       .sort((a, b) => new Date(a.created_at) - new Date(b.created_at)),
     [orders]
@@ -1988,10 +1988,10 @@ function AddItemsModal({ order, t, staffName, onClose }) {
         body: JSON.stringify({
           orderType: "dine-in",
           tableNumber: order.table_number,
-          orderSource: "front-desk",
+          orderSource: "waiter",
           placedBy: staffName,
           guestName: order.guest_name || `Table ${order.table_number}`,
-          guestPhone: order.guest_phone || "—",
+          guestPhone: order.guest_phone || "0000000000",
           guestEmail: null,
           specialInstructions: `Added to Table ${order.table_number} tab`,
           scheduledTime: null,
@@ -2007,7 +2007,7 @@ function AddItemsModal({ order, t, staffName, onClose }) {
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to add items.");
+      if (!res.ok || !data.ok) throw new Error(data.detail ? `${data.error || "Failed"}: ${data.detail}` : (data.error || "Failed to add items."));
       onClose();
     } catch (e) {
       setError(e.message);
@@ -2143,12 +2143,13 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
     ? { ..._baseCfg, label: "Awaiting confirmation" }
     : _baseCfg;
   const payCfg = PAYMENT_CFG[order.payment_status] ?? { label: order.payment_status || "Unknown", color: "#6b7280" };
-  const items = order.order_items || [];
+  const items = (order.order_items || []).filter((it) => !it.voided);
   const session = useStaffSession();
   const staffName = session?.profile?.full_name || "Front Desk";
   const [mergedIds, setMergedIds] = useState(() => new Set());
   const [showMerge, setShowMerge] = useState(false);
   const [showAddItems, setShowAddItems] = useState(false);
+  const [showEditOrder, setShowEditOrder] = useState(false);
   const [printStatus, setPrintStatus] = useState(null);
 
   const mergedOrders = (otherTableOrders || []).filter((o) => mergedIds.has(o.id));
@@ -2338,6 +2339,20 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
                 <Plus size={15} /> Add Items to Table {order.table_number}
               </button>
             )}
+            {canAddItems && items.length > 0 && (
+              <button
+                onClick={() => setShowEditOrder(true)}
+                style={{
+                  width: "100%", padding: "11px 16px", borderRadius: 10,
+                  border: `1.5px solid ${t.border}`, background: "transparent",
+                  color: t.muted, fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  fontFamily: "inherit",
+                }}
+              >
+                <Lock size={14} /> Edit / Void Items
+              </button>
+            )}
             {hasMergeable && (
               <button
                 onClick={() => setShowMerge(true)}
@@ -2372,6 +2387,191 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
           onClose={() => setShowAddItems(false)}
         />
       )}
+      {showEditOrder && (
+        <EditOrderModal
+          order={order}
+          t={t}
+          onClose={() => setShowEditOrder(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditOrderModal({ order, t, onClose }) {
+  const [stage, setStage] = useState("pin");
+  const [pin, setPin] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [token, setToken] = useState("");
+  const [authorizedBy, setAuthorizedBy] = useState("");
+  const [tokenExp, setTokenExp] = useState(0);
+  const [error, setError] = useState("");
+  const [busyItemId, setBusyItemId] = useState("");
+  const [items, setItems] = useState(() => (order.order_items || []).filter((i) => !i.voided));
+
+  async function verifyPin() {
+    if (!/^\d{4,8}$/.test(pin)) { setError("Enter 4-8 digits."); return; }
+    setVerifying(true); setError("");
+    try {
+      const res = await fetch("/api/verify-void-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setError(data.error || "Invalid PIN.");
+        return;
+      }
+      setToken(data.token);
+      setAuthorizedBy(data.authorized_by?.name || "");
+      setTokenExp(data.expires_at || 0);
+      setStage("edit");
+    } finally {
+      setVerifying(false);
+      setPin("");
+    }
+  }
+
+  async function callOrderItems(method, body) {
+    const res = await fetch("/api/front-desk?resource=order-items", {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        "X-Void-Token": token,
+        ...(await authHeader()),
+      },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Failed.");
+    return data;
+  }
+
+  async function voidItem(it) {
+    const reason = window.prompt(`Void "${it.item_name}" — reason? (optional)`, "") || null;
+    if (reason === null && !window.confirm(`Void "${it.item_name}" from the order?`)) return;
+    setBusyItemId(it.id); setError("");
+    try {
+      await callOrderItems("POST", { order_id: order.id, item_id: it.id, reason });
+      setItems((prev) => prev.filter((x) => x.id !== it.id));
+    } catch (e) {
+      setError(e.message);
+      if (/pin/i.test(e.message)) setStage("pin");
+    } finally {
+      setBusyItemId("");
+    }
+  }
+
+  async function changeQty(it, delta) {
+    const nextQty = Math.max(1, it.qty + delta);
+    if (nextQty === it.qty) return;
+    setBusyItemId(it.id); setError("");
+    try {
+      await callOrderItems("PATCH", { order_id: order.id, item_id: it.id, qty: nextQty });
+      setItems((prev) => prev.map((x) => x.id === it.id ? { ...x, qty: nextQty, line_total: Number(x.unit_price || 0) * nextQty } : x));
+    } catch (e) {
+      setError(e.message);
+      if (/pin/i.test(e.message)) setStage("pin");
+    } finally {
+      setBusyItemId("");
+    }
+  }
+
+  const expiresIn = tokenExp ? Math.max(0, Math.round((tokenExp - Date.now()) / 1000)) : 0;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
+      <div style={{
+        position: "relative", width: "100%", maxWidth: 540,
+        background: t.card, border: `1px solid ${t.border}`,
+        borderRadius: 12, padding: 24, color: t.text, maxHeight: "88vh", overflow: "auto",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              <Lock size={16} style={{ color: t.gold }} /> Edit / Void — Table {order.table_number}
+            </div>
+            <div style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>
+              Order {order.order_number || order.id.slice(0, 8)}
+              {authorizedBy && ` · authorized by ${authorizedBy} (${expiresIn}s)`}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: t.muted }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {stage === "pin" && (
+          <div>
+            <div style={{ fontSize: 13, color: t.muted, marginBottom: 12 }}>
+              Enter the manager's void PIN. Only Oluchi, Super Admins, and staff with void authorization can approve.
+            </div>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => { if (e.key === "Enter") verifyPin(); }}
+              placeholder="Manager PIN"
+              autoFocus
+              style={{ width: "100%", padding: "12px 14px", background: t.input, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 18, letterSpacing: 6, textAlign: "center", outline: "none" }}
+            />
+            {error && (
+              <div style={{ marginTop: 10, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Cancel</button>
+              <button onClick={verifyPin} disabled={verifying || !pin} style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: t.gold, color: t.onGold, fontWeight: 700, fontSize: 13, cursor: verifying ? "default" : "pointer", opacity: verifying || !pin ? 0.6 : 1 }}>
+                {verifying ? "Verifying…" : "Unlock"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {stage === "edit" && (
+          <div>
+            {items.length === 0 ? (
+              <div style={{ padding: "24px", textAlign: "center", color: t.muted, fontSize: 14 }}>
+                Nothing left on this order.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {items.map((it) => (
+                  <div key={it.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", border: `1px solid ${t.border}`, borderRadius: 8, background: t.input }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: t.text }}>{it.item_name}</div>
+                      <div style={{ fontSize: 11.5, color: t.muted }}>₦{Number(it.unit_price || 0).toLocaleString("en-NG")} each</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <button onClick={() => changeQty(it, -1)} disabled={busyItemId === it.id || it.qty <= 1} style={{ padding: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.text, borderRadius: 6, cursor: "pointer" }}>
+                        <Minus size={12} />
+                      </button>
+                      <span style={{ minWidth: 24, textAlign: "center", fontWeight: 700, color: t.gold }}>{it.qty}</span>
+                      <button onClick={() => changeQty(it, 1)} disabled={busyItemId === it.id} style={{ padding: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.text, borderRadius: 6, cursor: "pointer" }}>
+                        <Plus size={12} />
+                      </button>
+                    </div>
+                    <button onClick={() => voidItem(it)} disabled={busyItemId === it.id} style={{ padding: "6px 10px", border: `1px solid ${t.accent}`, background: "transparent", color: t.accent, borderRadius: 6, cursor: "pointer", display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}>
+                      <Trash2 size={12} /> Void
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {error && (
+              <div style={{ marginTop: 12, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
+            )}
+            <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+              <button onClick={onClose} style={{ padding: "10px 20px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.text, fontFamily: "inherit", fontSize: 13, cursor: "pointer" }}>
+                Done
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

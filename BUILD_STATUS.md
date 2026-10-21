@@ -1,6 +1,6 @@
 # BUILD STATUS — The BlackRock
 
-_Last updated: 2026-09-28 (reliability: Kitchen/Bar/Waiter/FrontDesk — IdleLock disabled all four; wake lock added Kitchen/Bar/Waiter; repeating 2s alert loop with dismissable banner replaces one-shot chime; persistent AudioContext with suspend-resume on visibility/focus; optimistic status updates with rollback + timing log; Realtime echo revert prevented via inFlightIdsRef/actionIdsRef)_
+_Last updated: 2026-10-21 (Front Desk void/edit on confirmed orders: manager-PIN gate, HMAC-token-scoped `/api/front-desk?resource=order-items`, console authorization toggle & PIN setter, soft-delete audit trail. Migration 005 pending.)_
 
 ---
 
@@ -38,6 +38,28 @@ ALTER TABLE tables ADD COLUMN IF NOT EXISTS custom_qr_url TEXT;
 ```sql
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS modifiers TEXT;
 ```
+
+---
+
+### Run before Front Desk Void/Edit goes live (`005_order_voids_manager_pin.sql`)
+
+```sql
+ALTER TABLE order_items
+  ADD COLUMN IF NOT EXISTS voided      BOOLEAN     NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS voided_by   TEXT,
+  ADD COLUMN IF NOT EXISTS voided_at   TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS void_reason TEXT;
+
+CREATE INDEX IF NOT EXISTS idx_order_items_voided
+  ON order_items (order_id) WHERE voided = FALSE;
+
+ALTER TABLE staff_profiles
+  ADD COLUMN IF NOT EXISTS can_void_orders BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS void_pin_hash   TEXT,
+  ADD COLUMN IF NOT EXISTS void_pin_salt   TEXT;
+```
+
+The migration also replaces `protect_staff_profile_columns()` so the three new columns can only be changed by server-side endpoints (service role / SQL editor). Full statement is in `supabase/migrations/005_order_voids_manager_pin.sql`. After running, open User Management in the console → edit Oluchi → set her 4-8 digit void PIN (super_admin and manager roles are already authorized).
 
 ---
 
@@ -142,6 +164,7 @@ The BlackRock is a restaurant/rooftop-lounge in Ikeja, Lagos. The project is a m
 | Tables & QR: drop generated QR | `console/src/pages/tables/Tables.jsx`: BLACKROCK-generated QR removed from the QR modal and row thumbnail — each table now shows only the uploaded `custom_qr_url`. `qr-code-styling` import, `makeQR`, modal `download()`, and the thumbnail generation `useEffect` deleted; thumbnail falls back to the `QrCode` icon when no custom image is set. |
 | Waiter: cancel order before confirmation | `WaiterOrder.jsx`: `WaiterConfirmOverlay` footer gains a red "Cancel Order" button under Edit/Place; parent handler confirms via `window.confirm`, clears cart, resets submit error, and closes the overlay so the waiter can start a fresh order. |
 | Add items to existing table tab (Front Desk + Waiter) | **Front Desk:** `FrontDeskDisplay.jsx` — `OrderCard` gains "+ Add Items to Table N" dashed-gold button for dine-in orders in active states (new/confirmed/preparing/ready). Opens `AddItemsModal`: two-column menu picker (categories left, cart right), DB-first (`menu_items`) with static `MENU` fallback, per-item note field (free-text modifier). Submits a NEW order to `/api/orders` with same `table_number`, `orderSource: 'front-desk'`, `placedBy = staff full_name` (via `useStaffSession`). Each add-on becomes a separate kitchen ticket. **Waiter:** `WaiterOrder.jsx` polls active dine-in orders every 20s into `activeTableNumbers`; the Confirm overlay's table dropdown appends "· open tab" to options with existing orders and shows a gold note "Table N has an open tab — these items will be added to the existing bill." **Backend:** `frontend/api/orders.js` whitelists `'front-desk'` as a valid `order_source`. **Receipt merge:** no change needed — `OrderCard`'s existing `MergePickerModal` already lists all other dine-in orders (including same-table rounds); `buildReceiptHtml` groups items under `-- Table N --` dividers and sums `grandTotal` across merged tickets. |
+| Front Desk void/edit on confirmed orders (manager-PIN gated) | **SQL (`005_order_voids_manager_pin.sql`):** `order_items` gains `voided/voided_by/voided_at/void_reason` (soft-delete, audit); `staff_profiles` gains `can_void_orders/void_pin_hash/void_pin_salt`; `protect_staff_profile_columns` trigger extended so the three new columns are service-role-only. **PIN endpoint (`frontend/api/staff-login.js`):** `POST ?action=verify-void-pin` matches submitted PIN against every active profile with role super_admin/manager or `can_void_orders=true`, rate-limited 5/min/IP; returns HMAC token (`by_id`,`by_name`,`exp`) with 5-min TTL. `POST ?action=set-void-pin` lets any authorized staff rotate their own PIN. Helpers `signVoidToken`/`verifyVoidToken` live in `frontend/api/_lib/auth.js` so `front-desk.js` can verify. **Void/edit endpoint (`frontend/api/front-desk.js`):** new `?resource=order-items` branch. `POST` sets `voided=true` on an `order_items` row and stamps `voided_by` from the token; `PATCH` updates `qty`/`modifiers` and recomputes `line_total`. Both recompute `orders.subtotal` and `orders.total` from non-voided rows and fire a Telegram line attributing the action to the authorizing manager. Requires `x-void-token` header. **Console (`console/src/pages/users/UserManagement.jsx` + `console/api/update-staff.js`):** EditModal gains a "Front Desk Void Authorization" section — toggle `can_void_orders` and set/rotate a 4-8 digit void PIN. `update-staff` hashes the PIN with a fresh salt before writing. **Front Desk UI (`FrontDeskDisplay.jsx`):** `OrderCard` adds "Edit / Void Items" button next to Add Items. New `EditOrderModal` prompts for the manager PIN (`/api/verify-void-pin`), then renders the item list with ±qty controls and a Void button. Voided items drop silently from the on-screen order, the receipt, and BarView's `displayItems`. **Vercel routing:** `/api/front-desk-order-items`, `/api/verify-void-pin`, `/api/set-void-pin` aliased in `vercel.json`. Function count unchanged (12). |
 
 ---
 
@@ -320,7 +343,7 @@ Key tables (inferred from code and API usage):
 - **Front Desk reservations read through the website endpoint, not Realtime.** The `reservations` RLS policies are not in the repo, so the screen polls `/api/front-desk?resource=reservations` every 15 seconds (service role) instead of subscribing. A new booking can take up to 15 seconds to show and chime.
 - **Confirm and Cancel on the Front Desk send no guest email.** This matches the console, which only sends Telegram on Confirm and Cancel (guest emails are the booking email, the daily reminder cron and the manual Send Email). Confirming does not email the guest.
 - **Front Desk reservations has no Seated, No show, Reschedule or manual add.** The console has no seated or no-show status and the brief excluded editing and manual add. Pre-selected meals and guest email are not shown on the Front Desk card.
-- **Vercel Hobby allows 12 serverless functions; the website uses 11.** Every non-underscore file in `frontend/api` is one function, so a new endpoint should join an existing file behind a query param and a `vercel.json` route alias, not add a file. The alias routes in `vercel.json` (`/api/front-desk-orders`, `/api/front-desk-reservations`, `/api/telegram-setup`) are verified only against stubbed handlers; confirm them on a preview deploy before relying on them (the old paths matter for Front Desk tabs left open on an old bundle).
+- **Vercel Hobby allows 12 serverless functions; the website uses 12 (ceiling reached).** Every non-underscore file in `frontend/api` is one function, so any new endpoint MUST join an existing file behind a query param and a `vercel.json` route alias, not add a file. Current aliases: `/api/front-desk-orders`, `/api/front-desk-reservations`, `/api/front-desk-order-items`, `/api/telegram-setup`, `/api/verify-waiter-pin`, `/api/register-device`, `/api/verify-void-pin`, `/api/set-void-pin`. Confirm new aliases on a preview deploy before relying on them (old paths matter for Front Desk tabs left open on an old bundle).
 - **Kitchen/Bar displays** at `/kitchen-display` and `/bar-display` are public routes with no auth. Anyone who knows the URL can see live orders.
 - **`supabase.auth.admin` calls in console API** require `SUPABASE_SERVICE_ROLE_KEY`. If that var is missing from the Vercel project, invite and delete-staff silently fail.
 

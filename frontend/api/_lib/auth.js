@@ -1,9 +1,34 @@
 'use strict';
 
+const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// Short-lived HMAC token used to prove a manager PIN was verified. Issued by
+// /api/staff-login?action=verify-void-pin; checked by /api/front-desk when
+// voiding or editing items on confirmed orders.
+function signVoidToken(payload) {
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', SERVICE_ROLE_KEY || 'void').update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+function verifyVoidToken(token) {
+  if (typeof token !== 'string' || token.indexOf('.') === -1) return null;
+  const [body, sig] = token.split('.');
+  const expected = crypto.createHmac('sha256', SERVICE_ROLE_KEY || 'void').update(body).digest('base64url');
+  if (expected.length !== sig.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return null;
+  try {
+    const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
+    if (!payload || typeof payload.exp !== 'number' || payload.exp < Date.now()) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
 
 let _admin = null;
 function getAdmin() {
@@ -63,4 +88,4 @@ async function requireStaff(req, res, allowedRoles) {
   return { user: userData.user, profile };
 }
 
-module.exports = { requireStaff };
+module.exports = { requireStaff, signVoidToken, verifyVoidToken };
