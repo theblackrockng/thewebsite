@@ -462,6 +462,21 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
     else setCart(prev => prev.map(i => i.id === id ? { ...i, qty } : i));
   }
 
+  function removeLastVariant(baseId) {
+    setCart(prev => {
+      let lastIdx = -1;
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].baseId === baseId) { lastIdx = i; break; }
+      }
+      if (lastIdx === -1) return prev;
+      const target = prev[lastIdx];
+      if (target.qty > 1) {
+        return prev.map((it, i) => i === lastIdx ? { ...it, qty: it.qty - 1 } : it);
+      }
+      return prev.filter((_, i) => i !== lastIdx);
+    });
+  }
+
   const getCartItem = useCallback((id) => cart.find(i => i.id === id), [cart]);
   const getNationalCartItems = useCallback((id) => cart.filter(i => i.baseId === id), [cart]);
 
@@ -721,10 +736,15 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
                           <div style={{ display: "flex", alignItems: "center", gap: 14, flexShrink: 0 }}>
                             <span style={{ fontSize: 15, fontWeight: 700, color: "#C9A84C", whiteSpace: "nowrap" }}>{isBuffet ? "Set at order" : fmtPrice(dish.price)}</span>
                             {needsPicker ? (
-                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                              natQty > 0 ? (
+                                <WoQtyControl
+                                  qty={natQty}
+                                  onDec={() => removeLastVariant(dish.id)}
+                                  onInc={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : isBuffet ? setBuffetModal(dish) : setSideModal(dish)}
+                                />
+                              ) : (
                                 <WoCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : isBuffet ? setBuffetModal(dish) : setSideModal(dish)} />
-                                {natQty > 0 && <span style={{ fontSize: 10, color: "#C9A84C", fontWeight: 700, lineHeight: 1 }}>{natQty}</span>}
-                              </div>
+                              )
                             ) : cartItem ? (
                               <WoQtyControl
                                 qty={cartItem.qty}

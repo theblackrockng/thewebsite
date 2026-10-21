@@ -52,6 +52,21 @@ export function CartProvider({ children }) {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
+  const removeLastVariant = useCallback((baseId) => {
+    setItems((prev) => {
+      let lastIdx = -1;
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].baseId === baseId) { lastIdx = i; break; }
+      }
+      if (lastIdx === -1) return prev;
+      const target = prev[lastIdx];
+      if (target.qty > 1) {
+        return prev.map((it, i) => (i === lastIdx ? { ...it, qty: it.qty - 1 } : it));
+      }
+      return prev.filter((_, i) => i !== lastIdx);
+    });
+  }, []);
+
   const setQty = useCallback((id, qty) => {
     if (qty <= 0) {
       setItems((prev) => prev.filter((i) => i.id !== id));
@@ -75,6 +90,7 @@ export function CartProvider({ children }) {
         items,
         addItem,
         removeItem,
+        removeLastVariant,
         setQty,
         clearCart,
         totalItems,

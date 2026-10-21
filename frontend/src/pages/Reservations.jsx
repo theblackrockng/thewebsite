@@ -319,6 +319,21 @@ export default function Reservations() {
     );
   };
 
+  const removeLastVariant = (dishId) => {
+    setMealCart((prev) => {
+      let lastIdx = -1;
+      for (let i = prev.length - 1; i >= 0; i--) {
+        if (prev[i].id === dishId) { lastIdx = i; break; }
+      }
+      if (lastIdx === -1) return prev;
+      const target = prev[lastIdx];
+      if (target.qty > 1) {
+        return prev.map((it, i) => i === lastIdx ? { ...it, qty: it.qty - 1 } : it);
+      }
+      return prev.filter((_, i) => i !== lastIdx);
+    });
+  };
+
   const buildMealsPayload = () =>
     mealCart.map((i) => ({
       id: i.id,
@@ -928,10 +943,15 @@ export default function Reservations() {
                                         <div style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0 }}>
                                           <span style={{ fontSize: 14, fontWeight: 700, color: "#C9A84C", whiteSpace: "nowrap" }}>{fmtPrice(dish.price)}</span>
                                           {needsPicker ? (
-                                            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                                            totalQty > 0 ? (
+                                              <ResQtyControl
+                                                qty={totalQty}
+                                                onDec={() => removeLastVariant(dish.id)}
+                                                onInc={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : setSideModal(dish)}
+                                              />
+                                            ) : (
                                               <ResCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : setSideModal(dish)} />
-                                              {totalQty > 0 && <span style={{ fontSize: 10, color: "#C9A84C", fontWeight: 700 }}>{totalQty}</span>}
-                                            </div>
+                                            )
                                           ) : totalQty > 0 ? (
                                             <ResQtyControl
                                               qty={totalQty}

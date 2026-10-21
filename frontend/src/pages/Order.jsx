@@ -41,7 +41,7 @@ function slugify(str) {
 }
 
 export default function Order() {
-  const { items: cartItems, addItem, setQty, clearCart, totalItems, subtotal, setDrawerOpen } = useCart();
+  const { items: cartItems, addItem, setQty, removeLastVariant, clearCart, totalItems, subtotal, setDrawerOpen } = useCart();
   const { tableNumber, tableValid, setTable } = useTable();
   const [searchParams] = useSearchParams();
 
@@ -384,6 +384,7 @@ export default function Order() {
                         else addItem({ id: dish.id, name: dish.name, price: dish.price, category: dish.category, menuType: "food", description: dish.description });
                       }}
                       onSetQty={(q) => setQty(dish.id, q)}
+                      onRemoveLast={() => removeLastVariant(dish.id)}
                     />
                   );
                 })}
@@ -761,7 +762,7 @@ function CategoryHeader({ cat }) {
   );
 }
 
-function DishCard({ dish, cartItem, nationalCartItems, onAdd, onSetQty }) {
+function DishCard({ dish, cartItem, nationalCartItems, onAdd, onSetQty, onRemoveLast }) {
   const totalNationalQty = nationalCartItems ? nationalCartItems.reduce((s, i) => s + i.qty, 0) : 0;
 
   return (
@@ -792,14 +793,34 @@ function DishCard({ dish, cartItem, nationalCartItems, onAdd, onSetQty }) {
               {totalNationalQty} variation{totalNationalQty > 1 ? "s" : ""} in cart
             </p>
           )}
-          <button
-            onClick={onAdd}
-            style={{ width: "100%", background: "transparent", border: "1px solid var(--gold, #C9A84C)", color: "var(--gold, #C9A84C)", borderRadius: 6, padding: "10px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all 0.15s" }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--gold, #C9A84C)"; e.currentTarget.style.color = "#0f0d0a"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--gold, #C9A84C)"; }}
-          >
-            <Plus size={14} /> Add to Cart
-          </button>
+          {totalNationalQty > 0 ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+              <button
+                onClick={onRemoveLast}
+                aria-label="Remove last variant"
+                style={{ width: 40, height: 40, background: "#2e2820", border: "none", borderRadius: 6, color: "var(--warm-white, #F5F0E8)", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}
+              >
+                <Minus size={16} />
+              </button>
+              <button
+                onClick={onAdd}
+                style={{ flex: 1, background: "transparent", border: "1px solid var(--gold, #C9A84C)", color: "var(--gold, #C9A84C)", borderRadius: 6, padding: "10px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all 0.15s" }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "var(--gold, #C9A84C)"; e.currentTarget.style.color = "#0f0d0a"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--gold, #C9A84C)"; }}
+              >
+                <Plus size={14} /> Add Another
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={onAdd}
+              style={{ width: "100%", background: "transparent", border: "1px solid var(--gold, #C9A84C)", color: "var(--gold, #C9A84C)", borderRadius: 6, padding: "10px 16px", fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "all 0.15s" }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = "var(--gold, #C9A84C)"; e.currentTarget.style.color = "#0f0d0a"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--gold, #C9A84C)"; }}
+            >
+              <Plus size={14} /> Add to Cart
+            </button>
+          )}
         </div>
       ) : cartItem ? (
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>

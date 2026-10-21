@@ -135,7 +135,7 @@ function buildStaticFood() {
 }
 
 export default function OrderPreview() {
-  const { items: cartItems, addItem, setQty, totalItems, subtotal, setDrawerOpen } = useCart();
+  const { items: cartItems, addItem, setQty, removeLastVariant, totalItems, subtotal, setDrawerOpen } = useCart();
   const { tableNumber, tableValid, setTable } = useTable();
   const [searchParams] = useSearchParams();
 
@@ -519,12 +519,15 @@ export default function OrderPreview() {
                             </span>
 
                             {needsPicker ? (
-                              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                              natQty > 0 ? (
+                                <QtyControl
+                                  qty={natQty}
+                                  onDec={() => removeLastVariant(dish.id)}
+                                  onInc={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : setSideModal(dish)}
+                                />
+                              ) : (
                                 <CircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : setSideModal(dish)} />
-                                {natQty > 0 && (
-                                  <span style={{ fontSize: 10, color: "#C9A84C", fontWeight: 700, lineHeight: 1 }}>{natQty}</span>
-                                )}
-                              </div>
+                              )
                             ) : cartItem ? (
                               <QtyControl
                                 qty={cartItem.qty}
