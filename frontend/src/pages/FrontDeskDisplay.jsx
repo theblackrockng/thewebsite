@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search, Lock, Trash2, Edit2, BedDouble, KeyRound, LogIn as LogInIcon } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search, Lock, Trash2, Edit2, BedDouble, KeyRound, LogIn as LogInIcon, ChefHat } from "lucide-react";
 import { MENU } from "../lib/data";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
@@ -333,7 +333,33 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}
 </html>`;
 }
 
-function buildEndOfDayHtml(completedOrders) {
+const EOD_MAIN_KITCHEN_CATEGORIES = new Set([
+  "Starters", "Salads", "Rice", "Pasta",
+  "Bush Bar Kitchen", "Continental", "Sauces",
+  "National Dishes", "Traditional Specials",
+  "BLACKROCK EXPERIENCE", "Buffet", "Packaging", "Protein Section",
+]);
+const EOD_GRILL_KITCHEN_CATEGORIES = new Set(["Charcoal Grills"]);
+const EOD_GRILL_KITCHEN_ITEM_NAMES = new Set([
+  "Naan Bread (Cheese)", "Naan Bread (Garlic & Plain)",
+]);
+const EOD_DRINK_CATEGORIES = new Set([
+  "Wines", "Spirits", "Beer & Cider", "Cocktails",
+  "Mocktails", "Soft Drinks & Water", "Hot Drinks", "Fresh Juice",
+]);
+
+function classifyEodSection(item, menuCategoryMap) {
+  if (EOD_GRILL_KITCHEN_ITEM_NAMES.has(item.item_name)) return "Grill Kitchen";
+  const sub = (menuCategoryMap && item.item_id && menuCategoryMap.get(item.item_id)) || null;
+  if (sub && EOD_GRILL_KITCHEN_CATEGORIES.has(sub)) return "Grill Kitchen";
+  if (sub && EOD_DRINK_CATEGORIES.has(sub)) return "Drinks";
+  if (sub && EOD_MAIN_KITCHEN_CATEGORIES.has(sub)) return "Main Kitchen";
+  if (item.category === "drink") return "Drinks";
+  return "Main Kitchen";
+}
+
+function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mode) {
+  const kitchenOnly = mode === "kitchen";
   const paidOrders = (completedOrders || []).filter(
     (o) => o.order_status === "completed" && o.payment_status === "paid"
   );
@@ -344,17 +370,26 @@ function buildEndOfDayHtml(completedOrders) {
   const timeStr = now.toLocaleTimeString("en-NG", {
     hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Africa/Lagos",
   });
+  const todayLagos = now.toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
   const fmt = (n) => "₦" + Number(n || 0).toLocaleString("en-NG");
-  const agg = new Map();
+
+  const sectionAgg = {
+    "Main Kitchen": new Map(),
+    "Grill Kitchen": new Map(),
+    "Drinks": new Map(),
+  };
   for (const order of paidOrders) {
     for (const item of (order.order_items || [])) {
+      if (item.voided) continue;
+      const section = classifyEodSection(item, menuCategoryMap);
+      const bucket = sectionAgg[section];
       const key = `${item.item_name}||${item.modifiers || ""}`;
-      if (agg.has(key)) {
-        const row = agg.get(key);
+      if (bucket.has(key)) {
+        const row = bucket.get(key);
         row.qty += (item.qty || 0);
         row.total += (Number(item.line_total) || 0);
       } else {
-        agg.set(key, {
+        bucket.set(key, {
           name: item.item_name,
           modifier: item.modifiers || null,
           qty: item.qty || 0,
@@ -364,19 +399,126 @@ function buildEndOfDayHtml(completedOrders) {
       }
     }
   }
-  const rows = [...agg.values()].sort((a, b) => a.name.localeCompare(b.name));
-  const grandTotal = rows.reduce((s, r) => s + r.total, 0);
-  const orderCount = paidOrders.length;
 
-  let itemRows = "";
-  if (rows.length === 0) {
-    itemRows = `<tr><td colspan="4" style="text-align:center;padding:4mm 0;font-style:italic">No paid orders today</td></tr>`;
-  } else {
-    for (const r of rows) {
-      const label = r.modifier ? `${esc(r.name)} (${esc(r.modifier)})` : esc(r.name);
-      itemRows += `<tr><td class="nm">${label}</td><td class="qty">${r.qty}</td><td class="up">${esc(fmt(r.unit_price))}</td><td class="ln">${esc(fmt(r.total))}</td></tr>`;
+  const voidedAgg = new Map();
+  for (const order of (completedOrders || [])) {
+    if (order.order_status !== "completed") continue;
+    for (const item of (order.order_items || [])) {
+      if (!item.voided) continue;
+      const key = `${item.item_name}||${item.modifiers || ""}`;
+      if (voidedAgg.has(key)) {
+        const row = voidedAgg.get(key);
+        row.qty += (item.qty || 0);
+        row.total += (Number(item.line_total) || 0);
+      } else {
+        voidedAgg.set(key, {
+          name: item.item_name,
+          modifier: item.modifiers || null,
+          qty: item.qty || 0,
+          unit_price: Number(item.unit_price) || 0,
+          total: Number(item.line_total) || 0,
+        });
+      }
     }
   }
+
+  function sectionHtml(title, agg) {
+    const rows = [...agg.values()].sort((a, b) => a.name.localeCompare(b.name));
+    if (rows.length === 0) return "";
+    let body = "";
+    for (const r of rows) {
+      const label = r.modifier ? `${esc(r.name)} (${esc(r.modifier)})` : esc(r.name);
+      body += `<tr><td class="nm">${label}</td><td class="qty">${r.qty}</td><td class="up">${esc(fmt(r.unit_price))}</td><td class="ln">${esc(fmt(r.total))}</td></tr>`;
+    }
+    const subtotal = rows.reduce((s, r) => s + r.total, 0);
+    return `
+<div class="sec">${esc(title)}</div>
+<table>
+<thead><tr><th class="nm">ITEM</th><th class="qty">QTY</th><th class="up">UNIT</th><th class="ln">TOTAL</th></tr></thead>
+<tbody>${body}</tbody>
+</table>
+<table><tr class="ssub"><td class="gl">${esc(title)} Subtotal</td><td class="gv">${esc(fmt(subtotal))}</td></tr></table>
+<div class="hr"></div>`;
+  }
+
+  function voidedHtml(agg) {
+    const rows = [...agg.values()].sort((a, b) => a.name.localeCompare(b.name));
+    if (rows.length === 0) return "";
+    let body = "";
+    for (const r of rows) {
+      const label = r.modifier ? `${esc(r.name)} (${esc(r.modifier)})` : esc(r.name);
+      body += `<tr><td class="nm">${label}</td><td class="qty">${r.qty}</td><td class="up">${esc(fmt(r.unit_price))}</td><td class="ln">${esc(fmt(r.total))}</td></tr>`;
+    }
+    const subtotal = rows.reduce((s, r) => s + r.total, 0);
+    return `
+<div class="sec">Voided Items</div>
+<table>
+<thead><tr><th class="nm">ITEM</th><th class="qty">QTY</th><th class="up">UNIT</th><th class="ln">TOTAL</th></tr></thead>
+<tbody>${body}</tbody>
+</table>
+<table><tr class="ssub"><td class="gl">Voided Subtotal (not counted)</td><td class="gv">${esc(fmt(subtotal))}</td></tr></table>
+<div class="hr"></div>`;
+  }
+
+  function guesthouseHtml(bookings) {
+    const todays = (bookings || []).filter((b) => {
+      const t = b.check_in_at || b.created_at;
+      if (!t) return false;
+      const d = new Date(t).toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+      return d === todayLagos;
+    });
+    if (todays.length === 0) return "";
+    todays.sort((a, b) => String(a.room_number || "").localeCompare(String(b.room_number || "")));
+    let body = "";
+    let paidSum = 0;
+    for (const b of todays) {
+      const total = Number(b.total_amount || 0);
+      const paid = b.payment_status === "paid";
+      if (paid) paidSum += total;
+      const payLbl = paid ? "PAID" : "UNPAID";
+      body += `<tr><td class="nm">Rm ${esc(b.room_number || "?")} · ${esc(b.guest_name || "")}</td><td class="qty">${esc(String(b.nights || ""))}n</td><td class="up">${esc(payLbl)}</td><td class="ln">${esc(fmt(total))}</td></tr>`;
+    }
+    return `
+<div class="sec">Guest House</div>
+<table>
+<thead><tr><th class="nm">ROOM / GUEST</th><th class="qty">NTS</th><th class="up">PAY</th><th class="ln">TOTAL</th></tr></thead>
+<tbody>${body}</tbody>
+</table>
+<table><tr class="ssub"><td class="gl">Guest House Subtotal (paid)</td><td class="gv">${esc(fmt(paidSum))}</td></tr></table>
+<div class="hr"></div>`;
+  }
+
+  const mainKitchen = sectionHtml("Main Kitchen", sectionAgg["Main Kitchen"]);
+  const grillKitchen = sectionHtml("Grill Kitchen", sectionAgg["Grill Kitchen"]);
+  const drinks = kitchenOnly ? "" : sectionHtml("Drinks", sectionAgg["Drinks"]);
+  const guesthouse = kitchenOnly ? "" : guesthouseHtml(bookings);
+  const voided = voidedHtml(voidedAgg);
+
+  const foodTotal =
+    [...sectionAgg["Main Kitchen"].values()].reduce((s, r) => s + r.total, 0)
+    + [...sectionAgg["Grill Kitchen"].values()].reduce((s, r) => s + r.total, 0);
+  const drinkTotal = [...sectionAgg["Drinks"].values()].reduce((s, r) => s + r.total, 0);
+  const guesthousePaidTotal = (bookings || [])
+    .filter((b) => b.payment_status === "paid")
+    .filter((b) => {
+      const t = b.check_in_at || b.created_at;
+      if (!t) return false;
+      const d = new Date(t).toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+      return d === todayLagos;
+    })
+    .reduce((s, b) => s + Number(b.total_amount || 0), 0);
+  const grandTotal = foodTotal + (kitchenOnly ? 0 : drinkTotal + guesthousePaidTotal);
+  const orderCount = paidOrders.length;
+
+  const anyContent = mainKitchen || grillKitchen || drinks || guesthouse || voided;
+  const emptyBlock = anyContent ? "" : `<div class="smry" style="padding:4mm 0;font-style:italic">No activity today</div>`;
+
+  const grandBlock = kitchenOnly ? "" : `
+<table><tr class="grand"><td class="gl">Grand Total</td><td class="gv">${esc(fmt(grandTotal))}</td></tr></table>
+<div class="smry">${esc(String(orderCount))} completed order${orderCount !== 1 ? "s" : ""} included</div>
+<div class="hr"></div>`;
+
+  const title = kitchenOnly ? "Kitchen End of Day" : "End of Day Sales Report";
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -391,16 +533,18 @@ body{margin:0;padding:0 8mm;width:80mm;font-family:'Courier New',Courier,monospa
 .rpt{font-size:10pt;font-weight:bold;text-align:center;margin:2mm 0 1mm}
 .dt{font-size:8pt;text-align:center;margin-bottom:1mm}
 .hr{border-top:1px dashed #000;margin:2mm 0}
+.sec{font-size:9.5pt;font-weight:bold;text-align:left;margin:2mm 0 1mm;letter-spacing:1px;text-transform:uppercase}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
 thead tr th{font-size:7.5pt;text-align:left;padding-bottom:1.5mm;border-bottom:1px solid #000}
 .nm{font-size:8.5pt;padding:1mm 1mm 1mm 0;word-break:break-word;text-align:left}
-.qty{width:8mm;font-size:8.5pt;text-align:right;padding:1mm 1mm;white-space:nowrap}
+.qty{width:10mm;font-size:8.5pt;text-align:right;padding:1mm 1mm;white-space:nowrap}
 .up{width:16mm;font-size:8.5pt;text-align:right;padding:1mm 1mm;white-space:nowrap}
 .ln{width:18mm;font-size:8.5pt;text-align:right;padding:1mm 0 1mm 1mm;white-space:nowrap}
 thead .qty,thead .up,thead .ln{text-align:right}
-.grand td{padding-top:2mm;font-size:9.5pt}
+.grand td{padding-top:2mm;font-size:9.5pt;border-top:1px solid #000}
 .gl{text-align:left}
 .gv{text-align:right;white-space:nowrap}
+.ssub td{padding-top:1mm;font-size:8.5pt;font-style:italic}
 .smry{font-size:8pt;text-align:center;margin-top:2mm}
 .foot{font-size:8pt;text-align:center;margin-top:3mm}
 </style>
@@ -409,18 +553,11 @@ thead .qty,thead .up,thead .ln{text-align:right}
 <div class="brand">BLACKROCK</div>
 <div class="sub">Restaurant and Lounge Bar</div>
 <div class="hr"></div>
-<div class="rpt">End of Day Sales Report</div>
+<div class="rpt">${esc(title)}</div>
 <div class="dt">${esc(dateStr)}</div>
 <div class="dt">Printed: ${esc(timeStr)}</div>
 <div class="hr"></div>
-<table>
-<thead><tr><th class="nm">ITEM</th><th class="qty">QTY</th><th class="up">UNIT</th><th class="ln">TOTAL</th></tr></thead>
-<tbody>${itemRows}</tbody>
-</table>
-<div class="hr"></div>
-<table><tr class="grand"><td class="gl">Grand Total</td><td class="gv">${esc(fmt(grandTotal))}</td></tr></table>
-<div class="smry">${esc(String(orderCount))} completed order${orderCount !== 1 ? "s" : ""} included</div>
-<div class="hr"></div>
+${mainKitchen}${grillKitchen}${drinks}${guesthouse}${voided}${emptyBlock}${grandBlock}
 <div class="foot">Generated by BLACKROCK Front Desk</div>
 </body>
 </html>`;
@@ -581,7 +718,10 @@ function FrontDeskMain({ onSessionLost }) {
   const [callActionIds, setCallActionIds] = useState(() => new Set());
   const [statusFilter, setStatusFilter] = useState(null);
   const [eodPrintStatus, setEodPrintStatus] = useState(null);
+  const [kitchenPrintStatus, setKitchenPrintStatus] = useState(null);
   const [testPrintStatus, setTestPrintStatus] = useState(null);
+  const [menuCategoryMap, setMenuCategoryMap] = useState(() => new Map());
+  const [todayBookings, setTodayBookings] = useState([]);
 
   const [guesthouseRooms, setGuesthouseRooms] = useState([]);
   const [guesthouseLoaded, setGuesthouseLoaded] = useState(false);
@@ -854,6 +994,17 @@ function FrontDeskMain({ onSessionLost }) {
     } catch {}
   }, []);
 
+  const fetchTodayBookings = useCallback(async () => {
+    try {
+      const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+      const res = await apiRequest(`/api/front-desk?resource=guesthouse-bookings&from=${today}&to=${today}`, "GET");
+      if (!mountedRef.current) return;
+      if (res === "lost" || res === "offline" || !res.ok) return;
+      const json = await res.json();
+      setTodayBookings(json.bookings || []);
+    } catch {}
+  }, []);
+
   async function promptGuesthousePin(forAction) {
     const pin = window.prompt(`Enter guest house PIN to ${forAction}:`);
     if (!pin) return null;
@@ -1057,9 +1208,29 @@ function FrontDeskMain({ onSessionLost }) {
 
   useEffect(() => {
     fetchGuesthouseRooms();
-    const id = setInterval(fetchGuesthouseRooms, POLL_MS * 2);
+    fetchTodayBookings();
+    const id = setInterval(() => { fetchGuesthouseRooms(); fetchTodayBookings(); }, POLL_MS * 2);
     return () => clearInterval(id);
-  }, [fetchGuesthouseRooms]);
+  }, [fetchGuesthouseRooms, fetchTodayBookings]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("menu_items")
+          .select("id, category")
+          .limit(1000);
+        if (cancelled || !mountedRef.current) return;
+        const map = new Map();
+        for (const row of (data || [])) {
+          if (row.id && row.category) map.set(row.id, row.category);
+        }
+        setMenuCategoryMap(map);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (tab === "completed") fetchOrders();
@@ -1112,13 +1283,14 @@ function FrontDeskMain({ onSessionLost }) {
     };
   }, [fetchOrders, fetchReservations, fetchWaiterCalls]);
 
-  async function handleEndOfDayPrint() {
-    setEodPrintStatus("printing");
-    const html = buildEndOfDayHtml(completedOrders);
+  async function printEod(mode) {
+    const setStatus = mode === "kitchen" ? setKitchenPrintStatus : setEodPrintStatus;
+    setStatus("printing");
+    const html = buildEndOfDayHtml(completedOrders, menuCategoryMap, todayBookings, mode);
     try {
       if (window.electronAPI) {
         const result = await window.electronAPI.printReceipt(html);
-        setEodPrintStatus(result.success ? "ok" : "error");
+        setStatus(result.success ? "ok" : "error");
       } else {
         const w = window.open("", "_blank");
         if (w) {
@@ -1126,16 +1298,18 @@ function FrontDeskMain({ onSessionLost }) {
           w.document.close();
           w.focus();
           try { w.print(); } catch {}
-          setEodPrintStatus("ok");
+          setStatus("ok");
         } else {
-          setEodPrintStatus("error");
+          setStatus("error");
         }
       }
     } catch {
-      setEodPrintStatus("error");
+      setStatus("error");
     }
-    setTimeout(() => setEodPrintStatus(null), 3000);
+    setTimeout(() => setStatus(null), 3000);
   }
+  const handleEndOfDayPrint = () => printEod("all");
+  const handleKitchenEodPrint = () => printEod("kitchen");
 
   async function handleTestPrint() {
     setTestPrintStatus("printing");
@@ -1714,6 +1888,22 @@ function FrontDeskMain({ onSessionLost }) {
         >
           <Printer size={16} />
           {eodPrintStatus === "printing" ? "Printing..." : eodPrintStatus === "ok" ? "Sent to Printer" : eodPrintStatus === "error" ? "Print Failed" : "End of Day Report"}
+        </button>
+        <button
+          onClick={handleKitchenEodPrint}
+          disabled={kitchenPrintStatus === "printing"}
+          style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "14px 22px", borderRadius: 10,
+            border: `1.5px solid ${kitchenPrintStatus === "error" ? t.accent : t.gold}`,
+            background: kitchenPrintStatus === "ok" ? "rgba(200,169,110,0.10)" : "transparent",
+            color: kitchenPrintStatus === "error" ? t.accent : t.gold,
+            fontSize: 16, fontWeight: 700, cursor: kitchenPrintStatus === "printing" ? "default" : "pointer",
+            fontFamily: "inherit", opacity: kitchenPrintStatus === "printing" ? 0.6 : 1, flexShrink: 0,
+          }}
+          title="Kitchen-only EOD: Main Kitchen + Grill Kitchen + Voided items (no drinks, no guest house, no totals)"
+        >
+          <ChefHat size={16} />
+          {kitchenPrintStatus === "printing" ? "Printing..." : kitchenPrintStatus === "ok" ? "Sent to Printer" : kitchenPrintStatus === "error" ? "Print Failed" : "Kitchen Only"}
         </button>
         <button
           onClick={handleTestPrint}
