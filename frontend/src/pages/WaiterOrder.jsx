@@ -161,6 +161,7 @@ function buildStaticFood() {
 export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
   const [cart, setCart] = useState([]);
   const [tables, setTables] = useState([]);
+  const [activeTableNumbers, setActiveTableNumbers] = useState(new Set());
   const [selectedTable, setSelectedTable] = useState("");
   const [tableFlash, setTableFlash] = useState(false);
   const [menuType, setMenuType] = useState("food");
@@ -188,6 +189,22 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
   useEffect(() => {
     supabase.from("tables").select("*").eq("active", true).order("table_number", { ascending: true })
       .then(({ data }) => setTables(data || []));
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadActiveTables() {
+      const { data } = await supabase
+        .from("orders")
+        .select("table_number")
+        .eq("order_type", "dine-in")
+        .in("order_status", ["new", "confirmed", "preparing", "ready"]);
+      if (cancelled) return;
+      setActiveTableNumbers(new Set((data || []).map(o => Number(o.table_number)).filter(Boolean)));
+    }
+    loadActiveTables();
+    const id = setInterval(loadActiveTables, 20000);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
 
   useEffect(() => {
@@ -679,6 +696,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
           cart={cart}
           cartTotal={cartTotal}
           tables={tables}
+          activeTableNumbers={activeTableNumbers}
           selectedTable={selectedTable}
           setSelectedTable={setSelectedTable}
           tableFlash={tableFlash}
@@ -918,8 +936,9 @@ function WaiterSidePickerModal({ dish, onClose, onConfirm }) {
 }
 
 /* ── Confirm overlay ────────────────────────────────────────────────── */
-function WaiterConfirmOverlay({ cart, cartTotal, tables, selectedTable, setSelectedTable, tableFlash, submitting, submitError, waiterName, onClose, onPlaceOrder, onCancelOrder }) {
+function WaiterConfirmOverlay({ cart, cartTotal, tables, activeTableNumbers, selectedTable, setSelectedTable, tableFlash, submitting, submitError, waiterName, onClose, onPlaceOrder, onCancelOrder }) {
   const selectedTableObj = tables.find(t => String(t.id) === String(selectedTable));
+  const selectedIsActive = selectedTableObj && activeTableNumbers?.has(Number(selectedTableObj.table_number));
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.82)", display: "flex", alignItems: "flex-end", justifyContent: "center", padding: "0 0 0 0" }}>
@@ -952,10 +971,19 @@ function WaiterConfirmOverlay({ cart, cartTotal, tables, selectedTable, setSelec
               }}
             >
               <option value="">Select a table to place this order…</option>
-              {tables.map(t => <option key={t.id} value={t.id}>Table {t.table_number}</option>)}
+              {tables.map(t => (
+                <option key={t.id} value={t.id}>
+                  Table {t.table_number}{activeTableNumbers?.has(Number(t.table_number)) ? " · open tab" : ""}
+                </option>
+              ))}
             </select>
             {!selectedTable && tableFlash && (
               <p style={{ margin: "6px 0 0", fontSize: 12, color: "#f59e0b" }}>Please select a table before placing the order.</p>
+            )}
+            {selectedIsActive && (
+              <p style={{ margin: "8px 0 0", fontSize: 12, color: "#c8a96e" }}>
+                Table {selectedTableObj.table_number} has an open tab — these items will be added to the existing bill.
+              </p>
             )}
           </div>
 

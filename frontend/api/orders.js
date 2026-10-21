@@ -239,7 +239,7 @@ module.exports = async function handler(req, res) {
         order_type: orderType,
         delivery_address: orderType === 'delivery' ? deliveryAddress.trim() : null,
         table_number: orderType === 'dine-in' ? parseInt(tableNumber, 10) : null,
-        order_source: ['website', 'qr', 'waiter'].includes(orderSource) ? orderSource : 'website',
+        order_source: ['website', 'qr', 'waiter', 'front-desk'].includes(orderSource) ? orderSource : 'website',
         placed_by: placedBy ? String(placedBy).slice(0, 100) : null,
         special_instructions: specialInstructions ? specialInstructions.trim() : null,
         scheduled_time: scheduledTimeISO,

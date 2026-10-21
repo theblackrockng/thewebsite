@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search } from "lucide-react";
+import { MENU } from "../lib/data";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
 
@@ -1897,6 +1898,245 @@ function MergePickerModal({ t, orders, selectedIds, onToggle, onDone }) {
   );
 }
 
+function buildFallbackMenu() {
+  const flat = [];
+  Object.entries(MENU).forEach(([cat, dishes]) => {
+    dishes.forEach((d, idx) => flat.push({
+      id: `static-${cat.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${idx}`,
+      name: d.name,
+      price: parseInt((d.price || "0").replace(/[^\d]/g, ""), 10) || 0,
+      category: cat,
+      menuType: "food",
+    }));
+  });
+  return flat;
+}
+
+function AddItemsModal({ order, t, staffName, onClose }) {
+  const [menu, setMenu] = useState([]);
+  const [cart, setCart] = useState([]);
+  const [query, setQuery] = useState("");
+  const [activeCat, setActiveCat] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("menu_items")
+          .select("*")
+          .eq("available", true)
+          .order("sort_order", { ascending: true, nullsFirst: false });
+        if (cancelled) return;
+        if (data?.length) {
+          setMenu(data.map(it => ({
+            id: it.id,
+            name: it.name,
+            price: Number(it.price || 0),
+            category: it.category || "Other",
+            menuType: /drink|cocktail|wine|beer|spirit|bar/i.test(it.category || "") ? "drink" : "food",
+          })));
+        } else {
+          setMenu(buildFallbackMenu());
+        }
+      } catch {
+        if (!cancelled) setMenu(buildFallbackMenu());
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const categories = useMemo(() => {
+    const seen = new Set();
+    return menu.filter(m => { if (seen.has(m.category)) return false; seen.add(m.category); return true; }).map(m => m.category);
+  }, [menu]);
+
+  useEffect(() => { if (!activeCat && categories.length) setActiveCat(categories[0]); }, [categories, activeCat]);
+
+  const visible = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (q) return menu.filter(m => m.name.toLowerCase().includes(q));
+    return menu.filter(m => m.category === activeCat);
+  }, [menu, query, activeCat]);
+
+  function addItem(it) {
+    setCart(prev => {
+      const idx = prev.findIndex(c => c.id === it.id);
+      if (idx >= 0) return prev.map((c, i) => i === idx ? { ...c, qty: c.qty + 1 } : c);
+      return [...prev, { ...it, qty: 1, note: "" }];
+    });
+  }
+  function setQty(id, qty) {
+    if (qty <= 0) setCart(prev => prev.filter(c => c.id !== id));
+    else setCart(prev => prev.map(c => c.id === id ? { ...c, qty } : c));
+  }
+  function setNote(id, note) {
+    setCart(prev => prev.map(c => c.id === id ? { ...c, note } : c));
+  }
+
+  const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
+
+  async function submit() {
+    if (!cart.length || submitting) return;
+    setSubmitting(true); setError("");
+    try {
+      const res = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderType: "dine-in",
+          tableNumber: order.table_number,
+          orderSource: "front-desk",
+          placedBy: staffName,
+          guestName: order.guest_name || `Table ${order.table_number}`,
+          guestPhone: order.guest_phone || "—",
+          guestEmail: null,
+          specialInstructions: `Added to Table ${order.table_number} tab`,
+          scheduledTime: null,
+          paymentMethod: "pay_on_arrival",
+          items: cart.map(c => ({
+            id: c.id,
+            name: c.name,
+            price: c.price,
+            qty: c.qty,
+            menuType: c.menuType || "food",
+            modifiers: c.note?.trim() || null,
+          })),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to add items.");
+      onClose();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 920, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: t.card, color: t.text, border: `2px solid ${t.border}`, borderRadius: 16, width: "100%", maxWidth: 760, maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+      >
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: t.gold, fontWeight: 700 }}>Add to Table {order.table_number}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>Extend this tab</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: t.muted, cursor: "pointer", display: "flex" }}><X size={22} /></button>
+        </div>
+
+        <div style={{ padding: "14px 24px", borderBottom: `1px solid ${t.border}`, display: "flex", gap: 10, alignItems: "center" }}>
+          <div style={{ position: "relative", flex: 1 }}>
+            <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: t.muted }} />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search menu…"
+              style={{ width: "100%", padding: "10px 12px 10px 36px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.input, color: t.text, fontSize: 14, fontFamily: "inherit", outline: "none" }}
+            />
+          </div>
+        </div>
+
+        {!query && (
+          <div style={{ padding: "10px 24px", borderBottom: `1px solid ${t.border}`, overflowX: "auto", display: "flex", gap: 8 }}>
+            {categories.map(cat => (
+              <button
+                key={cat}
+                onClick={() => setActiveCat(cat)}
+                style={{
+                  padding: "7px 13px", borderRadius: 999, border: `1px solid ${activeCat === cat ? t.gold : t.border}`,
+                  background: activeCat === cat ? t.gold : "transparent",
+                  color: activeCat === cat ? t.onGold : t.muted,
+                  fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", flex: 1, minHeight: 0 }}>
+          <div style={{ overflowY: "auto", borderRight: `1px solid ${t.border}`, padding: "12px 16px" }}>
+            {visible.length === 0 ? (
+              <div style={{ color: t.muted, fontSize: 14, padding: 20, textAlign: "center" }}>No matches.</div>
+            ) : visible.map(it => (
+              <button
+                key={it.id}
+                onClick={() => addItem(it)}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.text, cursor: "pointer", fontFamily: "inherit", textAlign: "left", marginBottom: 8 }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{it.name}</div>
+                  <div style={{ fontSize: 12, color: t.muted }}>{fmtPrice(it.price)}</div>
+                </div>
+                <Plus size={16} style={{ color: t.gold, flexShrink: 0 }} />
+              </button>
+            ))}
+          </div>
+
+          <div style={{ overflowY: "auto", padding: "12px 16px", display: "flex", flexDirection: "column", gap: 10 }}>
+            {cart.length === 0 ? (
+              <div style={{ color: t.muted, fontSize: 14, textAlign: "center", padding: 20 }}>Tap items to add.</div>
+            ) : cart.map(c => (
+              <div key={c.id} style={{ padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}`, display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</div>
+                    <div style={{ fontSize: 12, color: t.muted }}>{fmtPrice(c.price)} × {c.qty} = {fmtPrice(c.price * c.qty)}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button onClick={() => setQty(c.id, c.qty - 1)} style={{ width: 26, height: 26, borderRadius: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Minus size={13} /></button>
+                    <span style={{ minWidth: 20, textAlign: "center", fontWeight: 700 }}>{c.qty}</span>
+                    <button onClick={() => setQty(c.id, c.qty + 1)} style={{ width: 26, height: 26, borderRadius: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><Plus size={13} /></button>
+                  </div>
+                </div>
+                <input
+                  value={c.note || ""}
+                  onChange={(e) => setNote(c.id, e.target.value)}
+                  placeholder="Note (e.g. Egusi, Semo)"
+                  style={{ width: "100%", padding: "6px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: t.input, color: t.text, fontSize: 12, fontFamily: "inherit", outline: "none" }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ padding: "10px 24px", color: "#ef4444", fontSize: 13, borderTop: `1px solid ${t.border}` }}>{error}</div>
+        )}
+
+        <div style={{ padding: "16px 24px", borderTop: `1px solid ${t.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 11, color: t.muted, textTransform: "uppercase", letterSpacing: "0.1em" }}>Add-on total</div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: t.text }}>{fmtPrice(total)}</div>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={onClose} style={{ padding: "12px 18px", borderRadius: 10, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+            <button
+              onClick={submit}
+              disabled={!cart.length || submitting}
+              style={{ padding: "12px 22px", borderRadius: 10, border: "none", background: !cart.length || submitting ? t.border : t.gold, color: !cart.length || submitting ? t.muted : t.onGold, fontSize: 14, fontWeight: 800, cursor: !cart.length || submitting ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+            >
+              {submitting ? "Sending to kitchen…" : "Send to kitchen →"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, onConfirm, onComplete, onPayment, otherTableOrders }) {
   const _baseCfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
   const statusCfg = (order.order_status === "new" && (order.order_type === "pickup" || order.order_type === "delivery"))
@@ -1904,8 +2144,11 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
     : _baseCfg;
   const payCfg = PAYMENT_CFG[order.payment_status] ?? { label: order.payment_status || "Unknown", color: "#6b7280" };
   const items = order.order_items || [];
+  const session = useStaffSession();
+  const staffName = session?.profile?.full_name || "Front Desk";
   const [mergedIds, setMergedIds] = useState(() => new Set());
   const [showMerge, setShowMerge] = useState(false);
+  const [showAddItems, setShowAddItems] = useState(false);
   const [printStatus, setPrintStatus] = useState(null);
 
   const mergedOrders = (otherTableOrders || []).filter((o) => mergedIds.has(o.id));
@@ -1955,6 +2198,7 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
   const cancelled = order.order_status === "cancelled";
   const canConfirm = !inCompletedTab && order.order_status === "new";
   const canComplete = !inCompletedTab && order.order_status === "ready";
+  const canAddItems = !inCompletedTab && !cancelled && isTableOrder(order) && ACTIVE_STATUSES.includes(order.order_status);
   const isPaid = order.payment_status === "paid";
   const canMarkPaid = !isPaid && !cancelled && (inCompletedTab || order.payment_status !== "failed");
   const canProof = !inCompletedTab && order.payment_status === "awaiting_proof" && !cancelled;
@@ -2080,6 +2324,20 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
               <Printer size={15} />
               {printLabel}
             </button>
+            {canAddItems && (
+              <button
+                onClick={() => setShowAddItems(true)}
+                style={{
+                  width: "100%", padding: "11px 16px", borderRadius: 10,
+                  border: `1.5px dashed ${t.gold}`, background: "transparent",
+                  color: t.gold, fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  fontFamily: "inherit",
+                }}
+              >
+                <Plus size={15} /> Add Items to Table {order.table_number}
+              </button>
+            )}
             {hasMergeable && (
               <button
                 onClick={() => setShowMerge(true)}
@@ -2104,6 +2362,14 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
           selectedIds={mergedIds}
           onToggle={toggleMerge}
           onDone={() => setShowMerge(false)}
+        />
+      )}
+      {showAddItems && (
+        <AddItemsModal
+          order={order}
+          t={t}
+          staffName={staffName}
+          onClose={() => setShowAddItems(false)}
         />
       )}
     </div>
