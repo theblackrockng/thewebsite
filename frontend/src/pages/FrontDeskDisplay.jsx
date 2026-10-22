@@ -247,6 +247,10 @@ function isTableOrder(o) {
   return o.order_type === "dine-in";
 }
 
+function hasActiveItems(o) {
+  return (o.order_items || []).some((it) => !it.voided);
+}
+
 function orderLabel(o) {
   if (isTableOrder(o)) return `Table ${o.table_number}`;
   if (o.order_type === "delivery") return "Delivery";
@@ -1576,13 +1580,15 @@ function FrontDeskMain({ onSessionLost }) {
     past: resLists.past.length,
   }), [resLists, reservations, resToday]);
 
+  const activeOrders = useMemo(() => orders.filter(hasActiveItems), [orders]);
+
   const counts = useMemo(() => {
     const c = { new: 0, confirmed: 0, preparing: 0, ready: 0, completed: completedCount };
-    orders.forEach((o) => {
+    activeOrders.forEach((o) => {
       if (c[o.order_status] !== undefined && o.order_status !== "completed") c[o.order_status] += 1;
     });
     return c;
-  }, [orders, completedCount]);
+  }, [activeOrders, completedCount]);
 
   const paidToday = useMemo(() => {
     const orderSum = completedOrders
@@ -1595,11 +1601,11 @@ function FrontDeskMain({ onSessionLost }) {
   }, [completedOrders, todayBookings]);
 
   const tabCounts = useMemo(() => ({
-    all: orders.length,
-    table: orders.filter(isTableOrder).length,
-    online: orders.filter((o) => !isTableOrder(o)).length,
+    all: activeOrders.length,
+    table: activeOrders.filter(isTableOrder).length,
+    online: activeOrders.filter((o) => !isTableOrder(o)).length,
     completed: completedCount,
-  }), [orders, completedCount]);
+  }), [activeOrders, completedCount]);
 
   const barOrders = useMemo(() =>
     orders
@@ -1618,11 +1624,11 @@ function FrontDeskMain({ onSessionLost }) {
         .map((o) => ({ order: o, info: completionInfo(o) }))
         .sort((a, b) => new Date(b.info.iso) - new Date(a.info.iso));
     }
-    return orders
+    return activeOrders
       .filter((o) => (tab === "table" ? isTableOrder(o) : tab === "online" ? !isTableOrder(o) : true))
       .filter((o) => statusFilter ? o.order_status === statusFilter : true)
       .map((o) => ({ order: o, info: null }));
-  }, [isCompletedTab, completedOrders, orders, tab, statusFilter]);
+  }, [isCompletedTab, completedOrders, activeOrders, tab, statusFilter]);
 
   const onReservations = view === "reservations";
   const onBar = view === "bar";
