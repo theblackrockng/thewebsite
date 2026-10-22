@@ -264,7 +264,7 @@ function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-export const DEFAULT_PRINT_STYLE = { fontSize: 9.5, fontFamily: "Courier New", pageWidth: 80 };
+export const DEFAULT_PRINT_STYLE = { fontSize: 9.5, fontFamily: "Courier New", pageWidth: 76 };
 export const PRINT_STYLE_KEY = "blackrock-eod-print-style";
 export const FONT_OPTIONS = [
   { label: "Courier New (default)", value: "Courier New" },
@@ -353,7 +353,7 @@ function buildReceiptHtml(orders) {
 <style>
 @page{size:80mm auto;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{margin:0;padding:0 5mm;width:80mm;font-family:'Courier New',Courier,ui-monospace,monospace;font-size:10pt;font-weight:900;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-stroke:0.3px #000;text-rendering:geometricPrecision}
+body{margin:0;padding:0 7mm;width:80mm;font-family:'Courier New',Courier,ui-monospace,monospace;font-size:10pt;font-weight:900;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-stroke:0.3px #000;text-rendering:geometricPrecision}
 .brand{font-size:16pt;font-weight:900;letter-spacing:4px;text-align:center;margin-top:1mm;margin-bottom:1mm}
 .sub{font-size:9pt;font-weight:900;text-align:center;letter-spacing:1px;margin-bottom:2mm;text-transform:uppercase}
 .hr{border-top:2px solid #000;margin:2mm 0;height:0}
@@ -574,7 +574,7 @@ export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mo
 <style>
 @page{size:80mm auto;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{margin:0;padding:0 4mm;width:80mm;font-family:'Courier New',Courier,ui-monospace,monospace;font-size:9.5pt;font-weight:900;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-stroke:0.3px #000;text-rendering:geometricPrecision;line-height:1.3}
+body{margin:0;padding:0 7mm;width:80mm;font-family:'Courier New',Courier,ui-monospace,monospace;font-size:9.5pt;font-weight:900;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-stroke:0.3px #000;text-rendering:geometricPrecision;line-height:1.3}
 .brand{font-size:17pt;font-weight:900;letter-spacing:5px;text-align:center;margin-top:1mm;margin-bottom:1mm}
 .sub{font-size:9pt;font-weight:900;text-align:center;letter-spacing:1px;text-transform:uppercase;margin-bottom:2mm}
 .rpt{font-size:12pt;font-weight:900;text-align:center;margin:1mm 0 1mm;text-transform:uppercase;letter-spacing:2px}
