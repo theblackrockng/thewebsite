@@ -293,42 +293,42 @@ function buildReceiptHtml(orders) {
 <style>
 @page{size:80mm auto;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{margin:0;padding:0 8mm;width:80mm;font-family:'Courier New',Courier,monospace;font-size:9pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.brand{font-size:14pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
-.sub{font-size:8pt;text-align:center;margin-bottom:3mm}
-.hr{border-top:1px dashed #000;margin:2mm 0}
-.tbl{font-size:10pt;font-weight:bold;text-align:center;margin:1mm 0}
-.meta{font-size:8pt;text-align:center;margin-bottom:2mm}
+body{margin:0;padding:0 5mm;width:80mm;font-family:'Courier New',Courier,ui-monospace,monospace;font-size:10pt;font-weight:900;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-stroke:0.3px #000;text-rendering:geometricPrecision}
+.brand{font-size:16pt;font-weight:900;letter-spacing:4px;text-align:center;margin-top:1mm;margin-bottom:1mm}
+.sub{font-size:9pt;font-weight:900;text-align:center;letter-spacing:1px;margin-bottom:2mm;text-transform:uppercase}
+.hr{border-top:2px solid #000;margin:2mm 0;height:0}
+.hr2{border-top:3px double #000;margin:2mm 0;height:0}
+.tbl{font-size:12pt;font-weight:900;text-align:center;margin:1mm 0;letter-spacing:2px;text-transform:uppercase}
+.meta{font-size:9pt;font-weight:900;text-align:center;margin-bottom:2mm;letter-spacing:1px}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
-.tl td{font-weight:bold;padding:1.5mm 0 0.5mm}
-.item .nm{word-break:break-word;padding-right:1mm}
-.item .pr{width:22mm;text-align:right;white-space:nowrap}
-.mod td{font-size:8pt;padding-left:4mm;padding-bottom:0.5mm;font-style:italic}
+.tl td{font-weight:900;padding:1.5mm 0 0.5mm;text-align:center;text-transform:uppercase;letter-spacing:1px}
+.item .nm{font-size:10pt;word-break:break-word;padding:0.8mm 1mm 0.8mm 0;text-align:left}
+.item .pr{width:24mm;font-size:10pt;text-align:right;white-space:nowrap;padding:0.8mm 0}
+.mod td{font-size:8.5pt;font-weight:700;padding-left:4mm;padding-bottom:0.5mm;font-style:italic}
 .gap td{height:2mm}
-.tot td{padding-top:1.5mm;font-weight:bold}
-.tot .pr{width:22mm;text-align:right;white-space:nowrap}
-.pay{text-align:center;font-size:10pt;font-weight:bold;margin:2mm 0}
-.bl{font-size:8pt;font-weight:bold;margin-bottom:1mm}
-.bd{font-size:8pt;margin-bottom:0.5mm}
-.foot{font-size:8pt;text-align:center;margin-top:3mm}
+.tot td{padding:2mm 0;font-size:11.5pt;font-weight:900;border-top:3px double #000;border-bottom:3px double #000;text-transform:uppercase;letter-spacing:1px}
+.tot .pr{width:24mm;text-align:right;white-space:nowrap}
+.pay{text-align:center;font-size:12pt;font-weight:900;margin:2mm 0;letter-spacing:3px;text-transform:uppercase}
+.bl{font-size:9.5pt;font-weight:900;text-align:center;margin-bottom:1mm;text-transform:uppercase;letter-spacing:1px}
+.bd{font-size:9.5pt;font-weight:900;text-align:center;margin-bottom:0.5mm}
+.foot{font-size:9pt;font-weight:900;text-align:center;margin-top:3mm;letter-spacing:1px}
 </style>
 </head>
 <body>
 <div class="brand">BLACKROCK</div>
-<div class="sub">Restaurant and Lounge Bar</div>
+<div class="sub">Restaurant &amp; Lounge Bar</div>
+<div class="hr2"></div>
+<div class="tbl">${esc(tableHeader || 'RECEIPT')}</div>
+<div class="meta">${esc(dateStr)} &middot; ${esc(timeStr)}</div>
 <div class="hr"></div>
-<div class="tbl">${esc(tableHeader || 'Receipt')}</div>
-<div class="meta">${esc(dateStr)}  ${esc(timeStr)}</div>
-<div class="hr"></div>
-<table>${rows}<tr><td colspan="2"><div class="hr"></div></td></tr><tr class="tot"><td>Total</td><td class="pr">${esc(fmtN(grandTotal))}</td></tr></table>
-<div class="hr"></div>
+<table>${rows}<tr class="tot"><td>Total</td><td class="pr">${esc(fmtN(grandTotal))}</td></tr></table>
 <div class="pay">Payment: ${payLabel}</div>
-<div class="hr"></div>
-<div class="bl">Bank Transfer:</div>
+<div class="hr2"></div>
+<div class="bl">Bank Transfer</div>
 <div class="bd">Guaranty Trust Bank (GTB)</div>
 <div class="bd">Blackrock Restaurant LoungeBar</div>
 <div class="bd">9006080442</div>
-<div class="hr"></div>
+<div class="hr2"></div>
 <div class="foot">Thank you for dining with us</div>
 </body>
 </html>`;
@@ -438,8 +438,7 @@ export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mo
 <thead><tr><th class="nm">ITEM</th><th class="qty">QTY</th><th class="up">UNIT</th><th class="ln">TOTAL</th></tr></thead>
 <tbody>${body}</tbody>
 </table>
-<table><tr class="ssub"><td class="gl">${esc(title)} Subtotal</td><td class="gv">${esc(fmt(subtotal))}</td></tr></table>
-<div class="hr"></div>`;
+<table><tr class="ssub"><td class="gl">${esc(title)} Subtotal</td><td class="gv">${esc(fmt(subtotal))}</td></tr></table>`;
   }
 
   function voidedHtml(agg) {
@@ -457,8 +456,7 @@ export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mo
 <thead><tr><th class="nm">ITEM</th><th class="qty">QTY</th><th class="up">UNIT</th><th class="ln">TOTAL</th></tr></thead>
 <tbody>${body}</tbody>
 </table>
-<table><tr class="ssub"><td class="gl">Voided Subtotal (not counted)</td><td class="gv">${esc(fmt(subtotal))}</td></tr></table>
-<div class="hr"></div>`;
+<table><tr class="ssub"><td class="gl">Voided Subtotal (not counted)</td><td class="gv">${esc(fmt(subtotal))}</td></tr></table>`;
   }
 
   function guesthouseHtml(bookings) {
@@ -480,8 +478,7 @@ export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mo
 <thead><tr><th class="nm">ROOM / GUEST</th><th class="qty">NTS</th><th class="up">PAY</th><th class="ln">TOTAL</th></tr></thead>
 <tbody>${body}</tbody>
 </table>
-<table><tr class="ssub"><td class="gl">Guest House Subtotal (paid)</td><td class="gv">${esc(fmt(paidSum))}</td></tr></table>
-<div class="hr"></div>`;
+<table><tr class="ssub"><td class="gl">Guest House Subtotal (paid)</td><td class="gv">${esc(fmt(paidSum))}</td></tr></table>`;
   }
 
   const mainKitchen = sectionHtml("Main Kitchen", sectionAgg["Main Kitchen"]);
@@ -517,36 +514,39 @@ export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mo
 <style>
 @page{size:80mm auto;margin:0}
 *{box-sizing:border-box;margin:0;padding:0}
-body{margin:0;padding:0 8mm;width:80mm;font-family:'Courier New',Courier,monospace;font-size:8.5pt;font-weight:bold;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.brand{font-size:13pt;font-weight:bold;letter-spacing:3px;text-align:center;margin-bottom:1mm}
-.sub{font-size:8pt;text-align:center;margin-bottom:1mm}
-.rpt{font-size:10pt;font-weight:bold;text-align:center;margin:2mm 0 1mm}
-.dt{font-size:8pt;text-align:center;margin-bottom:1mm}
-.hr{border-top:1px dashed #000;margin:2mm 0}
-.sec{font-size:9.5pt;font-weight:bold;text-align:left;margin:2mm 0 1mm;letter-spacing:1px;text-transform:uppercase}
+body{margin:0;padding:0 4mm;width:80mm;font-family:'Courier New',Courier,ui-monospace,monospace;font-size:9.5pt;font-weight:900;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-stroke:0.3px #000;text-rendering:geometricPrecision;line-height:1.3}
+.brand{font-size:17pt;font-weight:900;letter-spacing:5px;text-align:center;margin-top:1mm;margin-bottom:1mm}
+.sub{font-size:9pt;font-weight:900;text-align:center;letter-spacing:1px;text-transform:uppercase;margin-bottom:2mm}
+.rpt{font-size:12pt;font-weight:900;text-align:center;margin:1mm 0 1mm;text-transform:uppercase;letter-spacing:2px}
+.dt{font-size:9pt;font-weight:900;text-align:center;margin-bottom:0.5mm;letter-spacing:1px}
+.hr{border-top:2px solid #000;margin:2mm 0;height:0}
+.hr2{border-top:3px double #000;margin:2mm 0;height:0}
+.sec{font-size:11pt;font-weight:900;text-align:center;margin:3mm 0 1mm;letter-spacing:3px;text-transform:uppercase;padding:1mm 0;border-top:3px double #000;border-bottom:3px double #000}
 table{width:100%;border-collapse:collapse;table-layout:fixed}
-thead tr th{font-size:7.5pt;text-align:left;padding-bottom:1.5mm;border-bottom:1px solid #000}
-.nm{font-size:8.5pt;padding:1mm 1mm 1mm 0;word-break:break-word;text-align:left}
-.qty{width:10mm;font-size:8.5pt;text-align:right;padding:1mm 1mm;white-space:nowrap}
-.up{width:16mm;font-size:8.5pt;text-align:right;padding:1mm 1mm;white-space:nowrap}
-.ln{width:18mm;font-size:8.5pt;text-align:right;padding:1mm 0 1mm 1mm;white-space:nowrap}
+thead tr th{font-size:8.5pt;font-weight:900;padding:1mm 0;border-bottom:2px solid #000;text-transform:uppercase;letter-spacing:0.5px}
+thead .nm{text-align:left}
 thead .qty,thead .up,thead .ln{text-align:right}
-.grand td{padding-top:2mm;font-size:9.5pt;border-top:1px solid #000}
+tbody td{font-size:9.5pt;font-weight:900;padding:0.8mm 0}
+.nm{word-break:break-word;text-align:left;padding-right:1mm}
+.qty{width:7mm;text-align:right;white-space:nowrap;padding:0.8mm 1mm 0.8mm 0}
+.up{width:16mm;text-align:right;white-space:nowrap;padding:0.8mm 1mm 0.8mm 0}
+.ln{width:18mm;text-align:right;white-space:nowrap;padding:0.8mm 0}
+.ssub td{padding:1.2mm 0;font-size:9.5pt;font-weight:900;border-top:1px dashed #000;text-transform:uppercase;letter-spacing:0.5px}
+.grand td{padding:2mm 0;font-size:12pt;font-weight:900;border-top:3px double #000;border-bottom:3px double #000;text-transform:uppercase;letter-spacing:1.5px}
 .gl{text-align:left}
 .gv{text-align:right;white-space:nowrap}
-.ssub td{padding-top:1mm;font-size:8.5pt;font-style:italic}
-.smry{font-size:8pt;text-align:center;margin-top:2mm}
-.foot{font-size:8pt;text-align:center;margin-top:3mm}
+.smry{font-size:9pt;font-weight:900;text-align:center;margin:2mm 0;letter-spacing:0.5px}
+.foot{font-size:8.5pt;font-weight:900;text-align:center;margin-top:4mm;letter-spacing:1.5px;text-transform:uppercase}
 </style>
 </head>
 <body>
 <div class="brand">BLACKROCK</div>
-<div class="sub">Restaurant and Lounge Bar</div>
-<div class="hr"></div>
+<div class="sub">Restaurant &amp; Lounge Bar</div>
+<div class="hr2"></div>
 <div class="rpt">${esc(title)}</div>
 <div class="dt">${esc(dateStr)}</div>
 <div class="dt">Printed: ${esc(timeStr)}</div>
-<div class="hr"></div>
+<div class="hr2"></div>
 ${mainKitchen}${grillKitchen}${drinks}${guesthouse}${voided}${emptyBlock}${grandBlock}
 <div class="foot">Generated by BLACKROCK Front Desk</div>
 </body>
