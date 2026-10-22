@@ -1,7 +1,10 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
+import { authHeader } from "../../lib/authHeader";
 import { useStaff } from "../../context/StaffContext";
-import { Mail, Send, Plus, Trash2, Loader, Check, X, Pencil } from "lucide-react";
+import { Mail, Send, Plus, Trash2, Loader, Check, X, Pencil, History } from "lucide-react";
+
+const FRONTEND_API = "https://www.blackrockrestaurantng.com";
 
 const MODES = [
   { value: "full",    label: "Full report" },
@@ -12,6 +15,16 @@ const KIND_LABELS = {
   email:    "Email",
   telegram: "Telegram",
 };
+
+function lagosYesterday() {
+  const now = new Date();
+  const y = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  return y.toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+}
+
+function lagosToday() {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+}
 
 function Section({ title, icon: Icon, children, right }) {
   return (
@@ -417,6 +430,48 @@ export default function EodRecipients() {
     return true;
   }
 
+  const [resendDate, setResendDate] = useState(() => lagosYesterday());
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendResult, setResendResult] = useState(null);
+
+  const triggerResend = useCallback(async (channels) => {
+    setResendBusy(true);
+    setResendResult(null);
+    try {
+      const headers = { "Content-Type": "application/json", ...(await authHeader()) };
+      const res = await fetch(`${FRONTEND_API}/api/front-desk?resource=eod-resend`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ date: resendDate, channels }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify(data.error || `Resend failed (${res.status})`, false);
+        setResendResult({ ok: false, error: data.error || `HTTP ${res.status}` });
+      } else {
+        const emails = data.emails || [];
+        const telegrams = data.telegrams || [];
+        const sent = emails.filter((e) => e.status === "sent").length
+                   + telegrams.filter((t) => t.status === "sent").length;
+        const failed = emails.filter((e) => e.status === "failed").length
+                     + telegrams.filter((t) => t.status === "failed").length;
+        if (sent === 0 && failed === 0) {
+          notify("Nothing to send for the selected channel.", false);
+        } else if (failed === 0) {
+          notify(`Resent to ${sent} recipient${sent === 1 ? "" : "s"}.`, true);
+        } else {
+          notify(`Resent to ${sent}, ${failed} failed. See details below.`, false);
+        }
+        setResendResult({ ok: true, emails, telegrams });
+      }
+    } catch (err) {
+      notify(err?.message || "Could not reach the server.", false);
+      setResendResult({ ok: false, error: err?.message || "Network error" });
+    } finally {
+      setResendBusy(false);
+    }
+  }, [resendDate, notify]);
+
   if (!authorized) {
     return (
       <div style={{ padding: 24, color: "var(--ds-muted)" }}>
@@ -440,6 +495,98 @@ export default function EodRecipients() {
           Changes take effect from the next cron run.
         </p>
       </div>
+
+      <Section title="Resend a past EOD report" icon={History}>
+        <div style={{ fontSize: 12.5, color: "var(--ds-muted)", lineHeight: 1.5, marginBottom: 12 }}>
+          Pick an archived date and resend to every active recipient. Useful when
+          the 6am cron missed a day, or someone needs yesterday's figures again.
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 10, alignItems: "center" }}>
+          <label style={{ fontSize: 12.5, color: "var(--ds-muted)" }}>Report date</label>
+          <input
+            type="date"
+            value={resendDate}
+            max={lagosToday()}
+            onChange={(e) => setResendDate(e.target.value)}
+            style={inputStyle}
+          />
+        </div>
+        <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={() => triggerResend(["email"])}
+            disabled={resendBusy || !resendDate}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "9px 16px", borderRadius: 7, border: "1px solid var(--ds-border)",
+              background: "transparent", color: "var(--ds-text)",
+              fontSize: 13, fontWeight: 600, cursor: resendBusy ? "default" : "pointer",
+              opacity: resendBusy ? 0.6 : 1,
+            }}
+          >
+            {resendBusy ? <Loader size={13} className="spin" /> : <Mail size={13} />}
+            Resend email
+          </button>
+          <button
+            type="button"
+            onClick={() => triggerResend(["telegram"])}
+            disabled={resendBusy || !resendDate}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "9px 16px", borderRadius: 7, border: "1px solid var(--ds-border)",
+              background: "transparent", color: "var(--ds-text)",
+              fontSize: 13, fontWeight: 600, cursor: resendBusy ? "default" : "pointer",
+              opacity: resendBusy ? 0.6 : 1,
+            }}
+          >
+            {resendBusy ? <Loader size={13} className="spin" /> : <Send size={13} />}
+            Resend Telegram
+          </button>
+          <button
+            type="button"
+            onClick={() => triggerResend(["email", "telegram"])}
+            disabled={resendBusy || !resendDate}
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "9px 16px", borderRadius: 7, border: "none",
+              background: resendBusy ? "var(--ds-border)" : "var(--ds-gold)",
+              color: resendBusy ? "var(--ds-muted)" : "#1a1008",
+              fontSize: 13, fontWeight: 700, cursor: resendBusy ? "default" : "pointer",
+            }}
+          >
+            {resendBusy ? <Loader size={13} className="spin" /> : <History size={13} />}
+            Resend all
+          </button>
+        </div>
+        {resendResult?.ok && (
+          <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--ds-input-bg)", borderRadius: 7, fontSize: 12, color: "var(--ds-muted)", lineHeight: 1.6 }}>
+            {(resendResult.emails || []).map((r, i) => (
+              <div key={`e${i}`}>
+                <span style={{ color: r.status === "sent" ? "#16a34a" : "#dc2626", fontWeight: 700 }}>
+                  {r.status === "sent" ? "✓" : "✗"}
+                </span>{" "}
+                Email → {r.to}{r.error ? ` · ${r.error}` : ""}
+              </div>
+            ))}
+            {(resendResult.telegrams || []).map((r, i) => (
+              <div key={`t${i}`}>
+                <span style={{ color: r.status === "sent" ? "#16a34a" : r.status === "skipped" ? "#a16207" : "#dc2626", fontWeight: 700 }}>
+                  {r.status === "sent" ? "✓" : r.status === "skipped" ? "–" : "✗"}
+                </span>{" "}
+                Telegram → {r.to}{r.error ? ` · ${r.error}` : r.reason ? ` · ${r.reason}` : ""}
+              </div>
+            ))}
+            {(resendResult.emails?.length || 0) + (resendResult.telegrams?.length || 0) === 0 && (
+              <div style={{ fontStyle: "italic" }}>No recipients matched that channel.</div>
+            )}
+          </div>
+        )}
+        {resendResult?.ok === false && resendResult.error && (
+          <div style={{ marginTop: 12, padding: "10px 12px", background: "rgba(220,38,38,0.08)", borderRadius: 7, fontSize: 12, color: "#991b1b", fontWeight: 600 }}>
+            {resendResult.error}
+          </div>
+        )}
+      </Section>
 
       <Section title="Add recipient" icon={Plus}>
         <AddForm onAdd={handleAdd} saving={busy} />

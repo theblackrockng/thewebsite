@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Printer, ChefHat, RefreshCw, ArrowLeft } from "lucide-react";
+import { Printer, ChefHat, RefreshCw, ArrowLeft, Sun, Moon, Delete, X } from "lucide-react";
 import StaffLoginGate from "../components/StaffLoginGate";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
@@ -10,9 +10,9 @@ const EOD_ROLES = ["front_desk", "manager", "super_admin"];
 
 const GOLD = "#c8a96e";
 const BURGUNDY = "#7a1c1c";
-const T = {
-  bg: "#faf8f5", card: "#ffffff", border: "#e4dccd",
-  text: "#1a1a1a", muted: "#7a6f60", gold: GOLD, accent: BURGUNDY, onGold: "#1a1a1a",
+const THEMES = {
+  light: { bg: "#faf8f5", card: "#ffffff", cardHead: "#f3eee6", border: "#e4dccd", text: "#1a1a1a", muted: "#7a6f60", gold: GOLD, accent: BURGUNDY, onGold: "#1a1a1a", input: "#ffffff" },
+  dark:  { bg: "#1a1a1a", card: "#242220", cardHead: "#2c2926", border: "#3a352e", text: "#f5f0e8", muted: "#a89a84", gold: GOLD, accent: "#d05a5a", onGold: "#1a1a1a", input: "#2c2926" },
 };
 
 function lagosToday() {
@@ -33,6 +33,211 @@ function formatDateHeader(dateStr) {
   });
 }
 
+function escHtml(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+// Injects "Printed by: <name>" into the receipt HTML so the ticket shows who
+// ran the print. The marker is the "Printed:" line that buildEndOfDayHtml
+// always emits — we prepend our line to it.
+function stampPrintedBy(html, waiterName) {
+  if (!waiterName) return html;
+  const line = `<div class="dt">Printed by: ${escHtml(waiterName)}</div>`;
+  return html.replace('<div class="dt">Printed:', `${line}<div class="dt">Printed:`);
+}
+
+function WaiterPinModal({ open, onClose, onVerified, t }) {
+  const [waiters, setWaiters] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState(null);
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setSelected(null); setPin(""); setError(""); setVerifying(false);
+    setLoading(true);
+    (async () => {
+      try {
+        const res = await fetch("/api/waiter-profiles", { headers: await authHeader() });
+        const data = await res.json();
+        setWaiters(data.waiters || []);
+      } catch {
+        setWaiters([]);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [open]);
+
+  const verifyPin = useCallback(async (waiter, pinVal) => {
+    setVerifying(true);
+    setError("");
+    try {
+      const res = await fetch("/api/verify-waiter-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ id: waiter.id, pin: pinVal }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        onVerified(waiter.name);
+      } else {
+        setPin("");
+        setError(res.status === 429 ? (data.error || "Too many attempts.") : "Incorrect PIN. Try again.");
+      }
+    } catch {
+      setPin("");
+      setError("Connection error. Try again.");
+    } finally {
+      setVerifying(false);
+    }
+  }, [onVerified]);
+
+  function pressDigit(d) {
+    if (verifying || pin.length >= 4) return;
+    const next = pin + d;
+    setPin(next);
+    setError("");
+    if (next.length === 4) verifyPin(selected, next);
+  }
+
+  function backspace() {
+    if (verifying) return;
+    setPin((p) => p.slice(0, -1));
+    setError("");
+  }
+
+  if (!open) return null;
+
+  const overlayStyle = {
+    position: "fixed", inset: 0, zIndex: 2000,
+    background: "rgba(0,0,0,0.55)",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    padding: 20, fontFamily: "'DM Sans', 'Montserrat', sans-serif",
+  };
+  const cardStyle = {
+    width: "100%", maxWidth: selected ? 360 : 480,
+    background: t.card, border: `1px solid ${t.border}`,
+    borderRadius: 16, padding: "28px 24px",
+    display: "flex", flexDirection: "column", gap: 20,
+  };
+  const headerStyle = {
+    display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12,
+  };
+
+  if (!selected) {
+    return (
+      <div style={overlayStyle}>
+        <div style={cardStyle}>
+          <div style={headerStyle}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", color: t.gold, textTransform: "uppercase" }}>Authorise print</div>
+              <div style={{ fontSize: 20, fontWeight: 700, color: t.text, marginTop: 2 }}>Who's printing?</div>
+              <div style={{ fontSize: 13, color: t.muted, marginTop: 4 }}>Tap your name, then enter your PIN.</div>
+            </div>
+            <button onClick={onClose} aria-label="Cancel" style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 7, padding: 6, color: t.muted, cursor: "pointer", display: "flex" }}>
+              <X size={14} />
+            </button>
+          </div>
+          {loading ? (
+            <div style={{ textAlign: "center", color: t.muted, fontSize: 13, padding: "20px 0" }}>Loading…</div>
+          ) : waiters.length === 0 ? (
+            <div style={{ textAlign: "center", color: t.muted, fontSize: 13, padding: "20px 0", background: t.cardHead, borderRadius: 10, border: `1px solid ${t.border}` }}>
+              No waiter profiles set up yet.<br />
+              <span style={{ fontSize: 12, opacity: 0.75 }}>Ask a super admin to add waiter profiles in the console.</span>
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: 10 }}>
+              {waiters.map((w) => (
+                <button
+                  key={w.id}
+                  onClick={() => { setSelected(w); setPin(""); setError(""); }}
+                  style={{
+                    padding: "18px 10px", background: t.cardHead, border: `1px solid ${t.border}`,
+                    borderRadius: 10, color: t.text, fontSize: 14, fontWeight: 700, cursor: "pointer",
+                    fontFamily: "inherit", textAlign: "center",
+                  }}
+                >
+                  {w.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  const PAD = ["1","2","3","4","5","6","7","8","9","","0","⌫"];
+  return (
+    <div style={overlayStyle}>
+      <div style={cardStyle}>
+        <div style={headerStyle}>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "2px", color: t.gold, textTransform: "uppercase" }}>Enter PIN</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: t.text, marginTop: 2 }}>{selected.name}</div>
+          </div>
+          <button onClick={onClose} aria-label="Cancel" style={{ background: "transparent", border: `1px solid ${t.border}`, borderRadius: 7, padding: 6, color: t.muted, cursor: "pointer", display: "flex" }}>
+            <X size={14} />
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: 14, justifyContent: "center", padding: "4px 0" }}>
+          {[0,1,2,3].map((i) => (
+            <div
+              key={i}
+              style={{
+                width: 16, height: 16, borderRadius: "50%",
+                background: i < pin.length ? t.gold : "transparent",
+                border: `2px solid ${i < pin.length ? t.gold : t.border}`,
+                transition: "background 0.1s, border-color 0.1s",
+              }}
+            />
+          ))}
+        </div>
+        {error && (
+          <div style={{ background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.25)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "#991b1b", textAlign: "center" }}>
+            {error}
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
+          {PAD.map((key, idx) => {
+            if (key === "") return <div key={idx} />;
+            const isBack = key === "⌫";
+            return (
+              <button
+                key={idx}
+                onClick={() => isBack ? backspace() : pressDigit(key)}
+                disabled={verifying || (!isBack && pin.length >= 4)}
+                style={{
+                  height: 58, borderRadius: 10, border: `1px solid ${t.border}`,
+                  background: isBack ? "transparent" : t.cardHead,
+                  color: isBack ? t.muted : t.text,
+                  fontSize: isBack ? 16 : 20, fontWeight: 600,
+                  cursor: (verifying || (!isBack && pin.length >= 4)) ? "default" : "pointer",
+                  opacity: verifying ? 0.5 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "inherit",
+                }}
+              >
+                {isBack ? <Delete size={18} /> : key}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => { setSelected(null); setPin(""); setError(""); }}
+          style={{ background: "none", border: "none", color: t.muted, fontSize: 13, cursor: "pointer", fontFamily: "inherit", textAlign: "center", padding: "4px 0" }}
+        >
+          ← Back to waiter list
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function EodHistoryInner() {
   const todayStr = lagosToday();
   const [date, setDate] = useState(() => lagosYesterday());
@@ -42,7 +247,22 @@ function EodHistoryInner() {
   const [menuCategoryMap, setMenuCategoryMap] = useState(() => new Map());
   const [allPrintStatus, setAllPrintStatus] = useState(null);
   const [kitchenPrintStatus, setKitchenPrintStatus] = useState(null);
+  const [pinOpen, setPinOpen] = useState(false);
+  const pendingModeRef = useRef(null);
   const mountedRef = useRef(true);
+
+  const [isDark, setIsDark] = useState(() => {
+    try { return localStorage.getItem("blackrock-frontdesk-theme") === "dark"; } catch { return false; }
+  });
+  const t = THEMES[isDark ? "dark" : "light"];
+
+  function toggleTheme() {
+    setIsDark((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("blackrock-frontdesk-theme", next ? "dark" : "light"); } catch {}
+      return next;
+    });
+  }
 
   useEffect(() => {
     mountedRef.current = true;
@@ -103,17 +323,18 @@ function EodHistoryInner() {
     );
   }, [report, menuCategoryMap]);
 
-  async function printMode(mode) {
+  const doPrint = useCallback(async (mode, waiterName) => {
     if (!report) return;
     const setStatus = mode === "kitchen" ? setKitchenPrintStatus : setAllPrintStatus;
     setStatus("printing");
-    const html = buildEndOfDayHtml(
+    const baseHtml = buildEndOfDayHtml(
       report.completedOrders || [],
       menuCategoryMap,
       report.bookings || [],
       mode,
       report.date
     );
+    const html = stampPrintedBy(baseHtml, waiterName);
     try {
       if (window.electronAPI) {
         const result = await window.electronAPI.printReceipt(html);
@@ -134,6 +355,19 @@ function EodHistoryInner() {
       setStatus("error");
     }
     setTimeout(() => mountedRef.current && setStatus(null), 3000);
+  }, [report, menuCategoryMap]);
+
+  function requestPrint(mode) {
+    if (!report) return;
+    pendingModeRef.current = mode;
+    setPinOpen(true);
+  }
+
+  function onPinVerified(waiterName) {
+    const mode = pendingModeRef.current;
+    pendingModeRef.current = null;
+    setPinOpen(false);
+    if (mode) doPrint(mode, waiterName);
   }
 
   const sourceLabel = report
@@ -142,40 +376,44 @@ function EodHistoryInner() {
       : "Live computation (no archive yet for this date)"
     : "";
 
+  const pill = {
+    display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 14px",
+    borderRadius: 10, border: `1px solid ${t.border}`, background: t.card,
+    color: t.muted, textDecoration: "none", fontSize: 14, fontWeight: 600, cursor: "pointer",
+    fontFamily: "inherit",
+  };
+
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, color: T.text, padding: "28px 24px", fontFamily: "'Inter', system-ui, sans-serif" }}>
+    <div style={{ minHeight: "100vh", background: t.bg, color: t.text, padding: "28px 24px", fontFamily: "'DM Sans', 'Montserrat', sans-serif" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-            <Link
-              to="/front-desk-display"
-              style={{
-                display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 14px",
-                borderRadius: 10, border: `1px solid ${T.border}`, background: T.card,
-                color: T.muted, textDecoration: "none", fontSize: 14, fontWeight: 600,
-              }}
-            >
+            <Link to="/front-desk-display" style={{ ...pill, textDecoration: "none" }}>
               <ArrowLeft size={16} /> Back to Front Desk
             </Link>
             <div>
-              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: 1 }}>End of Day — History</div>
-              <div style={{ fontSize: 13, color: T.muted }}>Browse archived sales reports by date.</div>
+              <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: 1, color: t.text }}>End of Day — History</div>
+              <div style={{ fontSize: 13, color: t.muted }}>Browse archived sales reports by date.</div>
             </div>
           </div>
+          <button onClick={toggleTheme} style={pill} aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}>
+            {isDark ? <Sun size={16} /> : <Moon size={16} />} {isDark ? "Light" : "Dark"}
+          </button>
         </div>
 
-        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, padding: 18, marginBottom: 18 }}>
+        <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 14, padding: 18, marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
             <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span style={{ fontSize: 12, color: T.muted, fontWeight: 600, letterSpacing: 0.4 }}>REPORT DATE</span>
+              <span style={{ fontSize: 12, color: t.muted, fontWeight: 600, letterSpacing: 0.4 }}>REPORT DATE</span>
               <input
                 type="date"
                 value={date}
                 max={todayStr}
                 onChange={(e) => setDate(e.target.value)}
                 style={{
-                  padding: "10px 12px", borderRadius: 10, border: `1px solid ${T.border}`,
-                  background: "#fff", color: T.text, fontSize: 16, fontFamily: "inherit",
+                  padding: "10px 12px", borderRadius: 10, border: `1px solid ${t.border}`,
+                  background: t.input, color: t.text, fontSize: 16, fontFamily: "inherit",
+                  colorScheme: isDark ? "dark" : "light",
                 }}
               />
             </label>
@@ -183,23 +421,21 @@ function EodHistoryInner() {
               onClick={() => date && fetchReport(date)}
               disabled={loading || !date}
               style={{
-                display: "inline-flex", alignItems: "center", gap: 8, padding: "12px 18px",
-                borderRadius: 10, border: `1px solid ${T.border}`, background: T.card,
-                color: T.muted, fontSize: 14, fontWeight: 700, cursor: loading ? "default" : "pointer",
-                opacity: loading ? 0.6 : 1, alignSelf: "flex-end",
+                ...pill, alignSelf: "flex-end", padding: "12px 18px", fontWeight: 700,
+                opacity: loading ? 0.6 : 1, cursor: loading ? "default" : "pointer",
               }}
             >
               <RefreshCw size={16} /> {loading ? "Loading..." : "Reload"}
             </button>
             <div style={{ marginLeft: "auto", display: "flex", gap: 10, flexWrap: "wrap" }}>
               <button
-                onClick={() => printMode("all")}
+                onClick={() => requestPrint("all")}
                 disabled={!report || allPrintStatus === "printing"}
                 style={{
                   display: "flex", alignItems: "center", gap: 8, padding: "12px 18px", borderRadius: 10,
-                  border: `1.5px solid ${allPrintStatus === "error" ? T.accent : T.gold}`,
+                  border: `1.5px solid ${allPrintStatus === "error" ? t.accent : t.gold}`,
                   background: allPrintStatus === "ok" ? "rgba(200,169,110,0.10)" : "transparent",
-                  color: allPrintStatus === "error" ? T.accent : T.gold,
+                  color: allPrintStatus === "error" ? t.accent : t.gold,
                   fontSize: 14, fontWeight: 700, cursor: (!report || allPrintStatus === "printing") ? "default" : "pointer",
                   fontFamily: "inherit", opacity: (!report || allPrintStatus === "printing") ? 0.6 : 1,
                 }}
@@ -208,14 +444,14 @@ function EodHistoryInner() {
                 {allPrintStatus === "printing" ? "Printing..." : allPrintStatus === "ok" ? "Sent" : allPrintStatus === "error" ? "Failed" : "Print All"}
               </button>
               <button
-                onClick={() => printMode("kitchen")}
+                onClick={() => requestPrint("kitchen")}
                 disabled={!report || kitchenPrintStatus === "printing"}
                 title="Kitchen-only EOD: Main Kitchen + Grill Kitchen + Voided items"
                 style={{
                   display: "flex", alignItems: "center", gap: 8, padding: "12px 18px", borderRadius: 10,
-                  border: `1.5px solid ${kitchenPrintStatus === "error" ? T.accent : T.gold}`,
+                  border: `1.5px solid ${kitchenPrintStatus === "error" ? t.accent : t.gold}`,
                   background: kitchenPrintStatus === "ok" ? "rgba(200,169,110,0.10)" : "transparent",
-                  color: kitchenPrintStatus === "error" ? T.accent : T.gold,
+                  color: kitchenPrintStatus === "error" ? t.accent : t.gold,
                   fontSize: 14, fontWeight: 700, cursor: (!report || kitchenPrintStatus === "printing") ? "default" : "pointer",
                   fontFamily: "inherit", opacity: (!report || kitchenPrintStatus === "printing") ? 0.6 : 1,
                 }}
@@ -225,13 +461,13 @@ function EodHistoryInner() {
               </button>
             </div>
           </div>
-          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 13, color: T.muted }}>
-            <span style={{ fontWeight: 700, color: T.text }}>{formatDateHeader(date)}</span>
+          <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 13, color: t.muted }}>
+            <span style={{ fontWeight: 700, color: t.text }}>{formatDateHeader(date)}</span>
             {report && (
               <span style={{
                 padding: "4px 10px", borderRadius: 999, fontSize: 12, fontWeight: 700,
                 background: report.source === "archive" ? "rgba(200,169,110,0.15)" : "rgba(122,28,28,0.10)",
-                color: report.source === "archive" ? T.gold : T.accent,
+                color: report.source === "archive" ? t.gold : t.accent,
               }}>
                 {sourceLabel}
               </span>
@@ -242,15 +478,15 @@ function EodHistoryInner() {
         {error && (
           <div style={{
             background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.3)",
-            borderRadius: 12, padding: 14, color: "#991b1b", marginBottom: 18, fontWeight: 600,
+            borderRadius: 12, padding: 14, color: "#dc2626", marginBottom: 18, fontWeight: 600,
           }}>
             {error}
           </div>
         )}
 
-        <div style={{ background: T.card, border: `1px solid ${T.border}`, borderRadius: 14, overflow: "hidden" }}>
+        <div style={{ background: t.card, border: `1px solid ${t.border}`, borderRadius: 14, overflow: "hidden" }}>
           {loading && !report ? (
-            <div style={{ padding: 48, textAlign: "center", color: T.muted }}>Loading…</div>
+            <div style={{ padding: 48, textAlign: "center", color: t.muted }}>Loading…</div>
           ) : previewHtml ? (
             <iframe
               title="EOD preview"
@@ -258,12 +494,19 @@ function EodHistoryInner() {
               style={{ width: "100%", minHeight: 720, border: "none", background: "#fff" }}
             />
           ) : (
-            <div style={{ padding: 48, textAlign: "center", color: T.muted }}>
+            <div style={{ padding: 48, textAlign: "center", color: t.muted }}>
               {error ? "Could not load report." : "Pick a date to view the report."}
             </div>
           )}
         </div>
       </div>
+
+      <WaiterPinModal
+        open={pinOpen}
+        onClose={() => { pendingModeRef.current = null; setPinOpen(false); }}
+        onVerified={onPinVerified}
+        t={t}
+      />
     </div>
   );
 }

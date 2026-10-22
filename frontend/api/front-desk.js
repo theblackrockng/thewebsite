@@ -1370,6 +1370,130 @@ async function maybeRunMonthlyDigest(db, menuCategoryMap, recipients) {
   return { ran: true, purged: true, from: first, to: last, days: batch.length, results };
 }
 
+// Manual resend of an archived EOD report to all active recipients (or a
+// filtered subset). Called by the console's EOD Recipients page when the daily
+// cron missed a day, or the operator wants to send yesterday's figures again.
+// Super-admin / manager only. Expects POST { date, channels, recipient_id? }.
+async function eodResendHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, ['manager', 'super_admin']);
+  if (!staff) return;
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const body = req.body || {};
+  const date = typeof body.date === 'string' ? body.date : '';
+  if (!DATE_RE.test(date)) return res.status(400).json({ error: 'Pass date=YYYY-MM-DD.' });
+
+  const requested = Array.isArray(body.channels) ? body.channels : [];
+  const wantEmail = requested.includes('email');
+  const wantTelegram = requested.includes('telegram');
+  if (!wantEmail && !wantTelegram) return res.status(400).json({ error: 'Pick at least one channel.' });
+
+  const recipientId = typeof body.recipient_id === 'string' ? body.recipient_id : null;
+
+  const ip = getIP(req);
+  const { limited } = checkInMemoryRateLimit(ip, 'front-desk-eod-resend', 20, 60 * 60 * 1000);
+  if (limited) return res.status(429).json({ error: 'Too many resend attempts. Try again later.' });
+
+  const archiveRes = await db
+    .from('eod_archives')
+    .select('report_date, snapshot')
+    .eq('report_date', date)
+    .maybeSingle();
+  if (archiveRes.error) {
+    console.error('[eod-resend] archive lookup:', archiveRes.error);
+    return res.status(500).json({ error: 'Could not read archive.' });
+  }
+  if (!archiveRes.data) {
+    return res.status(404).json({ error: `No archived report for ${date}. The cron may not have run yet.` });
+  }
+  const completedOrders = archiveRes.data.snapshot.completedOrders || [];
+  const bookings = archiveRes.data.snapshot.bookings || [];
+
+  const menuRes = await db.from('menu_items').select('id, category').limit(2000);
+  if (menuRes.error) {
+    console.error('[eod-resend] menu:', menuRes.error);
+    return res.status(500).json({ error: 'Could not load menu.' });
+  }
+  const menuCategoryMap = new Map();
+  for (const row of (menuRes.data || [])) {
+    if (row.id && row.category) menuCategoryMap.set(row.id, row.category);
+  }
+
+  let recipientsQuery = db.from('eod_recipients').select('*').eq('active', true);
+  if (recipientId) recipientsQuery = recipientsQuery.eq('id', recipientId);
+  const recipientsRes = await recipientsQuery;
+  if (recipientsRes.error) {
+    console.error('[eod-resend] recipients:', recipientsRes.error);
+    return res.status(500).json({ error: 'Could not load recipients.' });
+  }
+  const recipients = recipientsRes.data || [];
+
+  const titleFor = (mode) => mode === 'kitchen' ? 'Kitchen End of Day' : 'End of Day Report';
+  const dateLabel = new Date(`${date}T12:00:00+01:00`)
+    .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Lagos' });
+
+  const emailResults = [];
+  const telegramResults = [];
+
+  for (const r of recipients) {
+    const mode = r.mode === 'kitchen' ? 'kitchen' : 'full';
+    if (r.kind === 'email' && wantEmail) {
+      try {
+        const bodyHtml = buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, date);
+        await sendBlackRockEmail({
+          to: r.value,
+          subject: `${titleFor(mode)} — ${dateLabel} (resent)`,
+          guestName: r.label || 'Team',
+          bodyHtml,
+          type: 'general',
+          preheader: `Resent sales summary for ${dateLabel}.`,
+        });
+        emailResults.push({ to: r.value, status: 'sent' });
+      } catch (err) {
+        emailResults.push({ to: r.value, status: 'failed', error: err?.message || String(err) });
+        console.error('[eod-resend] email failed:', r.value, err);
+      }
+    } else if (r.kind === 'telegram' && wantTelegram) {
+      if (!TOKEN) { telegramResults.push({ to: r.value, status: 'skipped', reason: 'no token' }); continue; }
+      const text = buildEodText(completedOrders, menuCategoryMap, bookings, mode, date);
+      try {
+        const tgRes = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: r.value, text, parse_mode: 'HTML' }),
+        });
+        if (!tgRes.ok) {
+          const errBody = await tgRes.text().catch(() => '');
+          telegramResults.push({ to: r.value, status: 'failed', error: `${tgRes.status} ${errBody.slice(0, 200)}` });
+          console.error('[eod-resend] telegram failed:', r.value, tgRes.status, errBody);
+        } else {
+          telegramResults.push({ to: r.value, status: 'sent' });
+        }
+      } catch (err) {
+        telegramResults.push({ to: r.value, status: 'failed', error: err?.message || String(err) });
+        console.error('[eod-resend] telegram error:', r.value, err);
+      }
+    }
+  }
+
+  return res.status(200).json({
+    ok: true,
+    date,
+    emails: emailResults,
+    telegrams: telegramResults,
+  });
+}
+
 module.exports = function handler(req, res) {
   const resource = req.query && req.query.resource;
   if (resource === 'orders') return ordersHandler(req, res);
@@ -1381,6 +1505,7 @@ module.exports = function handler(req, res) {
   if (resource === 'guesthouse-bookings') return guesthouseBookingsHandler(req, res);
   if (resource === 'eod') return eodHandler(req, res);
   if (resource === 'eod-cron') return eodCronHandler(req, res);
+  if (resource === 'eod-resend') return eodResendHandler(req, res);
   applySecurityHeaders(res);
   return res.status(400).json({ error: 'Unknown resource.' });
 };

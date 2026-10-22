@@ -183,6 +183,7 @@ function checkUserAgent(req) {
 const ALLOWED_ORIGINS = new Set([
   'https://blackrockrestaurantng.com',
   'https://www.blackrockrestaurantng.com',
+  'https://console.blackrockrestaurantng.com',
   'http://localhost:3000',
   'http://localhost:5173',
 ]);
@@ -201,7 +202,7 @@ function getCorsHeaders(req) {
   return {
     'Access-Control-Allow-Origin': allowedOrigin,
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 }
 
