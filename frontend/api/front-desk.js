@@ -1409,15 +1409,38 @@ async function eodResendHandler(req, res) {
     .select('report_date, snapshot')
     .eq('report_date', date)
     .maybeSingle();
-  if (archiveRes.error) {
-    console.error('[eod-resend] archive lookup:', archiveRes.error);
-    return res.status(500).json({ error: 'Could not read archive.' });
+  if (archiveRes.error) console.warn('[eod-resend] archive lookup (falling back to live):', archiveRes.error?.message || archiveRes.error);
+
+  let completedOrders;
+  let bookings;
+  let source;
+  if (archiveRes.data) {
+    completedOrders = archiveRes.data.snapshot.completedOrders || [];
+    bookings = archiveRes.data.snapshot.bookings || [];
+    source = 'archive';
+  } else {
+    const { start, end } = lagosDayBounds(date);
+    const [ordersRes, bookingsRes] = await Promise.all([
+      db.from('orders')
+        .select('*, order_items(*)')
+        .eq('order_status', 'completed')
+        .or(`completed_at.gte.${start},and(completed_at.is.null,created_at.gte.${start})`)
+        .or(`completed_at.lt.${end},and(completed_at.is.null,created_at.lt.${end})`)
+        .order('created_at', { ascending: false })
+        .limit(1000),
+      db.from('guest_room_bookings')
+        .select('*')
+        .gte('check_in_at', start)
+        .lt('check_in_at', end)
+        .order('check_in_at', { ascending: false })
+        .limit(500),
+    ]);
+    if (ordersRes.error) { console.error('[eod-resend] live orders:', ordersRes.error); return res.status(500).json({ error: 'Could not read orders for that date.' }); }
+    if (bookingsRes.error) { console.error('[eod-resend] live bookings:', bookingsRes.error); return res.status(500).json({ error: 'Could not read guest house bookings for that date.' }); }
+    completedOrders = ordersRes.data || [];
+    bookings = bookingsRes.data || [];
+    source = 'live';
   }
-  if (!archiveRes.data) {
-    return res.status(404).json({ error: `No archived report for ${date}. The cron may not have run yet.` });
-  }
-  const completedOrders = archiveRes.data.snapshot.completedOrders || [];
-  const bookings = archiveRes.data.snapshot.bookings || [];
 
   const menuRes = await db.from('menu_items').select('id, category').limit(2000);
   if (menuRes.error) {
@@ -1489,6 +1512,7 @@ async function eodResendHandler(req, res) {
   return res.status(200).json({
     ok: true,
     date,
+    source,
     emails: emailResults,
     telegrams: telegramResults,
   });

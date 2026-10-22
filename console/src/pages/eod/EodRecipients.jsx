@@ -462,7 +462,7 @@ export default function EodRecipients() {
         } else {
           notify(`Resent to ${sent}, ${failed} failed. See details below.`, false);
         }
-        setResendResult({ ok: true, emails, telegrams });
+        setResendResult({ ok: true, source: data.source, emails, telegrams });
       }
     } catch (err) {
       notify(err?.message || "Could not reach the server.", false);
@@ -498,8 +498,9 @@ export default function EodRecipients() {
 
       <Section title="Resend a past EOD report" icon={History}>
         <div style={{ fontSize: 12.5, color: "var(--ds-muted)", lineHeight: 1.5, marginBottom: 12 }}>
-          Pick an archived date and resend to every active recipient. Useful when
-          the 6am cron missed a day, or someone needs yesterday's figures again.
+          Pick a date and resend to every active recipient. If the 6am cron
+          already archived that day, the archived snapshot is used; otherwise
+          the report is computed live from orders and bookings for the date.
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 10, alignItems: "center" }}>
           <label style={{ fontSize: 12.5, color: "var(--ds-muted)" }}>Report date</label>
@@ -560,6 +561,11 @@ export default function EodRecipients() {
         </div>
         {resendResult?.ok && (
           <div style={{ marginTop: 12, padding: "10px 12px", background: "var(--ds-input-bg)", borderRadius: 7, fontSize: 12, color: "var(--ds-muted)", lineHeight: 1.6 }}>
+            {resendResult.source && (
+              <div style={{ marginBottom: 6, fontWeight: 700, color: resendResult.source === "archive" ? "#16a34a" : "#a16207" }}>
+                Source: {resendResult.source === "archive" ? "archived snapshot" : "live computation (no archive yet for this date)"}
+              </div>
+            )}
             {(resendResult.emails || []).map((r, i) => (
               <div key={`e${i}`}>
                 <span style={{ color: r.status === "sent" ? "#16a34a" : "#dc2626", fontWeight: 700 }}>
