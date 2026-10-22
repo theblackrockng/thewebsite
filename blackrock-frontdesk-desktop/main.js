@@ -275,6 +275,8 @@ ipcMain.handle('frontdesk:print-receipt', (_event, html) => new Promise((resolve
 
   const receipt = new BrowserWindow({
     show: false,
+    width: 480,
+    height: 1200,
     webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true },
   });
 
@@ -282,15 +284,19 @@ ipcMain.handle('frontdesk:print-receipt', (_event, html) => new Promise((resolve
 
   receipt.webContents.once('did-finish-load', async () => {
     try {
-      const heightPx = await receipt.webContents.executeJavaScript(
-        'Math.max(document.documentElement.scrollHeight, document.body.scrollHeight)'
+      await new Promise((r) => setTimeout(r, 120));
+      const measurement = await receipt.webContents.executeJavaScript(
+        '(() => { const b = document.body; const r = b.getBoundingClientRect(); return { height: Math.max(document.documentElement.scrollHeight, b.scrollHeight, Math.ceil(r.height)), width: Math.max(document.documentElement.scrollWidth, b.scrollWidth, Math.ceil(r.width)) }; })()'
       );
-      const heightMicrons = Math.ceil(heightPx * 264.583) + 5000;
+      const heightPx = measurement.height;
+      const widthPx = measurement.width;
+      const heightMicrons = Math.ceil(heightPx * 264.583) + 30000;
+      const widthMicrons = Math.max(80000, Math.ceil(widthPx * 264.583) + 2000);
       receipt.webContents.print(
         {
           silent: true,
           printBackground: false,
-          pageSize: { width: 80000, height: heightMicrons },
+          pageSize: { width: widthMicrons, height: heightMicrons },
           margins: { marginType: 'none' },
           scaleFactor: 100,
         },
