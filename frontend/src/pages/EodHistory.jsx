@@ -4,7 +4,7 @@ import { Printer, ChefHat, RefreshCw, ArrowLeft, Sun, Moon, Delete, X, RotateCcw
 import StaffLoginGate from "../components/StaffLoginGate";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
-import { buildEndOfDayHtml } from "./FrontDeskDisplay";
+import { buildEndOfDayHtml, applyPrintStyle, loadPrintStyle, DEFAULT_PRINT_STYLE, PRINT_STYLE_KEY, FONT_OPTIONS } from "./FrontDeskDisplay";
 
 const EOD_ROLES = ["front_desk", "manager", "super_admin"];
 
@@ -47,58 +47,6 @@ function stampPrintedBy(html, waiterName) {
   return html.replace('<div class="dt">Printed:', `${line}<div class="dt">Printed:`);
 }
 
-const DEFAULT_PRINT_STYLE = { fontSize: 9.5, fontFamily: "Courier New", pageWidth: 80 };
-const PRINT_STYLE_KEY = "blackrock-eod-print-style";
-const FONT_OPTIONS = [
-  { label: "Courier New (default)", value: "Courier New" },
-  { label: "Courier", value: "Courier" },
-  { label: "Consolas", value: "Consolas" },
-  { label: "Lucida Console", value: "Lucida Console" },
-  { label: "Menlo", value: "Menlo" },
-  { label: "Monaco", value: "Monaco" },
-  { label: "System monospace", value: "ui-monospace, SFMono-Regular, monospace" },
-];
-
-function loadPrintStyle() {
-  try {
-    const raw = localStorage.getItem(PRINT_STYLE_KEY);
-    if (!raw) return { ...DEFAULT_PRINT_STYLE };
-    const parsed = JSON.parse(raw);
-    return {
-      fontSize: Number(parsed.fontSize) || DEFAULT_PRINT_STYLE.fontSize,
-      fontFamily: parsed.fontFamily || DEFAULT_PRINT_STYLE.fontFamily,
-      pageWidth: Number(parsed.pageWidth) || DEFAULT_PRINT_STYLE.pageWidth,
-    };
-  } catch {
-    return { ...DEFAULT_PRINT_STYLE };
-  }
-}
-
-function applyPrintStyle(html, s) {
-  const base = DEFAULT_PRINT_STYLE.fontSize;
-  const scale = s.fontSize / base;
-  const r = (n) => (n * scale).toFixed(1);
-  const w = Math.max(56, Math.min(120, Number(s.pageWidth) || 80));
-  const ff = s.fontFamily.includes(",") ? s.fontFamily : `'${s.fontFamily}'`;
-  const override = `
-<style id="eod-print-override">
-@page{size:${w}mm auto;margin:0 !important}
-body{width:${w}mm !important;font-family:${ff},Courier,ui-monospace,monospace !important;font-size:${s.fontSize}pt !important}
-.brand{font-size:${r(17)}pt !important}
-.sub{font-size:${r(9)}pt !important}
-.rpt{font-size:${r(12)}pt !important}
-.dt{font-size:${r(9)}pt !important}
-.sec{font-size:${r(11)}pt !important}
-thead tr th{font-size:${r(8.5)}pt !important}
-tbody td{font-size:${r(9.5)}pt !important}
-.ssub td{font-size:${r(9.5)}pt !important}
-.grand td{font-size:${r(12)}pt !important}
-.smry{font-size:${r(9)}pt !important}
-.eor{font-size:${r(11)}pt !important}
-.foot{font-size:${r(8.5)}pt !important}
-</style>`;
-  return html.replace("</head>", `${override}</head>`);
-}
 
 function WaiterPinModal({ open, onClose, onVerified, t }) {
   const [waiters, setWaiters] = useState([]);

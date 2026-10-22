@@ -264,6 +264,66 @@ function esc(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+export const DEFAULT_PRINT_STYLE = { fontSize: 9.5, fontFamily: "Courier New", pageWidth: 80 };
+export const PRINT_STYLE_KEY = "blackrock-eod-print-style";
+export const FONT_OPTIONS = [
+  { label: "Courier New (default)", value: "Courier New" },
+  { label: "Courier", value: "Courier" },
+  { label: "Consolas", value: "Consolas" },
+  { label: "Lucida Console", value: "Lucida Console" },
+  { label: "Menlo", value: "Menlo" },
+  { label: "Monaco", value: "Monaco" },
+  { label: "System monospace", value: "ui-monospace, SFMono-Regular, monospace" },
+];
+
+export function loadPrintStyle() {
+  try {
+    const raw = localStorage.getItem(PRINT_STYLE_KEY);
+    if (!raw) return { ...DEFAULT_PRINT_STYLE };
+    const parsed = JSON.parse(raw);
+    return {
+      fontSize: Number(parsed.fontSize) || DEFAULT_PRINT_STYLE.fontSize,
+      fontFamily: parsed.fontFamily || DEFAULT_PRINT_STYLE.fontFamily,
+      pageWidth: Number(parsed.pageWidth) || DEFAULT_PRINT_STYLE.pageWidth,
+    };
+  } catch {
+    return { ...DEFAULT_PRINT_STYLE };
+  }
+}
+
+export function applyPrintStyle(html, style) {
+  const s = style || loadPrintStyle();
+  const base = DEFAULT_PRINT_STYLE.fontSize;
+  const scale = s.fontSize / base;
+  const r = (n) => (n * scale).toFixed(1);
+  const w = Math.max(56, Math.min(120, Number(s.pageWidth) || 80));
+  const ff = s.fontFamily.includes(",") ? s.fontFamily : `'${s.fontFamily}'`;
+  const override = `
+<style id="eod-print-override">
+@page{size:${w}mm auto;margin:0 !important}
+body{width:${w}mm !important;font-family:${ff},Courier,ui-monospace,monospace !important;font-size:${s.fontSize}pt !important}
+.brand{font-size:${r(17)}pt !important}
+.sub{font-size:${r(9)}pt !important}
+.rpt{font-size:${r(12)}pt !important}
+.dt{font-size:${r(9)}pt !important}
+.tbl{font-size:${r(12)}pt !important}
+.meta{font-size:${r(9)}pt !important}
+.sec{font-size:${r(11)}pt !important}
+thead tr th{font-size:${r(8.5)}pt !important}
+tbody td{font-size:${r(9.5)}pt !important}
+.item .nm,.item .pr{font-size:${r(10)}pt !important}
+.ssub td{font-size:${r(9.5)}pt !important}
+.tot td{font-size:${r(11.5)}pt !important}
+.grand td{font-size:${r(12)}pt !important}
+.smry{font-size:${r(9)}pt !important}
+.pay{font-size:${r(12)}pt !important}
+.bl,.bd{font-size:${r(9.5)}pt !important}
+.eor{font-size:${r(11)}pt !important}
+.foot{font-size:${r(8.5)}pt !important}
+</style>`;
+  return html.replace("</head>", `${override}</head>`);
+}
+
 function buildReceiptHtml(orders) {
   const now = new Date();
   const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Lagos' });
@@ -1264,7 +1324,7 @@ function FrontDeskMain({ onSessionLost }) {
   async function printEod(mode) {
     const setStatus = mode === "kitchen" ? setKitchenPrintStatus : setEodPrintStatus;
     setStatus("printing");
-    const html = buildEndOfDayHtml(completedOrders, menuCategoryMap, todayBookings, mode);
+    const html = applyPrintStyle(buildEndOfDayHtml(completedOrders, menuCategoryMap, todayBookings, mode));
     try {
       if (window.electronAPI) {
         const result = await window.electronAPI.printReceipt(html);
@@ -2626,7 +2686,7 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
 
   async function handlePrint() {
     setPrintStatus('printing');
-    const html = buildReceiptHtml(printOrders);
+    const html = applyPrintStyle(buildReceiptHtml(printOrders));
     try {
       if (window.electronAPI) {
         const result = await window.electronAPI.printReceipt(html);
