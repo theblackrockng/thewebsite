@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useMatch } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
   Image, FileEdit, Users, UserCircle, Settings, Home, Search,
-  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop, QrCode, TrendingUp,
+  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop, QrCode, TrendingUp, Mail,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -36,7 +36,7 @@ function useCurrentPage() {
     "/media": "Media Library", "/gallery": "Gallery", "/content": "Site Content", "/images": "Website Images", "/tables": "Tables & QR Codes", "/analytics": "Analytics",
     "/users": "Staff Management", "/content-hub": "Content Hub",
     "/settings": "Settings", "/blog": "Blog", "/security": "Security Log",
-    "/profile": "My Profile",
+    "/profile": "My Profile", "/eod-recipients": "EOD Recipients",
   };
   if (pathname.startsWith("/profile/")) return "Staff Profile";
   return map[pathname] ?? "Console";
@@ -77,8 +77,9 @@ const NAV_GROUPS = [
   {
     label: "System",
     items: [
-      { to: "/settings",  label: "Settings",     icon: Settings },
-      { to: "/security",  label: "Security Log",  icon: ShieldAlert, superAdminOnly: true },
+      { to: "/settings",        label: "Settings",       icon: Settings },
+      { to: "/eod-recipients",  label: "EOD Recipients", icon: Mail },
+      { to: "/security",        label: "Security Log",   icon: ShieldAlert, superAdminOnly: true },
     ],
   },
 ];

@@ -27,6 +27,7 @@ import SiteImages from "./pages/images/SiteImages";
 import Tables from "./pages/tables/Tables";
 import Analytics from "./pages/analytics/Analytics";
 import Search from "./pages/search/Search";
+import EodRecipients from "./pages/eod/EodRecipients";
 
 function NotSetUpScreen() {
   const { signOut } = useAuth();
@@ -165,6 +166,7 @@ function AppRoutes() {
       <Route path="/content-hub"        element={<ProtectedRoute><ContentHub /></ProtectedRoute>} />
       <Route path="/content-hub/asset/:id" element={<ProtectedRoute><AssetDetail /></ProtectedRoute>} />
       <Route path="/settings"              element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+      <Route path="/eod-recipients"        element={<ProtectedRoute><EodRecipients /></ProtectedRoute>} />
       <Route path="/blog"               element={<ProtectedRoute><BlogManagement /></ProtectedRoute>} />
       <Route path="/blog/:id"           element={<ProtectedRoute><BlogEditor /></ProtectedRoute>} />
       <Route path="/security"           element={<ProtectedRoute><SecurityLog /></ProtectedRoute>} />

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search, Lock, Trash2, Edit2, BedDouble, KeyRound, LogIn as LogInIcon, ChefHat } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search, Lock, Trash2, Edit2, BedDouble, KeyRound, LogIn as LogInIcon, ChefHat, History } from "lucide-react";
 import { MENU } from "../lib/data";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
@@ -358,19 +359,19 @@ function classifyEodSection(item, menuCategoryMap) {
   return "Main Kitchen";
 }
 
-function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mode) {
+export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mode, reportDate) {
   const kitchenOnly = mode === "kitchen";
   const paidOrders = (completedOrders || []).filter(
     (o) => o.order_status === "completed" && o.payment_status === "paid"
   );
   const now = new Date();
-  const dateStr = now.toLocaleDateString("en-GB", {
+  const refDate = reportDate ? new Date(`${reportDate}T12:00:00+01:00`) : now;
+  const dateStr = refDate.toLocaleDateString("en-GB", {
     weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Africa/Lagos",
   });
   const timeStr = now.toLocaleTimeString("en-NG", {
     hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Africa/Lagos",
   });
-  const todayLagos = now.toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
   const fmt = (n) => "₦" + Number(n || 0).toLocaleString("en-NG");
 
   const sectionAgg = {
@@ -461,12 +462,7 @@ function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mode) {
   }
 
   function guesthouseHtml(bookings) {
-    const todays = (bookings || []).filter((b) => {
-      const t = b.check_in_at || b.created_at;
-      if (!t) return false;
-      const d = new Date(t).toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
-      return d === todayLagos;
-    });
+    const todays = [...(bookings || [])];
     if (todays.length === 0) return "";
     todays.sort((a, b) => String(a.room_number || "").localeCompare(String(b.room_number || "")));
     let body = "";
@@ -500,12 +496,6 @@ function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mode) {
   const drinkTotal = [...sectionAgg["Drinks"].values()].reduce((s, r) => s + r.total, 0);
   const guesthousePaidTotal = (bookings || [])
     .filter((b) => b.payment_status === "paid")
-    .filter((b) => {
-      const t = b.check_in_at || b.created_at;
-      if (!t) return false;
-      const d = new Date(t).toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
-      return d === todayLagos;
-    })
     .reduce((s, b) => s + Number(b.total_amount || 0), 0);
   const grandTotal = foodTotal + (kitchenOnly ? 0 : drinkTotal + guesthousePaidTotal);
   const orderCount = paidOrders.length;
@@ -727,6 +717,7 @@ function FrontDeskMain({ onSessionLost }) {
   const [guesthouseLoaded, setGuesthouseLoaded] = useState(false);
   const [guesthouseActionIds, setGuesthouseActionIds] = useState(() => new Set());
   const [guesthouseError, setGuesthouseError] = useState("");
+  const [guesthousePinPrompt, setGuesthousePinPrompt] = useState(null);
   const guesthouseActiveCount = useMemo(
     () => guesthouseRooms.filter((r) => r.active_booking).length,
     [guesthouseRooms],
@@ -1005,25 +996,10 @@ function FrontDeskMain({ onSessionLost }) {
     } catch {}
   }, []);
 
-  async function promptGuesthousePin(forAction) {
-    const pin = window.prompt(`Enter guest house PIN to ${forAction}:`);
-    if (!pin) return null;
-    try {
-      const res = await apiRequest("/api/staff-login?action=verify-guesthouse-pin", "POST", { pin });
-      if (!res || res === "lost" || res === "offline") {
-        setGuesthouseError("Could not verify PIN. Please try again.");
-        return null;
-      }
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok || !json.token) {
-        setGuesthouseError(json.error || "Invalid PIN.");
-        return null;
-      }
-      return { token: json.token, authorized_by: json.authorized_by };
-    } catch {
-      setGuesthouseError("Could not verify PIN. Please try again.");
-      return null;
-    }
+  function promptGuesthousePin(forAction) {
+    return new Promise((resolve) => {
+      setGuesthousePinPrompt({ forAction, resolve });
+    });
   }
 
   async function checkInGuest(room, form) {
@@ -1905,6 +1881,19 @@ function FrontDeskMain({ onSessionLost }) {
           <ChefHat size={16} />
           {kitchenPrintStatus === "printing" ? "Printing..." : kitchenPrintStatus === "ok" ? "Sent to Printer" : kitchenPrintStatus === "error" ? "Print Failed" : "Kitchen Only"}
         </button>
+        <Link
+          to="/eod"
+          style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "14px 22px", borderRadius: 10,
+            border: `1px solid ${t.border}`, background: "transparent", color: t.muted,
+            fontSize: 15, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+            textDecoration: "none", flexShrink: 0,
+          }}
+          title="Browse archived EOD reports by date"
+        >
+          <History size={16} />
+          View History
+        </Link>
         <button
           onClick={handleTestPrint}
           disabled={testPrintStatus === "printing"}
@@ -1977,6 +1966,87 @@ function FrontDeskMain({ onSessionLost }) {
           onCancel={() => { const id = cancelTarget.id; setCancelTarget(null); cancelReservation(id); }}
         />
       )}
+
+      {guesthousePinPrompt && (
+        <GuesthousePinPrompt
+          t={t}
+          forAction={guesthousePinPrompt.forAction}
+          onClose={(result) => {
+            const { resolve } = guesthousePinPrompt;
+            setGuesthousePinPrompt(null);
+            resolve(result);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function GuesthousePinPrompt({ t, forAction, onClose }) {
+  const [pin, setPin] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState("");
+
+  async function verify() {
+    if (!/^\d{4,8}$/.test(pin)) { setError("Enter 4-8 digits."); return; }
+    setVerifying(true); setError("");
+    try {
+      const res = await fetch("/api/staff-login?action=verify-guesthouse-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.token) {
+        setError(data.error || "Invalid PIN.");
+        setVerifying(false);
+        setPin("");
+        return;
+      }
+      onClose({ token: data.token, authorized_by: data.authorized_by });
+    } catch {
+      setError("Could not reach the server.");
+      setVerifying(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1600 }}
+      onClick={() => !verifying && onClose(null)}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: t.card, borderRadius: 14, maxWidth: 380, width: "100%", border: `2px solid ${t.gold}`, padding: 22 }}
+      >
+        <div style={{ fontSize: 18, fontWeight: 800, color: t.text, marginBottom: 6 }}>Guest House PIN</div>
+        <div style={{ fontSize: 13, color: t.muted, marginBottom: 14 }}>
+          Enter the guest house PIN to {forAction}.
+        </div>
+        <input
+          type="password"
+          inputMode="numeric"
+          maxLength={8}
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          onKeyDown={(e) => { if (e.key === "Enter") verify(); }}
+          placeholder="PIN"
+          autoFocus
+          disabled={verifying}
+          style={{ width: "100%", padding: "12px 14px", background: t.input, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 18, letterSpacing: 6, textAlign: "center", outline: "none", fontFamily: "inherit", boxSizing: "border-box" }}
+        />
+        {error && (
+          <div style={{ marginTop: 10, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
+        )}
+        <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+          <button type="button" onClick={() => onClose(null)} disabled={verifying} style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, cursor: verifying ? "default" : "pointer", fontFamily: "inherit", fontSize: 13 }}>Cancel</button>
+          <button type="button" onClick={verify} disabled={verifying || !pin} style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: t.gold, color: t.onGold, fontWeight: 700, fontSize: 13, cursor: verifying || !pin ? "default" : "pointer", opacity: verifying || !pin ? 0.6 : 1, fontFamily: "inherit" }}>
+            {verifying ? "Verifying…" : "Unlock"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

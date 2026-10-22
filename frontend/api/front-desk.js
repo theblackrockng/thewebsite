@@ -14,6 +14,8 @@ const {
   checkCors,
 } = require('./_lib/security');
 const { requireStaff, verifyVoidToken, verifyGuesthouseToken } = require('./_lib/auth');
+const { sendBlackRockEmail } = require('./_lib/email');
+const { buildEodEmailHtml, buildEodText } = require('./_lib/eod-report');
 
 const ORDER_ROLES        = ['front_desk', 'manager'];
 const RESERVATION_ROLES  = ['front_desk', 'manager', 'super_admin'];
@@ -1091,6 +1093,214 @@ async function guesthouseBookingsHandler(req, res) {
   return res.status(405).json({ error: 'Method not allowed.' });
 }
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function lagosDayBounds(dateStr) {
+  const start = `${dateStr}T00:00:00+01:00`;
+  const d = new Date(start);
+  const end = new Date(d.getTime() + 24 * 60 * 60 * 1000).toISOString();
+  return { start: new Date(start).toISOString(), end };
+}
+
+async function eodHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, GUESTHOUSE_ROLES);
+  if (!staff) return;
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const ip = getIP(req);
+  const { blocked } = checkUserAgent(req);
+  if (blocked) return res.status(400).json({ error: 'Bad request.' });
+
+  const { limited } = checkInMemoryRateLimit(ip, 'front-desk-eod', 120, 60 * 60 * 1000);
+  if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+  const date = typeof req.query.date === 'string' ? req.query.date : '';
+  if (!DATE_RE.test(date)) return res.status(400).json({ error: 'Pass ?date=YYYY-MM-DD.' });
+
+  const archiveLookup = await db
+    .from('eod_archives')
+    .select('report_date, snapshot, created_at')
+    .eq('report_date', date)
+    .maybeSingle();
+
+  if (archiveLookup.data && !archiveLookup.error) {
+    return res.status(200).json({
+      ok: true,
+      date,
+      source: 'archive',
+      archived_at: archiveLookup.data.created_at,
+      completedOrders: archiveLookup.data.snapshot.completedOrders || [],
+      bookings: archiveLookup.data.snapshot.bookings || [],
+    });
+  }
+
+  const { start, end } = lagosDayBounds(date);
+
+  const ordersReq = db
+    .from('orders')
+    .select('*, order_items(*)')
+    .eq('order_status', 'completed')
+    .or(`completed_at.gte.${start},and(completed_at.is.null,created_at.gte.${start})`)
+    .or(`completed_at.lt.${end},and(completed_at.is.null,created_at.lt.${end})`)
+    .order('created_at', { ascending: false })
+    .limit(1000);
+
+  const bookingsReq = db
+    .from('guest_room_bookings')
+    .select('*')
+    .gte('check_in_at', start)
+    .lt('check_in_at', end)
+    .order('check_in_at', { ascending: false })
+    .limit(500);
+
+  const [{ data: orders, error: ordersErr }, { data: bookings, error: bookingsErr }] = await Promise.all([ordersReq, bookingsReq]);
+
+  if (ordersErr) {
+    console.error('[eod] orders error:', ordersErr);
+    return res.status(500).json({ error: 'Failed to load orders.' });
+  }
+  if (bookingsErr) {
+    console.error('[eod] bookings error:', bookingsErr);
+    return res.status(500).json({ error: 'Failed to load bookings.' });
+  }
+
+  return res.status(200).json({
+    ok: true,
+    date,
+    source: 'live',
+    completedOrders: orders || [],
+    bookings: bookings || [],
+  });
+}
+
+// 6am Lagos cron: builds yesterday's EOD, writes it to eod_archives, and
+// delivers it to every active row in eod_recipients. Authenticated via
+// Authorization: Bearer <CRON_SECRET> (Vercel cron auth).
+async function eodCronHandler(req, res) {
+  applySecurityHeaders(res);
+
+  const authz = req.headers.authorization || '';
+  if (!process.env.CRON_SECRET || authz !== `Bearer ${process.env.CRON_SECRET}`) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const reportDate = typeof req.query.date === 'string' && DATE_RE.test(req.query.date)
+    ? req.query.date
+    : yesterday.toLocaleDateString('en-CA', { timeZone: 'Africa/Lagos' });
+  const { start, end } = lagosDayBounds(reportDate);
+
+  const [ordersRes, bookingsRes, menuRes, recipientsRes] = await Promise.all([
+    db.from('orders')
+      .select('*, order_items(*)')
+      .eq('order_status', 'completed')
+      .or(`completed_at.gte.${start},and(completed_at.is.null,created_at.gte.${start})`)
+      .or(`completed_at.lt.${end},and(completed_at.is.null,created_at.lt.${end})`)
+      .order('created_at', { ascending: false })
+      .limit(1000),
+    db.from('guest_room_bookings')
+      .select('*')
+      .gte('check_in_at', start)
+      .lt('check_in_at', end)
+      .order('check_in_at', { ascending: false })
+      .limit(500),
+    db.from('menu_items').select('id, category').limit(2000),
+    db.from('eod_recipients').select('*').eq('active', true),
+  ]);
+
+  if (ordersRes.error)    { console.error('[eod-cron] orders:', ordersRes.error);    return res.status(500).json({ error: 'orders query failed' }); }
+  if (bookingsRes.error)  { console.error('[eod-cron] bookings:', bookingsRes.error); return res.status(500).json({ error: 'bookings query failed' }); }
+  if (menuRes.error)      { console.error('[eod-cron] menu:', menuRes.error);         return res.status(500).json({ error: 'menu query failed' }); }
+
+  const completedOrders = ordersRes.data || [];
+  const bookings = bookingsRes.data || [];
+  const menuCategoryMap = new Map();
+  for (const row of (menuRes.data || [])) {
+    if (row.id && row.category) menuCategoryMap.set(row.id, row.category);
+  }
+
+  const archive = await db.from('eod_archives').upsert({
+    report_date: reportDate,
+    snapshot: { completedOrders, bookings },
+    created_by: 'cron',
+  }, { onConflict: 'report_date' });
+  if (archive.error) console.error('[eod-cron] archive upsert:', archive.error);
+
+  const recipients = recipientsRes.error ? [] : (recipientsRes.data || []);
+  if (recipientsRes.error) console.error('[eod-cron] recipients query:', recipientsRes.error);
+
+  const emailResults = [];
+  const telegramResults = [];
+  const titleFor = (mode) => mode === 'kitchen' ? 'Kitchen End of Day' : 'End of Day Report';
+  const dateLabel = new Date(`${reportDate}T12:00:00+01:00`)
+    .toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Lagos' });
+
+  for (const r of recipients) {
+    const mode = r.mode === 'kitchen' ? 'kitchen' : 'full';
+    if (r.kind === 'email') {
+      try {
+        const bodyHtml = buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, reportDate);
+        await sendBlackRockEmail({
+          to: r.value,
+          subject: `${titleFor(mode)} — ${dateLabel}`,
+          guestName: r.label || 'Team',
+          bodyHtml,
+          type: 'general',
+          preheader: `Daily sales summary for ${dateLabel}.`,
+        });
+        emailResults.push({ to: r.value, status: 'sent' });
+      } catch (err) {
+        emailResults.push({ to: r.value, status: 'failed', error: err?.message || String(err) });
+        console.error('[eod-cron] email send failed:', r.value, err);
+      }
+    } else if (r.kind === 'telegram') {
+      if (!TOKEN) { telegramResults.push({ to: r.value, status: 'skipped', reason: 'no token' }); continue; }
+      const text = buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDate);
+      try {
+        const tgRes = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: r.value, text, parse_mode: 'HTML' }),
+        });
+        if (!tgRes.ok) {
+          const errBody = await tgRes.text().catch(() => '');
+          telegramResults.push({ to: r.value, status: 'failed', error: `${tgRes.status} ${errBody.slice(0, 200)}` });
+          console.error('[eod-cron] telegram failed:', r.value, tgRes.status, errBody);
+        } else {
+          telegramResults.push({ to: r.value, status: 'sent' });
+        }
+      } catch (err) {
+        telegramResults.push({ to: r.value, status: 'failed', error: err?.message || String(err) });
+        console.error('[eod-cron] telegram send failed:', r.value, err);
+      }
+    }
+  }
+
+  return res.status(200).json({
+    ok: true,
+    date: reportDate,
+    orders: completedOrders.length,
+    bookings: bookings.length,
+    archive: archive.error ? 'failed' : 'written',
+    emails: emailResults,
+    telegrams: telegramResults,
+  });
+}
+
 module.exports = function handler(req, res) {
   const resource = req.query && req.query.resource;
   if (resource === 'orders') return ordersHandler(req, res);
@@ -1100,6 +1310,8 @@ module.exports = function handler(req, res) {
   if (resource === 'add-items') return addItemsHandler(req, res);
   if (resource === 'guesthouse-rooms') return guesthouseRoomsHandler(req, res);
   if (resource === 'guesthouse-bookings') return guesthouseBookingsHandler(req, res);
+  if (resource === 'eod') return eodHandler(req, res);
+  if (resource === 'eod-cron') return eodCronHandler(req, res);
   applySecurityHeaders(res);
   return res.status(400).json({ error: 'Unknown resource.' });
 };

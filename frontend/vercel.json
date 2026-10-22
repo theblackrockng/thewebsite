@@ -15,6 +15,8 @@
     { "source": "/api/set-guesthouse-pin",      "destination": "/api/staff-login?action=set-guesthouse-pin" },
     { "source": "/api/front-desk-guesthouse-rooms",    "destination": "/api/front-desk?resource=guesthouse-rooms" },
     { "source": "/api/front-desk-guesthouse-bookings", "destination": "/api/front-desk?resource=guesthouse-bookings" },
+    { "source": "/api/eod",                             "destination": "/api/front-desk?resource=eod" },
+    { "source": "/api/eod-cron",                         "destination": "/api/front-desk?resource=eod-cron" },
     { "source": "/:path*",                       "destination": "/index.html" }
   ],
   "headers": [
@@ -58,6 +60,10 @@
     {
       "path": "/api/scheduled-emails",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/eod-cron",
+      "schedule": "0 5 * * *"
     }
   ]
 }
