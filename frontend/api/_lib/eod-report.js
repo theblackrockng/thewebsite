@@ -303,6 +303,130 @@ function buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDa
   return `<b>BLACKROCK — ${esc(title)}</b>\n${esc(dateStr)}\n${body}${totalBlock}`;
 }
 
+// 30-day consolidated digest. Called by the cron when 30+ snapshots have piled
+// up: builds one email-safe HTML page with a per-day section + a grand summary,
+// then the caller purges the included rows.
+// archives: [{ report_date, snapshot: { completedOrders, bookings } }, ...] sorted ascending by date.
+function buildEodMonthlyDigestHtml(archives, menuCategoryMap) {
+  const styles = {
+    wrap:   'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#1a1a1a;background:#faf8f5;padding:24px;max-width:720px;margin:0 auto',
+    card:   'background:#ffffff;border:1px solid #e4dccd;border-radius:12px;padding:24px;margin-bottom:16px',
+    h1:     'font-size:22px;letter-spacing:2px;font-weight:800;margin:0 0 4px;color:#1a1a1a',
+    sub:    'font-size:13px;color:#7a6f60;margin:0 0 20px',
+    overH:  'font-size:12px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#7a1c1c;margin:4px 0 10px',
+    overTbl:'width:100%;border-collapse:collapse;font-size:13px;margin-bottom:18px;background:#faf3e4;border:1px solid #e4dccd;border-radius:8px;overflow:hidden',
+    overTd: 'padding:10px 12px;color:#1a1a1a',
+    overTdR:'padding:10px 12px;color:#1a1a1a;text-align:right;font-weight:700;white-space:nowrap',
+    dayH:   'font-size:16px;font-weight:800;color:#1a1a1a;margin:28px 0 6px;padding-top:16px;border-top:2px solid #c8a96e',
+    dayMeta:'font-size:12px;color:#7a6f60;margin:0 0 10px',
+    tbl:    'width:100%;border-collapse:collapse;font-size:13px;margin-bottom:4px',
+    th:     'text-align:left;padding:7px 10px;background:#f3eee6;color:#7a6f60;font-size:11px;letter-spacing:0.4px;text-transform:uppercase;font-weight:700;border-bottom:1px solid #e4dccd',
+    thR:    'text-align:right;padding:7px 10px;background:#f3eee6;color:#7a6f60;font-size:11px;letter-spacing:0.4px;text-transform:uppercase;font-weight:700;border-bottom:1px solid #e4dccd',
+    td:     'padding:7px 10px;border-bottom:1px solid #f3eee6;color:#1a1a1a',
+    tdR:    'padding:7px 10px;border-bottom:1px solid #f3eee6;text-align:right;white-space:nowrap;color:#1a1a1a',
+    dayTot: 'padding:9px 10px;border-top:1px solid #c8a96e;background:#faf3e4;font-weight:800;color:#1a1a1a',
+    dayTotR:'padding:9px 10px;border-top:1px solid #c8a96e;background:#faf3e4;text-align:right;white-space:nowrap;font-weight:800;color:#1a1a1a',
+    quiet:  'padding:14px 0;color:#7a6f60;font-style:italic;font-size:12.5px',
+    foot:   'margin:20px 0 0;font-size:12px;color:#7a6f60;text-align:center',
+  };
+
+  function dayLabel(reportDate) {
+    const d = new Date(`${reportDate}T12:00:00+01:00`);
+    return d.toLocaleDateString('en-GB', {
+      weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Lagos',
+    });
+  }
+
+  const days = [];
+  let grandFood = 0, grandDrinks = 0, grandGuest = 0, grandOrders = 0, grandBookings = 0;
+
+  for (const a of (archives || [])) {
+    const snap = a.snapshot || {};
+    const completedOrders = snap.completedOrders || [];
+    const bookings = snap.bookings || [];
+    const { sectionAgg, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
+
+    const main  = [...sectionAgg['Main Kitchen'].values()].reduce((s, r) => s + r.total, 0);
+    const grill = [...sectionAgg['Grill Kitchen'].values()].reduce((s, r) => s + r.total, 0);
+    const drinks = [...sectionAgg['Drinks'].values()].reduce((s, r) => s + r.total, 0);
+    const guestPaid = (bookings || [])
+      .filter((b) => b.payment_status === 'paid')
+      .reduce((s, b) => s + Number(b.total_amount || 0), 0);
+    const foodTotal = main + grill;
+    const dayTotal = foodTotal + drinks + guestPaid;
+
+    grandFood += foodTotal;
+    grandDrinks += drinks;
+    grandGuest += guestPaid;
+    grandOrders += paidOrderCount;
+    grandBookings += bookings.length;
+
+    const quiet = foodTotal === 0 && drinks === 0 && guestPaid === 0;
+    days.push({
+      report_date: a.report_date,
+      label: dayLabel(a.report_date),
+      foodTotal, drinks, guestPaid, dayTotal, paidOrderCount, bookingCount: bookings.length, quiet,
+    });
+  }
+
+  const first = days[0]?.report_date;
+  const last  = days[days.length - 1]?.report_date;
+  const rangeLabel = (first && last)
+    ? `${dayLabel(first)} — ${dayLabel(last)}`
+    : (first || 'No archives');
+  const grandTotal = grandFood + grandDrinks + grandGuest;
+
+  const overview = `
+<div style="${styles.overH}">30-Day Summary</div>
+<table style="${styles.overTbl}">
+  <tr><td style="${styles.overTd}">Days covered</td><td style="${styles.overTdR}">${days.length}</td></tr>
+  <tr><td style="${styles.overTd}">Paid orders (food &amp; drink)</td><td style="${styles.overTdR}">${grandOrders}</td></tr>
+  <tr><td style="${styles.overTd}">Guest House bookings</td><td style="${styles.overTdR}">${grandBookings}</td></tr>
+  <tr><td style="${styles.overTd}">Food subtotal</td><td style="${styles.overTdR}">${esc(fmtNaira(grandFood))}</td></tr>
+  <tr><td style="${styles.overTd}">Drinks subtotal</td><td style="${styles.overTdR}">${esc(fmtNaira(grandDrinks))}</td></tr>
+  <tr><td style="${styles.overTd}">Guest House (paid)</td><td style="${styles.overTdR}">${esc(fmtNaira(grandGuest))}</td></tr>
+  <tr><td style="${styles.overTd};font-weight:800;font-size:14px">Grand total</td><td style="${styles.overTdR};font-size:15px">${esc(fmtNaira(grandTotal))}</td></tr>
+</table>`;
+
+  let perDay = '';
+  for (const d of days) {
+    if (d.quiet) {
+      perDay += `
+<div style="${styles.dayH}">${esc(d.label)}</div>
+<div style="${styles.quiet}">No completed sales recorded on this day.</div>`;
+      continue;
+    }
+    perDay += `
+<div style="${styles.dayH}">${esc(d.label)}</div>
+<div style="${styles.dayMeta}">${d.paidOrderCount} paid order${d.paidOrderCount !== 1 ? 's' : ''}${d.bookingCount ? ` &middot; ${d.bookingCount} booking${d.bookingCount !== 1 ? 's' : ''}` : ''}</div>
+<table style="${styles.tbl}">
+  <thead><tr><th style="${styles.th}">Line</th><th style="${styles.thR}">Total</th></tr></thead>
+  <tbody>
+    <tr><td style="${styles.td}">Food (Main + Grill)</td><td style="${styles.tdR}">${esc(fmtNaira(d.foodTotal))}</td></tr>
+    <tr><td style="${styles.td}">Drinks</td><td style="${styles.tdR}">${esc(fmtNaira(d.drinks))}</td></tr>
+    <tr><td style="${styles.td}">Guest House (paid)</td><td style="${styles.tdR}">${esc(fmtNaira(d.guestPaid))}</td></tr>
+    <tr><td style="${styles.dayTot}">Day total</td><td style="${styles.dayTotR}">${esc(fmtNaira(d.dayTotal))}</td></tr>
+  </tbody>
+</table>`;
+  }
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>BLACKROCK &middot; 30-Day Sales Summary</title></head>
+<body style="margin:0;background:#faf8f5">
+<div style="${styles.wrap}">
+  <div style="${styles.card}">
+    <h1 style="${styles.h1}">BLACKROCK</h1>
+    <p style="${styles.sub}">30-Day Sales Summary &middot; ${esc(rangeLabel)}</p>
+    ${overview}
+    ${perDay}
+  </div>
+  <div style="${styles.foot}">Daily snapshots for this period are now archived off the server. Keep this email for records.</div>
+</div>
+</body>
+</html>`;
+}
+
 module.exports = {
   EOD_MAIN_KITCHEN_CATEGORIES,
   EOD_GRILL_KITCHEN_CATEGORIES,
@@ -312,4 +436,5 @@ module.exports = {
   aggregateEod,
   buildEodEmailHtml,
   buildEodText,
+  buildEodMonthlyDigestHtml,
 };

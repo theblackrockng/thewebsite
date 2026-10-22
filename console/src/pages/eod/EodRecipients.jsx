@@ -312,7 +312,9 @@ export default function EodRecipients() {
           EOD Recipients
         </h1>
         <p style={{ fontSize: 13, color: "var(--ds-muted)", margin: 0 }}>
-          Who gets the 6am End of Day email and Telegram message. Changes take effect from the next cron run.
+          Who gets the 6am End of Day email and Telegram message. Email recipients also receive the
+          consolidated 30-day sales summary when the archive rolls over (Telegram is daily only).
+          Changes take effect from the next cron run.
         </p>
       </div>
 

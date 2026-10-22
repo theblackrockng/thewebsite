@@ -15,7 +15,7 @@ const {
 } = require('./_lib/security');
 const { requireStaff, verifyVoidToken, verifyGuesthouseToken } = require('./_lib/auth');
 const { sendBlackRockEmail } = require('./_lib/email');
-const { buildEodEmailHtml, buildEodText } = require('./_lib/eod-report');
+const { buildEodEmailHtml, buildEodText, buildEodMonthlyDigestHtml } = require('./_lib/eod-report');
 
 const ORDER_ROLES        = ['front_desk', 'manager'];
 const RESERVATION_ROLES  = ['front_desk', 'manager', 'super_admin'];
@@ -1290,6 +1290,11 @@ async function eodCronHandler(req, res) {
     }
   }
 
+  // Rolling 30-day digest + purge. When archives reach 30 rows, send a
+  // consolidated email to active email recipients, then delete those 30 rows.
+  // Email only — Telegram does not receive the monthly digest (user preference).
+  const digest = await maybeRunMonthlyDigest(db, menuCategoryMap, recipients);
+
   return res.status(200).json({
     ok: true,
     date: reportDate,
@@ -1298,7 +1303,71 @@ async function eodCronHandler(req, res) {
     archive: archive.error ? 'failed' : 'written',
     emails: emailResults,
     telegrams: telegramResults,
+    digest,
   });
+}
+
+async function maybeRunMonthlyDigest(db, menuCategoryMap, recipients) {
+  const countRes = await db
+    .from('eod_archives')
+    .select('report_date', { count: 'exact', head: true });
+  if (countRes.error) {
+    console.error('[eod-cron] digest count failed:', countRes.error);
+    return { ran: false, reason: 'count query failed' };
+  }
+  const total = countRes.count || 0;
+  if (total < 30) return { ran: false, reason: `only ${total}/30 archives` };
+
+  const batchRes = await db
+    .from('eod_archives')
+    .select('report_date, snapshot')
+    .order('report_date', { ascending: true })
+    .limit(30);
+  if (batchRes.error) {
+    console.error('[eod-cron] digest batch fetch failed:', batchRes.error);
+    return { ran: false, reason: 'batch query failed' };
+  }
+  const batch = batchRes.data || [];
+  if (batch.length === 0) return { ran: false, reason: 'empty batch' };
+
+  const html = buildEodMonthlyDigestHtml(batch, menuCategoryMap);
+  const first = batch[0].report_date;
+  const last  = batch[batch.length - 1].report_date;
+  const subjectLabel = `${first} → ${last}`;
+
+  const emailRecipients = recipients.filter((r) => r.kind === 'email' && r.active);
+  const results = [];
+  for (const r of emailRecipients) {
+    try {
+      await sendBlackRockEmail({
+        to: r.value,
+        subject: `BLACKROCK — 30-Day Sales Summary (${subjectLabel})`,
+        guestName: r.label || 'Team',
+        bodyHtml: html,
+        type: 'general',
+        preheader: `30-day consolidated sales summary covering ${subjectLabel}.`,
+      });
+      results.push({ to: r.value, status: 'sent' });
+    } catch (err) {
+      results.push({ to: r.value, status: 'failed', error: err?.message || String(err) });
+      console.error('[eod-cron] digest email failed:', r.value, err);
+    }
+  }
+
+  const anySent = results.some((r) => r.status === 'sent');
+  if (!anySent && emailRecipients.length > 0) {
+    return { ran: true, purged: false, reason: 'all email sends failed', results };
+  }
+
+  const purge = await db
+    .from('eod_archives')
+    .delete()
+    .lte('report_date', last);
+  if (purge.error) {
+    console.error('[eod-cron] digest purge failed:', purge.error);
+    return { ran: true, purged: false, from: first, to: last, results, error: purge.error.message };
+  }
+  return { ran: true, purged: true, from: first, to: last, days: batch.length, results };
 }
 
 module.exports = function handler(req, res) {

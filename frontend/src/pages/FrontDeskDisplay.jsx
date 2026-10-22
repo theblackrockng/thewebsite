@@ -3141,6 +3141,7 @@ function BarDeskCard({ order, t, now, busy, onUpdate }) {
 
 function GuestHouseView({ t, rooms, loaded, error, actionIds, onCheckIn, onCheckOut, onEncodeKey, onMarkPaid, onRefresh }) {
   const [checkInRoom, setCheckInRoom] = useState(null);
+  const [tab, setTab] = useState("rooms");
   const fmtN = (n) => "₦" + Number(n || 0).toLocaleString("en-NG");
 
   if (!loaded) {
@@ -3155,17 +3156,41 @@ function GuestHouseView({ t, rooms, loaded, error, actionIds, onCheckIn, onCheck
         </div>
       ) : null}
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "24px 0 16px" }}>
-        <div style={{ fontSize: 22, fontWeight: 800, color: t.text, display: "flex", alignItems: "center", gap: 12 }}>
-          <BedDouble size={26} style={{ color: t.gold }} /> Guest House
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "24px 0 16px", flexWrap: "wrap", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div style={{ fontSize: 22, fontWeight: 800, color: t.text, display: "flex", alignItems: "center", gap: 12 }}>
+            <BedDouble size={26} style={{ color: t.gold }} /> Guest House
+          </div>
+          <div style={{ display: "inline-flex", borderRadius: 10, border: `1px solid ${t.border}`, overflow: "hidden" }}>
+            <button
+              onClick={() => setTab("rooms")}
+              style={{ padding: "8px 16px", fontSize: 14, fontWeight: 700, background: tab === "rooms" ? t.gold : "transparent", color: tab === "rooms" ? t.onGold : t.text, border: "none", cursor: "pointer", fontFamily: "inherit" }}
+            >
+              Rooms
+            </button>
+            <button
+              onClick={() => setTab("history")}
+              style={{ padding: "8px 16px", fontSize: 14, fontWeight: 700, background: tab === "history" ? t.gold : "transparent", color: tab === "history" ? t.onGold : t.text, border: "none", borderLeft: `1px solid ${t.border}`, cursor: "pointer", fontFamily: "inherit", display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <History size={14} /> Guest History
+            </button>
+          </div>
         </div>
-        <button
-          onClick={onRefresh}
-          style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.card, color: t.text, cursor: "pointer", fontFamily: "inherit", fontSize: 15, fontWeight: 600 }}
-        >
-          <RefreshCw size={16} /> Refresh
-        </button>
+        {tab === "rooms" ? (
+          <button
+            onClick={onRefresh}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderRadius: 10, border: `1px solid ${t.border}`, background: t.card, color: t.text, cursor: "pointer", fontFamily: "inherit", fontSize: 15, fontWeight: 600 }}
+          >
+            <RefreshCw size={16} /> Refresh
+          </button>
+        ) : null}
       </div>
+
+      {tab === "history" ? (
+        <GuestHistoryPanel t={t} />
+      ) : (
+      <>
+      <div style={{ display: "none" }} />
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: 20 }}>
         {rooms.map((room) => {
@@ -3263,7 +3288,174 @@ function GuestHouseView({ t, rooms, loaded, error, actionIds, onCheckIn, onCheck
           onSubmit={async (form) => { await onCheckIn(checkInRoom, form); setCheckInRoom(null); }}
         />
       ) : null}
+      </>
+      )}
     </>
+  );
+}
+
+function GuestHistoryPanel({ t }) {
+  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    .toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+  const [from, setFrom] = useState(thirtyDaysAgo);
+  const [to, setTo] = useState(today);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [bookings, setBookings] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const fmtN = (n) => "₦" + Number(n || 0).toLocaleString("en-NG");
+
+  const load = useCallback(async () => {
+    setLoading(true); setErr("");
+    try {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      if (statusFilter) params.set("status", statusFilter);
+      const url = `/api/front-desk?resource=guesthouse-bookings&${params.toString()}`;
+      const res = await fetch(url, { headers: { ...(await authHeader()) } });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(json.error || "Could not load history."); setBookings([]); }
+      else setBookings(json.bookings || []);
+    } catch {
+      setErr("Could not reach the server.");
+    } finally {
+      setLoading(false);
+    }
+  }, [from, to, statusFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return bookings;
+    return bookings.filter((b) =>
+      (b.guest_name || "").toLowerCase().includes(q)
+      || (b.guest_phone || "").toLowerCase().includes(q)
+      || (b.guest_email || "").toLowerCase().includes(q)
+      || String(b.room_number || "").toLowerCase().includes(q)
+    );
+  }, [bookings, search]);
+
+  const stats = useMemo(() => {
+    const paid = filtered.filter((b) => b.payment_status === "paid");
+    return {
+      count: filtered.length,
+      paidRevenue: paid.reduce((s, b) => s + Number(b.total_amount || 0), 0),
+      unpaid: filtered.length - paid.length,
+    };
+  }, [filtered]);
+
+  const inputStyle = { padding: "9px 12px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.input, color: t.text, fontSize: 14, fontFamily: "inherit" };
+
+  function statusChip(b) {
+    const map = {
+      active:    { bg: "#16a34a", label: "Active" },
+      checked_out:{bg: "#6b7280", label: "Checked out" },
+      cancelled: { bg: "#991b1b", label: "Cancelled" },
+    };
+    const m = map[b.status] || { bg: "#6b7280", label: b.status || "—" };
+    return (
+      <span style={{ padding: "3px 9px", borderRadius: 6, fontSize: 11, fontWeight: 700, background: m.bg, color: "#fff" }}>{m.label}</span>
+    );
+  }
+
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    try {
+      return new Date(iso).toLocaleString("en-GB", { timeZone: "Africa/Lagos", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch { return iso; }
+  }
+
+  return (
+    <div>
+      <div style={{ background: t.card, borderRadius: 12, border: `1px solid ${t.border}`, padding: 16, marginBottom: 16 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: t.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>From</span>
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={inputStyle} />
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: t.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>To</span>
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={inputStyle} />
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: t.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>Status</span>
+            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} style={inputStyle}>
+              <option value="">All</option>
+              <option value="active">Active</option>
+              <option value="checked_out">Checked out</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </label>
+          <label style={{ display: "grid", gap: 4 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color: t.muted, textTransform: "uppercase", letterSpacing: "0.08em" }}>Search (name / phone / room)</span>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Type to filter…" style={inputStyle} />
+          </label>
+        </div>
+        <div style={{ marginTop: 12, display: "flex", gap: 24, flexWrap: "wrap", fontSize: 13, color: t.muted }}>
+          <span><strong style={{ color: t.text }}>{stats.count}</strong> booking{stats.count !== 1 ? "s" : ""}</span>
+          <span>Paid revenue: <strong style={{ color: t.gold }}>{fmtN(stats.paidRevenue)}</strong></span>
+          {stats.unpaid > 0 ? <span>Unpaid: <strong style={{ color: t.accent }}>{stats.unpaid}</strong></span> : null}
+        </div>
+      </div>
+
+      {err ? (
+        <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(220,38,38,0.1)", border: "1px solid rgba(220,38,38,0.4)", color: t.accent, fontSize: 14, marginBottom: 12 }}>
+          {err}
+        </div>
+      ) : null}
+
+      {loading ? (
+        <div style={{ textAlign: "center", padding: "40px 0", color: t.muted, fontSize: 15 }}>Loading history…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "40px 0", color: t.muted, fontSize: 15, fontStyle: "italic" }}>
+          No bookings found for this filter.
+        </div>
+      ) : (
+        <div style={{ background: t.card, borderRadius: 12, border: `1px solid ${t.border}`, overflow: "hidden" }}>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+              <thead>
+                <tr style={{ background: t.cardHead }}>
+                  <th style={{ textAlign: "left", padding: "10px 14px", color: t.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${t.border}` }}>Guest</th>
+                  <th style={{ textAlign: "left", padding: "10px 14px", color: t.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${t.border}` }}>Room</th>
+                  <th style={{ textAlign: "left", padding: "10px 14px", color: t.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${t.border}` }}>Check-in</th>
+                  <th style={{ textAlign: "left", padding: "10px 14px", color: t.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${t.border}` }}>Check-out</th>
+                  <th style={{ textAlign: "right", padding: "10px 14px", color: t.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${t.border}` }}>Nts</th>
+                  <th style={{ textAlign: "right", padding: "10px 14px", color: t.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${t.border}` }}>Total</th>
+                  <th style={{ textAlign: "left", padding: "10px 14px", color: t.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${t.border}` }}>Status</th>
+                  <th style={{ textAlign: "left", padding: "10px 14px", color: t.muted, fontSize: 12, textTransform: "uppercase", letterSpacing: "0.08em", borderBottom: `1px solid ${t.border}` }}>Pay</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((b) => (
+                  <tr key={b.id} style={{ borderBottom: `1px solid ${t.border}` }}>
+                    <td style={{ padding: "10px 14px", color: t.text }}>
+                      <div style={{ fontWeight: 700 }}>{b.guest_name || "—"}</div>
+                      {b.guest_phone ? <div style={{ fontSize: 12, color: t.muted }}>{b.guest_phone}</div> : null}
+                      {b.guest_email ? <div style={{ fontSize: 12, color: t.muted }}>{b.guest_email}</div> : null}
+                    </td>
+                    <td style={{ padding: "10px 14px", color: t.text, fontWeight: 700 }}>{b.room_number || "—"}</td>
+                    <td style={{ padding: "10px 14px", color: t.muted, fontSize: 13 }}>{fmtDate(b.check_in_at)}</td>
+                    <td style={{ padding: "10px 14px", color: t.muted, fontSize: 13 }}>{fmtDate(b.check_out_at)}</td>
+                    <td style={{ padding: "10px 14px", color: t.text, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{b.nights || "—"}</td>
+                    <td style={{ padding: "10px 14px", color: t.gold, textAlign: "right", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{fmtN(b.total_amount)}</td>
+                    <td style={{ padding: "10px 14px" }}>{statusChip(b)}</td>
+                    <td style={{ padding: "10px 14px", color: b.payment_status === "paid" ? "#16a34a" : t.accent, fontWeight: 700, fontSize: 12, textTransform: "uppercase" }}>
+                      {b.payment_status === "paid" ? "Paid" : "Unpaid"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
