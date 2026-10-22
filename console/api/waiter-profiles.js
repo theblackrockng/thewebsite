@@ -19,28 +19,36 @@ function validPin(pin) {
   return typeof pin === "string" && /^\d{4}$/.test(pin);
 }
 
+function resolveTable(req) {
+  const resource = (req.query?.resource || "").toString();
+  if (resource === "guesthouse-staff") {
+    return { table: "guesthouse_staff", responseKey: "staff", label: "guesthouse staff" };
+  }
+  return { table: "waiter_profiles", responseKey: "waiters", label: "waiter profile" };
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
   if (req.method === "OPTIONS") return res.status(200).end();
 
-  // GET — super_admin sees all (active + inactive); others see active only
+  const { table, responseKey, label } = resolveTable(req);
+
   if (req.method === "GET") {
     const staff = await requireStaff(req, res, "any");
     if (!staff) return;
     const isSuperAdmin = staff.profile.role === "super_admin";
     let query = supabase
-      .from("waiter_profiles")
+      .from(table)
       .select("id, name, active, created_at")
       .order("name", { ascending: true });
     if (!isSuperAdmin) query = query.eq("active", true);
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: "Failed to fetch waiter profiles." });
-    return res.status(200).json({ waiters: data || [] });
+    if (error) return res.status(500).json({ error: `Failed to fetch ${label} list.` });
+    return res.status(200).json({ [responseKey]: data || [] });
   }
 
-  // POST — create (super_admin only)
   if (req.method === "POST") {
     const staff = await requireStaff(req, res, ["super_admin"]);
     if (!staff) return;
@@ -53,15 +61,14 @@ export default async function handler(req, res) {
     }
     const salt = generateSalt();
     const { data, error } = await supabase
-      .from("waiter_profiles")
+      .from(table)
       .insert({ name: name.trim(), pin_hash: hashPin(salt, pin), pin_salt: salt, active: true })
       .select("id, name, active, created_at")
       .single();
-    if (error) return res.status(500).json({ error: "Failed to create waiter profile." });
-    return res.status(201).json({ ok: true, waiter: data });
+    if (error) return res.status(500).json({ error: `Failed to create ${label}.` });
+    return res.status(201).json({ ok: true, [table === "waiter_profiles" ? "waiter" : "staff"]: data });
   }
 
-  // PATCH — update (super_admin only)
   if (req.method === "PATCH") {
     const staff = await requireStaff(req, res, ["super_admin"]);
     if (!staff) return;
@@ -83,26 +90,25 @@ export default async function handler(req, res) {
     if (active !== undefined) updates.active = !!active;
     if (!Object.keys(updates).length) return res.status(400).json({ error: "Nothing to update." });
     const { data, error } = await supabase
-      .from("waiter_profiles")
+      .from(table)
       .update(updates)
       .eq("id", id)
       .select("id, name, active, created_at")
       .single();
-    if (error) return res.status(500).json({ error: "Failed to update waiter profile." });
-    return res.status(200).json({ ok: true, waiter: data });
+    if (error) return res.status(500).json({ error: `Failed to update ${label}.` });
+    return res.status(200).json({ ok: true, [table === "waiter_profiles" ? "waiter" : "staff"]: data });
   }
 
-  // DELETE — soft delete (super_admin only)
   if (req.method === "DELETE") {
     const staff = await requireStaff(req, res, ["super_admin"]);
     if (!staff) return;
     const { id } = req.body || {};
     if (!id) return res.status(400).json({ error: "id is required." });
     const { error } = await supabase
-      .from("waiter_profiles")
+      .from(table)
       .update({ active: false })
       .eq("id", id);
-    if (error) return res.status(500).json({ error: "Failed to deactivate waiter profile." });
+    if (error) return res.status(500).json({ error: `Failed to deactivate ${label}.` });
     return res.status(200).json({ ok: true });
   }
 

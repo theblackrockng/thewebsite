@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "../../lib/supabase";
 import { authHeader } from "../../lib/authHeader";
 import { useStaff } from "../../context/StaffContext";
-import { KeyRound, ShieldCheck, Users, Check, X } from "lucide-react";
+import { KeyRound, ShieldCheck, Users, Check, X, UserPlus, Trash2 } from "lucide-react";
 
 const IMPLICIT_ROLES = new Set(["super_admin", "manager", "front_desk"]);
 
@@ -308,6 +308,266 @@ function StaffPanel({ notify }) {
   );
 }
 
+function GuesthouseStaffPanel({ notify }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [editPin, setEditPin] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/waiter-profiles?resource=guesthouse-staff", {
+        headers: { ...(await authHeader()) },
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        notify(json.error || "Could not load guest house staff", false);
+        setRows([]);
+      } else {
+        setRows(json.staff || []);
+      }
+    } catch {
+      notify("Could not reach the server", false);
+      setRows([]);
+    }
+    setLoading(false);
+  }, [notify]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function createStaff() {
+    if (!newName.trim()) { notify("Enter a name", false); return; }
+    if (!/^\d{4}$/.test(newPin)) { notify("PIN must be exactly 4 digits", false); return; }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/waiter-profiles?resource=guesthouse-staff", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ name: newName.trim(), pin: newPin }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { notify(json.error || "Could not add staff", false); }
+      else { notify("Staff added"); setNewName(""); setNewPin(""); load(); }
+    } catch {
+      notify("Could not reach the server", false);
+    }
+    setBusy(false);
+  }
+
+  function startEdit(s) {
+    setEditingId(s.id);
+    setEditName(s.name);
+    setEditPin("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditName("");
+    setEditPin("");
+  }
+
+  async function saveEdit() {
+    const payload = { id: editingId };
+    if (editName.trim() && editName.trim() !== rows.find((r) => r.id === editingId)?.name) {
+      payload.name = editName.trim();
+    }
+    if (editPin) {
+      if (!/^\d{4}$/.test(editPin)) { notify("PIN must be exactly 4 digits", false); return; }
+      payload.pin = editPin;
+    }
+    if (!payload.name && !payload.pin) { cancelEdit(); return; }
+    setBusy(true);
+    try {
+      const res = await fetch("/api/waiter-profiles?resource=guesthouse-staff", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { notify(json.error || "Update failed", false); }
+      else { notify("Saved"); cancelEdit(); load(); }
+    } catch {
+      notify("Could not reach the server", false);
+    }
+    setBusy(false);
+  }
+
+  async function deactivate(s) {
+    if (!window.confirm(`Deactivate ${s.name}? They won't be able to authorize guest house actions anymore.`)) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/waiter-profiles?resource=guesthouse-staff", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ id: s.id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { notify(json.error || "Could not deactivate", false); }
+      else { notify("Deactivated"); load(); }
+    } catch {
+      notify("Could not reach the server", false);
+    }
+    setBusy(false);
+  }
+
+  async function reactivate(s) {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/waiter-profiles?resource=guesthouse-staff", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ id: s.id, active: true }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) { notify(json.error || "Could not reactivate", false); }
+      else { notify("Reactivated"); load(); }
+    } catch {
+      notify("Could not reach the server", false);
+    }
+    setBusy(false);
+  }
+
+  const activeCount = rows.filter((r) => r.active).length;
+
+  return (
+    <Section
+      title={`Guest house–only staff (${activeCount})`}
+      icon={UserPlus}
+      note="Lightweight profiles with just a name and a 4-digit PIN — no email, no console login. Use these for staff who only work in the guest house. Their PIN unlocks the same check-in, check-out, encode-key, and mark-paid actions as full staff PINs do."
+    >
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 120px auto", gap: 10, marginBottom: 16, paddingBottom: 16, borderBottom: "1px solid var(--ds-border)" }}>
+        <input
+          placeholder="Full name"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          style={inputStyle}
+        />
+        <input
+          type="password"
+          inputMode="numeric"
+          placeholder="4-digit PIN"
+          value={newPin}
+          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+          style={{ ...inputStyle, letterSpacing: "0.3em" }}
+        />
+        <button
+          type="button"
+          disabled={busy || !newName.trim() || newPin.length !== 4}
+          onClick={createStaff}
+          style={{
+            padding: "8px 16px", borderRadius: 7, border: "none",
+            background: "var(--ds-gold)", color: "#1a1008",
+            fontSize: 12, fontWeight: 700,
+            cursor: busy || !newName.trim() || newPin.length !== 4 ? "default" : "pointer",
+            opacity: busy || !newName.trim() || newPin.length !== 4 ? 0.5 : 1,
+            whiteSpace: "nowrap",
+          }}
+        >
+          Add staff
+        </button>
+      </div>
+
+      {loading ? (
+        <div style={{ padding: 24, textAlign: "center", color: "var(--ds-muted)" }}>Loading…</div>
+      ) : rows.length === 0 ? (
+        <div style={{ padding: 24, textAlign: "center", color: "var(--ds-muted)", fontStyle: "italic" }}>
+          No guest house–only staff yet.
+        </div>
+      ) : (
+        rows.map((s) => (
+          <div key={s.id} style={{
+            padding: "12px 0",
+            borderBottom: "1px solid var(--ds-border)",
+            display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 12,
+          }}>
+            {editingId === s.id ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 140px", gap: 8 }}>
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    placeholder="Name"
+                    style={inputStyle}
+                  />
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    placeholder="New PIN (optional)"
+                    value={editPin}
+                    onChange={(e) => setEditPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    style={{ ...inputStyle, letterSpacing: "0.3em" }}
+                  />
+                </div>
+                <div style={{ display: "inline-flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={saveEdit}
+                    style={{ padding: "6px 12px", borderRadius: 7, border: "none", background: "var(--ds-gold)", color: "#1a1008", fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={cancelEdit}
+                    style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid var(--ds-border)", background: "transparent", color: "var(--ds-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "var(--ds-text)" }}>{s.name}</div>
+                  <div style={{ fontSize: 12, color: s.active ? "#16a34a" : "var(--ds-muted)", fontWeight: 600 }}>
+                    {s.active ? "Active · PIN set" : "Deactivated"}
+                  </div>
+                </div>
+                <div style={{ display: "inline-flex", gap: 6 }}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => startEdit(s)}
+                    style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid var(--ds-border)", background: "transparent", color: "var(--ds-text)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                  >
+                    Edit
+                  </button>
+                  {s.active ? (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => deactivate(s)}
+                      style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid var(--ds-border)", background: "transparent", color: "#991b1b", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}
+                    >
+                      <Trash2 size={12} /> Deactivate
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => reactivate(s)}
+                      style={{ padding: "6px 12px", borderRadius: 7, border: "1px solid var(--ds-border)", background: "transparent", color: "#16a34a", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      Reactivate
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        ))
+      )}
+    </Section>
+  );
+}
+
 export default function Guesthouse() {
   const { profile } = useStaff();
   const role = profile?.role;
@@ -345,6 +605,8 @@ export default function Guesthouse() {
         <ShieldCheck size={14} style={{ color: "var(--ds-gold)" }} />
         <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ds-text)" }}>Staff &amp; PINs</span>
       </div>
+
+      <GuesthouseStaffPanel notify={notify} />
 
       <StaffPanel notify={notify} />
 

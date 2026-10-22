@@ -185,12 +185,23 @@ module.exports = async function handler(req, res) {
       .not('guesthouse_pin_hash', 'is', null)
       .not('guesthouse_pin_salt', 'is', null);
 
-    const authorized = (candidates || []).find((p) => {
+    let authorized = (candidates || []).find((p) => {
       if (!p.guesthouse_pin_hash || !p.guesthouse_pin_salt) return false;
       const permitted = p.role === 'super_admin' || p.role === 'manager' || p.role === 'front_desk' || p.role === 'guesthouse' || p.can_manage_guesthouse === true;
       if (!permitted) return false;
       return sha256Hex(p.guesthouse_pin_salt, pin) === p.guesthouse_pin_hash;
     });
+
+    if (!authorized) {
+      const { data: ghStaff } = await db
+        .from('guesthouse_staff')
+        .select('id, name, active, pin_hash, pin_salt')
+        .eq('active', true);
+      const match = (ghStaff || []).find((p) => p.pin_hash && p.pin_salt && sha256Hex(p.pin_salt, pin) === p.pin_hash);
+      if (match) {
+        authorized = { id: match.id, full_name: match.name };
+      }
+    }
 
     if (!authorized) {
       await logAndAlert({
