@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Printer, ChefHat, RefreshCw, ArrowLeft, Sun, Moon, Delete, X } from "lucide-react";
+import { Printer, ChefHat, RefreshCw, ArrowLeft, Sun, Moon, Delete, X, RotateCcw } from "lucide-react";
 import StaffLoginGate from "../components/StaffLoginGate";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
@@ -45,6 +45,59 @@ function stampPrintedBy(html, waiterName) {
   if (!waiterName) return html;
   const line = `<div class="dt">Printed by: ${escHtml(waiterName)}</div>`;
   return html.replace('<div class="dt">Printed:', `${line}<div class="dt">Printed:`);
+}
+
+const DEFAULT_PRINT_STYLE = { fontSize: 9.5, fontFamily: "Courier New", pageWidth: 80 };
+const PRINT_STYLE_KEY = "blackrock-eod-print-style";
+const FONT_OPTIONS = [
+  { label: "Courier New (default)", value: "Courier New" },
+  { label: "Courier", value: "Courier" },
+  { label: "Consolas", value: "Consolas" },
+  { label: "Lucida Console", value: "Lucida Console" },
+  { label: "Menlo", value: "Menlo" },
+  { label: "Monaco", value: "Monaco" },
+  { label: "System monospace", value: "ui-monospace, SFMono-Regular, monospace" },
+];
+
+function loadPrintStyle() {
+  try {
+    const raw = localStorage.getItem(PRINT_STYLE_KEY);
+    if (!raw) return { ...DEFAULT_PRINT_STYLE };
+    const parsed = JSON.parse(raw);
+    return {
+      fontSize: Number(parsed.fontSize) || DEFAULT_PRINT_STYLE.fontSize,
+      fontFamily: parsed.fontFamily || DEFAULT_PRINT_STYLE.fontFamily,
+      pageWidth: Number(parsed.pageWidth) || DEFAULT_PRINT_STYLE.pageWidth,
+    };
+  } catch {
+    return { ...DEFAULT_PRINT_STYLE };
+  }
+}
+
+function applyPrintStyle(html, s) {
+  const base = DEFAULT_PRINT_STYLE.fontSize;
+  const scale = s.fontSize / base;
+  const r = (n) => (n * scale).toFixed(1);
+  const w = Math.max(56, Math.min(120, Number(s.pageWidth) || 80));
+  const ff = s.fontFamily.includes(",") ? s.fontFamily : `'${s.fontFamily}'`;
+  const override = `
+<style id="eod-print-override">
+@page{size:${w}mm auto;margin:0 !important}
+body{width:${w}mm !important;font-family:${ff},Courier,ui-monospace,monospace !important;font-size:${s.fontSize}pt !important}
+.brand{font-size:${r(17)}pt !important}
+.sub{font-size:${r(9)}pt !important}
+.rpt{font-size:${r(12)}pt !important}
+.dt{font-size:${r(9)}pt !important}
+.sec{font-size:${r(11)}pt !important}
+thead tr th{font-size:${r(8.5)}pt !important}
+tbody td{font-size:${r(9.5)}pt !important}
+.ssub td{font-size:${r(9.5)}pt !important}
+.grand td{font-size:${r(12)}pt !important}
+.smry{font-size:${r(9)}pt !important}
+.eor{font-size:${r(11)}pt !important}
+.foot{font-size:${r(8.5)}pt !important}
+</style>`;
+  return html.replace("</head>", `${override}</head>`);
 }
 
 function WaiterPinModal({ open, onClose, onVerified, t }) {
@@ -256,6 +309,21 @@ function EodHistoryInner() {
   });
   const t = THEMES[isDark ? "dark" : "light"];
 
+  const [printStyle, setPrintStyle] = useState(() => loadPrintStyle());
+
+  const updatePrintStyle = useCallback((patch) => {
+    setPrintStyle((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem(PRINT_STYLE_KEY, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  const resetPrintStyle = useCallback(() => {
+    try { localStorage.removeItem(PRINT_STYLE_KEY); } catch {}
+    setPrintStyle({ ...DEFAULT_PRINT_STYLE });
+  }, []);
+
   function toggleTheme() {
     setIsDark((prev) => {
       const next = !prev;
@@ -314,14 +382,15 @@ function EodHistoryInner() {
 
   const previewHtml = useMemo(() => {
     if (!report) return "";
-    return buildEndOfDayHtml(
+    const base = buildEndOfDayHtml(
       report.completedOrders || [],
       menuCategoryMap,
       report.bookings || [],
       "all",
       report.date
     );
-  }, [report, menuCategoryMap]);
+    return applyPrintStyle(base, printStyle);
+  }, [report, menuCategoryMap, printStyle]);
 
   const doPrint = useCallback(async (mode, waiterName) => {
     if (!report) return;
@@ -334,7 +403,7 @@ function EodHistoryInner() {
       mode,
       report.date
     );
-    const html = stampPrintedBy(baseHtml, waiterName);
+    const html = applyPrintStyle(stampPrintedBy(baseHtml, waiterName), printStyle);
     try {
       if (window.electronAPI) {
         const result = await window.electronAPI.printReceipt(html);
@@ -355,7 +424,7 @@ function EodHistoryInner() {
       setStatus("error");
     }
     setTimeout(() => mountedRef.current && setStatus(null), 3000);
-  }, [report, menuCategoryMap]);
+  }, [report, menuCategoryMap, printStyle]);
 
   function requestPrint(mode) {
     if (!report) return;
@@ -472,6 +541,73 @@ function EodHistoryInner() {
                 {sourceLabel}
               </span>
             )}
+          </div>
+
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: t.muted, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", alignSelf: "center" }}>
+              Print style
+            </span>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 11, color: t.muted, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>Font size (pt)</span>
+              <input
+                type="number"
+                min={7}
+                max={14}
+                step={0.5}
+                value={printStyle.fontSize}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) updatePrintStyle({ fontSize: Math.max(7, Math.min(14, v)) });
+                }}
+                style={{
+                  width: 90, padding: "8px 10px", borderRadius: 10, border: `1px solid ${t.border}`,
+                  background: t.input, color: t.text, fontSize: 14, fontFamily: "inherit",
+                  colorScheme: isDark ? "dark" : "light",
+                }}
+              />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 11, color: t.muted, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>Font style</span>
+              <select
+                value={printStyle.fontFamily}
+                onChange={(e) => updatePrintStyle({ fontFamily: e.target.value })}
+                style={{
+                  padding: "8px 10px", borderRadius: 10, border: `1px solid ${t.border}`,
+                  background: t.input, color: t.text, fontSize: 14, fontFamily: "inherit",
+                  minWidth: 200, colorScheme: isDark ? "dark" : "light",
+                }}
+              >
+                {FONT_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 11, color: t.muted, fontWeight: 600, letterSpacing: 0.4, textTransform: "uppercase" }}>Page width (mm)</span>
+              <input
+                type="number"
+                min={58}
+                max={112}
+                step={1}
+                value={printStyle.pageWidth}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (Number.isFinite(v)) updatePrintStyle({ pageWidth: Math.max(58, Math.min(112, v)) });
+                }}
+                style={{
+                  width: 90, padding: "8px 10px", borderRadius: 10, border: `1px solid ${t.border}`,
+                  background: t.input, color: t.text, fontSize: 14, fontFamily: "inherit",
+                  colorScheme: isDark ? "dark" : "light",
+                }}
+              />
+            </label>
+            <button
+              onClick={resetPrintStyle}
+              style={{ ...pill, padding: "9px 14px", alignSelf: "flex-end" }}
+              title="Reset to default print style"
+            >
+              <RotateCcw size={14} /> Reset
+            </button>
           </div>
         </div>
 
