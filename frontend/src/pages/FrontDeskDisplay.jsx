@@ -1581,14 +1581,20 @@ function FrontDeskMain({ onSessionLost }) {
   }), [resLists, reservations, resToday]);
 
   const activeOrders = useMemo(() => orders.filter(hasActiveItems), [orders]);
+  const activeCompletedOrders = useMemo(() => completedOrders.filter(hasActiveItems), [completedOrders]);
+  const paidBookingsToday = useMemo(
+    () => (todayBookings || []).filter((b) => b.payment_status === "paid"),
+    [todayBookings]
+  );
+  const visibleCompletedCount = activeCompletedOrders.length + paidBookingsToday.length;
 
   const counts = useMemo(() => {
-    const c = { new: 0, confirmed: 0, preparing: 0, ready: 0, completed: completedCount };
+    const c = { new: 0, confirmed: 0, preparing: 0, ready: 0, completed: visibleCompletedCount };
     activeOrders.forEach((o) => {
       if (c[o.order_status] !== undefined && o.order_status !== "completed") c[o.order_status] += 1;
     });
     return c;
-  }, [activeOrders, completedCount]);
+  }, [activeOrders, visibleCompletedCount]);
 
   const paidToday = useMemo(() => {
     const orderSum = completedOrders
@@ -1604,8 +1610,8 @@ function FrontDeskMain({ onSessionLost }) {
     all: activeOrders.length,
     table: activeOrders.filter(isTableOrder).length,
     online: activeOrders.filter((o) => !isTableOrder(o)).length,
-    completed: completedCount,
-  }), [activeOrders, completedCount]);
+    completed: visibleCompletedCount,
+  }), [activeOrders, visibleCompletedCount]);
 
   const barOrders = useMemo(() =>
     orders
@@ -1620,15 +1626,23 @@ function FrontDeskMain({ onSessionLost }) {
 
   const visible = useMemo(() => {
     if (isCompletedTab) {
-      return completedOrders
-        .map((o) => ({ order: o, info: completionInfo(o) }))
-        .sort((a, b) => new Date(b.info.iso) - new Date(a.info.iso));
+      const orderItems = activeCompletedOrders.map((o) => {
+        const info = completionInfo(o);
+        return { type: "order", id: `o:${o.id}`, order: o, info, iso: info.iso };
+      });
+      const bookingItems = paidBookingsToday.map((b) => ({
+        type: "booking",
+        id: `b:${b.id}`,
+        booking: b,
+        iso: b.check_in_at || b.created_at || new Date().toISOString(),
+      }));
+      return [...orderItems, ...bookingItems].sort((a, b) => new Date(b.iso) - new Date(a.iso));
     }
     return activeOrders
       .filter((o) => (tab === "table" ? isTableOrder(o) : tab === "online" ? !isTableOrder(o) : true))
       .filter((o) => statusFilter ? o.order_status === statusFilter : true)
-      .map((o) => ({ order: o, info: null }));
-  }, [isCompletedTab, completedOrders, activeOrders, tab, statusFilter]);
+      .map((o) => ({ type: "order", id: `o:${o.id}`, order: o, info: null }));
+  }, [isCompletedTab, activeCompletedOrders, paidBookingsToday, activeOrders, tab, statusFilter]);
 
   const onReservations = view === "reservations";
   const onBar = view === "bar";
@@ -2005,22 +2019,28 @@ function FrontDeskMain({ onSessionLost }) {
         </div>
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))", gap: 20 }}>
-          {visible.map(({ order, info }) => (
-            <OrderCard
-              key={order.id}
-              order={order}
-              t={t}
-              now={now}
-              completion={info}
-              flashing={!isCompletedTab && flashIds.has(order.id)}
-              readyFlashing={!isCompletedTab && readyFlashIds.has(order.id)}
-              busy={actionIds.has(order.id)}
-              onConfirm={confirmOrder}
-              onComplete={completeOrder}
-              onPayment={setPayment}
-              otherTableOrders={orders.filter((o) => isTableOrder(o) && o.id !== order.id)}
-            />
-          ))}
+          {visible.map((item) => {
+            if (item.type === "booking") {
+              return <PaidRoomCard key={item.id} booking={item.booking} t={t} />;
+            }
+            const { order, info } = item;
+            return (
+              <OrderCard
+                key={order.id}
+                order={order}
+                t={t}
+                now={now}
+                completion={info}
+                flashing={!isCompletedTab && flashIds.has(order.id)}
+                readyFlashing={!isCompletedTab && readyFlashIds.has(order.id)}
+                busy={actionIds.has(order.id)}
+                onConfirm={confirmOrder}
+                onComplete={completeOrder}
+                onPayment={setPayment}
+                otherTableOrders={orders.filter((o) => isTableOrder(o) && o.id !== order.id)}
+              />
+            );
+          })}
         </div>
       )}
       </>
@@ -2653,6 +2673,43 @@ function AddItemsModal({ order, t, staffName, onClose }) {
               {submitting ? "Adding…" : "Add Items →"}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PaidRoomCard({ booking, t }) {
+  const roomNumber = booking.room_number || booking.guest_rooms?.room_number || "—";
+  const guestName = booking.guest_name || "Guest";
+  const nights = Number(booking.nights) || 1;
+  const total = Number(booking.total_amount) || 0;
+  const checkInIso = booking.check_in_at || booking.created_at;
+  const checkInLabel = checkInIso
+    ? new Date(checkInIso).toLocaleTimeString("en-NG", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Africa/Lagos" })
+    : "";
+  return (
+    <div style={{ background: t.card, border: `1px solid ${t.border}`, borderLeft: `4px solid ${t.gold}`, borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          <BedDouble size={24} style={{ color: t.gold }} />
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: t.text, lineHeight: 1.1 }}>Room {roomNumber}</div>
+            <div style={{ fontSize: 13, color: t.muted, marginTop: 4, fontWeight: 600 }}>Guest House · {nights} night{nights === 1 ? "" : "s"}</div>
+          </div>
+        </div>
+        <div style={{ background: "rgba(34,197,94,0.14)", color: "#22c55e", padding: "5px 12px", borderRadius: 999, fontSize: 12, fontWeight: 700, letterSpacing: 0.5 }}>
+          PAID
+        </div>
+      </div>
+      <div style={{ fontSize: 15, color: t.text, fontWeight: 600 }}>{guestName}</div>
+      {checkInLabel ? (
+        <div style={{ fontSize: 13, color: t.muted }}>Checked in {checkInLabel}</div>
+      ) : null}
+      <div style={{ borderTop: `1px solid ${t.border}`, paddingTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontSize: 13, color: t.muted, fontWeight: 600 }}>Total</div>
+        <div style={{ fontSize: 22, fontWeight: 800, color: t.gold, fontVariantNumeric: "tabular-nums" }}>
+          ₦{total.toLocaleString()}
         </div>
       </div>
     </div>
