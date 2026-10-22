@@ -1100,8 +1100,7 @@ function FrontDeskMain({ onSessionLost }) {
 
   async function checkOutGuest(room) {
     if (!room.active_booking) return;
-    if (!window.confirm(`Check out ${room.active_booking.guest_name} from room ${room.room_number}?`)) return;
-    const auth = await promptGuesthousePin("check out");
+    const auth = await promptGuesthousePin(`check out ${room.active_booking.guest_name} from room ${room.room_number}`);
     if (!auth) return;
     setGuesthouseActionIds((prev) => new Set(prev).add(room.id));
     setGuesthouseError("");
