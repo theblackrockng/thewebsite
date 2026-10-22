@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useMatch } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
   Image, FileEdit, Users, UserCircle, Settings, Home, Search,
-  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop, QrCode, TrendingUp, Mail,
+  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop, QrCode, TrendingUp, Mail, BedDouble,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -37,6 +37,7 @@ function useCurrentPage() {
     "/users": "Staff Management", "/content-hub": "Content Hub",
     "/settings": "Settings", "/blog": "Blog", "/security": "Security Log",
     "/profile": "My Profile", "/eod-recipients": "EOD Recipients",
+    "/guesthouse": "Guest House",
   };
   if (pathname.startsWith("/profile/")) return "Staff Profile";
   return map[pathname] ?? "Console";
@@ -78,6 +79,7 @@ const NAV_GROUPS = [
     label: "System",
     items: [
       { to: "/settings",        label: "Settings",       icon: Settings },
+      { to: "/guesthouse",      label: "Guest House",    icon: BedDouble, managerOrAbove: true },
       { to: "/eod-recipients",  label: "EOD Recipients", icon: Mail },
       { to: "/security",        label: "Security Log",   icon: ShieldAlert, superAdminOnly: true },
     ],
@@ -190,6 +192,7 @@ function SidebarContent({ pathname, pendingCount, newEnqCount, newOrdersCount, s
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               {group.items
                 .filter(item => !item.superAdminOnly || staffProfile?.role === 'super_admin')
+                .filter(item => !item.managerOrAbove || staffProfile?.role === 'super_admin' || staffProfile?.role === 'manager')
                 .filter(item => {
                   if (!item.permKey) return true;
                   if (staffProfile?.role === 'super_admin') return true;

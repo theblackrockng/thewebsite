@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../../lib/supabase";
 import { useStaff } from "../../context/StaffContext";
-import { Mail, Send, Plus, Trash2, Loader, Check, X } from "lucide-react";
+import { Mail, Send, Plus, Trash2, Loader, Check, X, Pencil } from "lucide-react";
 
 const MODES = [
   { value: "full",    label: "Full report" },
@@ -157,11 +157,104 @@ function AddForm({ onAdd, saving }) {
   );
 }
 
-function RecipientRow({ r, onToggle, onDelete, busy }) {
+function RecipientRow({ r, onToggle, onDelete, onSave, busy }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(r.value || "");
+  const [label, setLabel] = useState(r.label || "");
+  const [phone, setPhone] = useState(r.phone || "");
+  const [mode, setMode] = useState(r.mode || "full");
+  const [saving, setSaving] = useState(false);
+
+  function openEdit() {
+    setValue(r.value || "");
+    setLabel(r.label || "");
+    setPhone(r.phone || "");
+    setMode(r.mode || "full");
+    setEditing(true);
+  }
+
+  function cancelEdit() {
+    setEditing(false);
+  }
+
+  async function saveEdit() {
+    const v = value.trim();
+    if (!v) { alert("Value is required."); return; }
+    if (r.kind === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+      alert("Enter a valid email address.");
+      return;
+    }
+    if (r.kind === "telegram" && !/^-?\d+$/.test(v)) {
+      alert("Telegram chat_id must be numeric.");
+      return;
+    }
+    setSaving(true);
+    const ok = await onSave(r, {
+      value: v,
+      label: label.trim() || null,
+      phone: r.kind === "telegram" ? (phone.trim() || null) : null,
+      mode,
+    });
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div style={{
+        display: "grid", gap: 8, padding: "14px 12px",
+        borderBottom: "1px solid var(--ds-border)",
+        background: "var(--ds-input-bg)", borderRadius: 7, marginBottom: 2,
+      }}>
+        <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 10, alignItems: "center" }}>
+          <label style={{ fontSize: 12, color: "var(--ds-muted)" }}>
+            {r.kind === "email" ? "Email" : "Chat ID"}
+          </label>
+          <input value={value} onChange={(e) => setValue(e.target.value)} style={inputStyle} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 10, alignItems: "center" }}>
+          <label style={{ fontSize: 12, color: "var(--ds-muted)" }}>Label</label>
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Chef Pius" style={inputStyle} />
+        </div>
+        {r.kind === "telegram" && (
+          <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 10, alignItems: "center" }}>
+            <label style={{ fontSize: 12, color: "var(--ds-muted)" }}>Phone</label>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+234…" style={inputStyle} />
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 10, alignItems: "center" }}>
+          <label style={{ fontSize: 12, color: "var(--ds-muted)" }}>Mode</label>
+          <select value={mode} onChange={(e) => setMode(e.target.value)} style={inputStyle}>
+            {MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginTop: 4 }}>
+          <button
+            type="button"
+            onClick={cancelEdit}
+            disabled={saving}
+            style={{ padding: "6px 14px", borderRadius: 7, border: "1px solid var(--ds-border)", background: "transparent", color: "var(--ds-muted)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={saveEdit}
+            disabled={saving || !value.trim()}
+            style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "6px 14px", borderRadius: 7, border: "none", background: "var(--ds-gold)", color: "#1a1008", fontSize: 12, fontWeight: 700, cursor: saving ? "default" : "pointer", opacity: !value.trim() ? 0.5 : 1 }}
+          >
+            {saving ? <Loader size={12} className="spin" /> : <Check size={12} />}
+            Save
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       display: "grid",
-      gridTemplateColumns: "90px 1fr 110px 90px 32px",
+      gridTemplateColumns: "90px 1fr 110px 90px 32px 32px",
       alignItems: "center", gap: 10, padding: "10px 0",
       borderBottom: "1px solid var(--ds-border)",
     }}>
@@ -202,6 +295,20 @@ function RecipientRow({ r, onToggle, onDelete, busy }) {
           {r.active ? "Active" : "Paused"}
         </button>
       </div>
+      <button
+        type="button"
+        onClick={openEdit}
+        disabled={busy}
+        title="Edit recipient"
+        style={{
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          width: 28, height: 28, borderRadius: 7,
+          border: "1px solid var(--ds-border)", background: "transparent",
+          color: "var(--ds-text)", cursor: busy ? "default" : "pointer",
+        }}
+      >
+        <Pencil size={13} />
+      </button>
       <button
         type="button"
         onClick={() => onDelete(r)}
@@ -294,6 +401,22 @@ export default function EodRecipients() {
     load();
   }
 
+  async function handleSave(r, patch) {
+    setBusy(true);
+    const { error } = await supabase
+      .from("eod_recipients")
+      .update(patch)
+      .eq("id", r.id);
+    setBusy(false);
+    if (error) {
+      notify(error.code === "23505" ? "Another recipient already uses that value." : error.message, false);
+      return false;
+    }
+    notify("Recipient updated");
+    load();
+    return true;
+  }
+
   if (!authorized) {
     return (
       <div style={{ padding: 24, color: "var(--ds-muted)" }}>
@@ -337,7 +460,7 @@ export default function EodRecipients() {
           </div>
         ) : (
           emailRows.map((r) => (
-            <RecipientRow key={r.id} r={r} onToggle={handleToggle} onDelete={handleDelete} busy={busy} />
+            <RecipientRow key={r.id} r={r} onToggle={handleToggle} onDelete={handleDelete} onSave={handleSave} busy={busy} />
           ))
         )}
       </Section>
@@ -351,7 +474,7 @@ export default function EodRecipients() {
           </div>
         ) : (
           telegramRows.map((r) => (
-            <RecipientRow key={r.id} r={r} onToggle={handleToggle} onDelete={handleDelete} busy={busy} />
+            <RecipientRow key={r.id} r={r} onToggle={handleToggle} onDelete={handleDelete} onSave={handleSave} busy={busy} />
           ))
         )}
       </Section>
