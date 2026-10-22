@@ -1584,12 +1584,15 @@ function FrontDeskMain({ onSessionLost }) {
     return c;
   }, [orders, completedCount]);
 
-  const paidToday = useMemo(() =>
-    completedOrders
+  const paidToday = useMemo(() => {
+    const orderSum = completedOrders
       .filter((o) => o.payment_status === "paid")
-      .reduce((s, o) => s + (Number(o.total) || 0), 0),
-    [completedOrders]
-  );
+      .reduce((s, o) => s + (Number(o.total) || 0), 0);
+    const bookingSum = (todayBookings || [])
+      .filter((b) => b.payment_status === "paid")
+      .reduce((s, b) => s + (Number(b.total_amount) || 0), 0);
+    return orderSum + bookingSum;
+  }, [completedOrders, todayBookings]);
 
   const tabCounts = useMemo(() => ({
     all: orders.length,
@@ -1887,7 +1890,7 @@ function FrontDeskMain({ onSessionLost }) {
         >
           <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: t.muted }}>Amount Made Today</div>
           <div style={{ fontSize: 28, fontWeight: 800, color: "#16a34a", lineHeight: 1.1, fontVariantNumeric: "tabular-nums", marginTop: 4 }}>{fmtPrice(paidToday)}</div>
-          <div style={{ fontSize: 12, color: t.muted, marginTop: 6 }}>Completed + Paid</div>
+          <div style={{ fontSize: 12, color: t.muted, marginTop: 6 }}>Completed orders + paid rooms</div>
         </div>
       </div>
 
