@@ -337,6 +337,8 @@ function buildReceiptHtml(orders) {
   const anyPaid = orders.some((o) => o.payment_status === 'paid');
   const payLabel = anyPaid ? 'PAID' : 'PENDING';
   const grandTotal = orders.reduce((s, o) => s + (Number(o.total) || 0), 0);
+  const totalDiscount = orders.reduce((s, o) => s + (Number(o.discount_amount) || 0), 0);
+  const grossBeforeDiscount = grandTotal + totalDiscount;
   const fmtN = (n) => '₦' + Number(n || 0).toLocaleString('en-NG');
 
   let rows = '';
@@ -348,6 +350,21 @@ function buildReceiptHtml(orders) {
       if (item.modifiers) rows += `<tr class="mod"><td colspan="2">${esc(item.modifiers)}</td></tr>`;
     }
     if (isMulti) rows += `<tr class="gap"><td colspan="2"></td></tr>`;
+  }
+
+  let discountSection = '';
+  if (totalDiscount > 0) {
+    const discountLabels = orders
+      .filter((o) => Number(o.discount_amount) > 0)
+      .map((o) => {
+        const parts = [];
+        if (o.discount_by_name) parts.push(`by ${o.discount_by_name}`);
+        if (o.discount_reason) parts.push(o.discount_reason);
+        return parts.length ? parts.join(' · ') : '';
+      })
+      .filter(Boolean);
+    discountSection = `<tr class="ssub"><td>Subtotal</td><td class="pr">${esc(fmtN(grossBeforeDiscount))}</td></tr>
+<tr class="dsc"><td>Discount${discountLabels.length ? ` (${esc(discountLabels[0])})` : ''}</td><td class="pr">- ${esc(fmtN(totalDiscount))}</td></tr>`;
   }
 
   return `<!DOCTYPE html>
@@ -370,6 +387,10 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}
 .item .pr{width:24mm;font-size:10pt;text-align:right;white-space:nowrap;padding:0.8mm 0}
 .mod td{font-size:8.5pt;font-weight:700;padding-left:4mm;padding-bottom:0.5mm;font-style:italic}
 .gap td{height:2mm}
+.ssub td{padding:1mm 0;font-size:10pt;font-weight:900;border-top:2px solid #000}
+.ssub .pr{width:24mm;text-align:right;white-space:nowrap}
+.dsc td{padding:0.6mm 0 1.5mm;font-size:10pt;font-weight:900}
+.dsc .pr{width:24mm;text-align:right;white-space:nowrap}
 .tot td{padding:2mm 0;font-size:11.5pt;font-weight:900;border-top:3px double #000;border-bottom:3px double #000;text-transform:uppercase;letter-spacing:1px}
 .tot .pr{width:24mm;text-align:right;white-space:nowrap}
 .pay{text-align:center;font-size:12pt;font-weight:900;margin:2mm 0;letter-spacing:3px;text-transform:uppercase}
@@ -2854,6 +2875,17 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
         )}
       </div>
 
+      {Number(order.discount_amount || 0) > 0 && (
+        <div style={{ padding: "6px 20px 0", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, fontSize: 13, color: t.muted }}>
+          <div>
+            Discount{order.discount_by_name ? ` · ${order.discount_by_name}` : ""}
+            {order.discount_reason ? ` · ${order.discount_reason}` : ""}
+          </div>
+          <div style={{ color: "#16a34a", fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>
+            −{fmtPrice(order.discount_amount)}
+          </div>
+        </div>
+      )}
       <div style={{ padding: "14px 20px", borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
         <div style={{ fontSize: 30, fontWeight: 800, color: t.text, fontVariantNumeric: "tabular-nums" }}>{fmtPrice(order.total)}</div>
         <Badge cfg={payCfg} />
@@ -2990,6 +3022,11 @@ function EditOrderModal({ order, t, onClose, onAddItems }) {
   const [items, setItems] = useState(() => (order.order_items || []).filter((i) => !i.voided));
   const [voidingItem, setVoidingItem] = useState(null);
   const [voidReason, setVoidReason] = useState("");
+  const [discountAmount, setDiscountAmount] = useState(Number(order.discount_amount || 0));
+  const [discountReason, setDiscountReason] = useState(order.discount_reason || "");
+  const [discountInput, setDiscountInput] = useState(Number(order.discount_amount || 0) > 0 ? String(order.discount_amount) : "");
+  const [discountBusy, setDiscountBusy] = useState(false);
+  const [discountSuccess, setDiscountSuccess] = useState("");
 
   async function verifyPin() {
     if (!/^\d{4,8}$/.test(pin)) { setError("Enter 4-8 digits."); return; }
@@ -3051,6 +3088,32 @@ function EditOrderModal({ order, t, onClose, onAddItems }) {
       if (/pin/i.test(e.message)) setStage("pin");
     } finally {
       setBusyItemId("");
+    }
+  }
+
+  async function applyDiscount(nextAmount) {
+    const amt = Math.max(0, Math.round(Number(nextAmount) || 0));
+    setDiscountBusy(true); setError(""); setDiscountSuccess("");
+    try {
+      const res = await fetch("/api/front-desk?resource=order-discount", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Void-Token": token,
+          ...(await authHeader()),
+        },
+        body: JSON.stringify({ order_id: order.id, amount: amt, reason: discountReason.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed.");
+      setDiscountAmount(amt);
+      setDiscountInput(amt > 0 ? String(amt) : "");
+      setDiscountSuccess(amt > 0 ? `Discount of ₦${amt.toLocaleString("en-NG")} applied. New total ₦${Number(data.total || 0).toLocaleString("en-NG")}.` : "Discount cleared.");
+    } catch (e) {
+      setError(e.message);
+      if (/pin/i.test(e.message)) setStage("pin");
+    } finally {
+      setDiscountBusy(false);
     }
   }
 
@@ -3175,6 +3238,58 @@ function EditOrderModal({ order, t, onClose, onAddItems }) {
                 </div>
               </div>
             )}
+            <div style={{ marginTop: 18, padding: 14, border: `1px solid ${t.border}`, borderRadius: 8, background: t.input }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: t.gold, marginBottom: 10, display: "flex", alignItems: "center", gap: 6, textTransform: "uppercase", letterSpacing: 1 }}>
+                Whole-Order Discount
+              </div>
+              <div style={{ fontSize: 12, color: t.muted, marginBottom: 10 }}>
+                Subtract a flat ₦ amount from this order before Mark Paid. Enter 0 to clear.
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "stretch", marginBottom: 8 }}>
+                <div style={{ display: "flex", alignItems: "center", background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, padding: "0 10px", color: t.muted, fontWeight: 700 }}>₦</div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={discountInput}
+                  onChange={(e) => setDiscountInput(e.target.value.replace(/[^\d]/g, "").slice(0, 8))}
+                  placeholder="0"
+                  style={{ flex: 1, padding: "9px 12px", background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 15, fontWeight: 700, outline: "none", fontVariantNumeric: "tabular-nums" }}
+                />
+                <button
+                  onClick={() => applyDiscount(discountInput || 0)}
+                  disabled={discountBusy}
+                  style={{ padding: "9px 16px", borderRadius: 6, border: "none", background: t.gold, color: t.onGold, fontWeight: 700, fontSize: 13, cursor: discountBusy ? "default" : "pointer", opacity: discountBusy ? 0.6 : 1 }}
+                >
+                  {discountBusy ? "Applying…" : "Apply"}
+                </button>
+              </div>
+              <input
+                type="text"
+                value={discountReason}
+                onChange={(e) => setDiscountReason(e.target.value.slice(0, 240))}
+                placeholder="Reason (optional) — e.g. loyal customer"
+                style={{ width: "100%", padding: "8px 10px", background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 12.5, outline: "none" }}
+              />
+              {discountAmount > 0 && (
+                <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                  <div style={{ fontSize: 12.5, color: "#16a34a", fontWeight: 700 }}>
+                    Currently off: ₦{discountAmount.toLocaleString("en-NG")}
+                  </div>
+                  <button
+                    onClick={() => { setDiscountInput(""); applyDiscount(0); }}
+                    disabled={discountBusy}
+                    style={{ padding: "6px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, cursor: "pointer", fontSize: 11.5 }}
+                  >
+                    Clear discount
+                  </button>
+                </div>
+              )}
+              {discountSuccess && (
+                <div style={{ marginTop: 10, fontSize: 12, color: "#16a34a", background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.4)", borderRadius: 6, padding: "6px 10px" }}>
+                  {discountSuccess}
+                </div>
+              )}
+            </div>
             {error && (
               <div style={{ marginTop: 12, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
             )}

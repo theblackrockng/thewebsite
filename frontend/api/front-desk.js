@@ -560,17 +560,110 @@ async function recomputeOrderTotals(db, orderId) {
   const subtotal = (rows || [])
     .filter((r) => !r.voided)
     .reduce((sum, r) => sum + Number(r.line_total || 0), 0);
-  const { data: order } = await db
+  let order;
+  ({ data: order } = await db
     .from('orders')
-    .select('delivery_fee')
+    .select('delivery_fee, discount_amount')
     .eq('id', orderId)
-    .maybeSingle();
+    .maybeSingle());
+  if (!order) {
+    ({ data: order } = await db
+      .from('orders')
+      .select('delivery_fee')
+      .eq('id', orderId)
+      .maybeSingle());
+  }
   const deliveryFee = Number(order?.delivery_fee || 0);
+  const discount = Number(order?.discount_amount || 0);
+  const total = Math.max(0, subtotal + deliveryFee - discount);
   await db
     .from('orders')
-    .update({ subtotal, total: subtotal + deliveryFee })
+    .update({ subtotal, total })
     .eq('id', orderId);
-  return { subtotal, total: subtotal + deliveryFee };
+  return { subtotal, total, discount };
+}
+
+async function orderDiscountHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Void-Token');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, ORDER_ITEM_ROLES);
+  if (!staff) return;
+
+  const ip = getIP(req);
+  const { blocked } = checkUserAgent(req);
+  if (blocked) return res.status(400).json({ error: 'Bad request.' });
+  const { allowed } = checkCors(req);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden.' });
+  const { limited } = checkInMemoryRateLimit(ip, 'front-desk-order-discount', 60, 60 * 60 * 1000);
+  if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+  const voidToken = req.headers['x-void-token'] || req.headers['X-Void-Token'] || '';
+  const authz = verifyVoidToken(voidToken);
+  if (!authz) return res.status(401).json({ error: 'Manager PIN required. Verify and try again.' });
+
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Invalid request body.' });
+  }
+  const { order_id: orderId } = body;
+  if (typeof orderId !== 'string' || !UUID_RE.test(orderId)) {
+    return res.status(400).json({ error: 'Missing or invalid order id.' });
+  }
+  const amountRaw = Number(body.amount);
+  if (!Number.isFinite(amountRaw) || amountRaw < 0 || amountRaw > 10000000) {
+    return res.status(400).json({ error: 'Discount amount must be between 0 and 10,000,000.' });
+  }
+  const amount = Math.round(amountRaw);
+  const reason = typeof body.reason === 'string' ? body.reason.slice(0, 240).trim() : '';
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const { data: order, error: orderErr } = await db
+    .from('orders')
+    .select('id, order_number, order_status, subtotal, payment_status')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (orderErr || !order) return res.status(404).json({ error: 'Order not found.' });
+  if (order.payment_status === 'paid') {
+    return res.status(400).json({ error: 'Order is already marked paid — cannot discount.' });
+  }
+  if (!EDITABLE_ORDER_STATUSES.includes(order.order_status) && order.order_status !== 'completed') {
+    return res.status(400).json({ error: `Cannot discount an order that is '${order.order_status}'.` });
+  }
+
+  try {
+    const update = {
+      discount_amount: amount,
+      discount_by_id: authz.by_id || null,
+      discount_by_name: authz.by_name || staff.profile.full_name || null,
+      discount_at: amount > 0 ? new Date().toISOString() : null,
+      discount_reason: amount > 0 ? (reason || null) : null,
+    };
+    const { error: updErr } = await db.from('orders').update(update).eq('id', orderId);
+    if (updErr) {
+      console.error('[front-desk-order-discount] update error:', updErr);
+      return res.status(500).json({ error: 'Failed to apply discount.' });
+    }
+    const totals = await recomputeOrderTotals(db, orderId);
+    const ref = order.order_number || orderId.slice(0, 8);
+    const fmt = (n) => '₦' + Number(n || 0).toLocaleString('en-NG');
+    const line = amount > 0
+      ? `🏷️ Discount on <b>${escapeHtml(ref)}</b>: <b>${escapeHtml(fmt(amount))}</b> off (new total ${escapeHtml(fmt(totals.total))}) — authorized by <b>${escapeHtml(authz.by_name || '?')}</b>${reason ? ` · ${escapeHtml(reason)}` : ''}`
+      : `🏷️ Discount cleared on <b>${escapeHtml(ref)}</b> — by <b>${escapeHtml(authz.by_name || '?')}</b>`;
+    await notifyTelegram('front-desk-order-discount', line);
+    return res.status(200).json({ ok: true, discount_amount: amount, ...totals });
+  } catch (err) {
+    console.error('[front-desk-order-discount] unexpected:', err);
+    return res.status(500).json({ error: 'An unexpected error occurred.' });
+  }
 }
 
 async function orderItemsHandler(req, res) {
@@ -1524,6 +1617,7 @@ module.exports = function handler(req, res) {
   if (resource === 'reservations') return reservationsHandler(req, res);
   if (resource === 'waiter-calls') return waiterCallsHandler(req, res);
   if (resource === 'order-items') return orderItemsHandler(req, res);
+  if (resource === 'order-discount') return orderDiscountHandler(req, res);
   if (resource === 'add-items') return addItemsHandler(req, res);
   if (resource === 'guesthouse-rooms') return guesthouseRoomsHandler(req, res);
   if (resource === 'guesthouse-bookings') return guesthouseBookingsHandler(req, res);
