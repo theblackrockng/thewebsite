@@ -261,9 +261,8 @@ function EditModal({ staff, onClose, onSave }) {
   const [role, setRole]     = useState(staff.role);
   const [perms, setPerms]   = useState({ ...DEFAULT_PERMS, ...staff.permissions });
   const [canVoid, setCanVoid] = useState(!!staff.can_void_orders);
-  const [voidPin, setVoidPin] = useState("");
   const [canGuesthouse, setCanGuesthouse] = useState(!!staff.can_manage_guesthouse);
-  const [guesthousePin, setGuesthousePin] = useState("");
+  const [managerPin, setManagerPin] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState("");
 
@@ -272,14 +271,9 @@ function EditModal({ staff, onClose, onSave }) {
   const save = async () => {
     setSaving(true);
     setError("");
-    if (voidPin && !/^\d{4,8}$/.test(voidPin)) {
+    if (managerPin && !/^\d{4,8}$/.test(managerPin)) {
       setSaving(false);
-      setError("Void PIN must be 4-8 digits.");
-      return;
-    }
-    if (guesthousePin && !/^\d{4,8}$/.test(guesthousePin)) {
-      setSaving(false);
-      setError("Guest house PIN must be 4-8 digits.");
+      setError("Manager PIN must be 4-8 digits.");
       return;
     }
     const updates = {
@@ -291,8 +285,7 @@ function EditModal({ staff, onClose, onSave }) {
       can_void_orders: canVoid,
       can_manage_guesthouse: canGuesthouse,
     };
-    if (voidPin) updates.void_pin = voidPin;
-    if (guesthousePin) updates.guesthouse_pin = guesthousePin;
+    if (managerPin) updates.manager_pin = managerPin;
     const res = await fetch("/api/update-staff", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(await authHeader()) },
@@ -367,76 +360,73 @@ function EditModal({ staff, onClose, onSave }) {
           )}
 
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ds-muted)", display: "block", marginBottom: 10 }}>Front Desk Void Authorization</label>
-            <label style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 12px", borderRadius: 7, cursor: "pointer",
-              background: canVoid ? "rgba(200,169,110,0.08)" : "var(--ds-input-bg)",
-              border: `1px solid ${canVoid ? "var(--ds-gold)" : "var(--ds-border)"}`,
-            }}>
-              <input type="checkbox" checked={canVoid} onChange={() => setCanVoid(v => !v)} style={{ display: "none" }} />
-              <div style={{
-                width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                background: canVoid ? "var(--ds-gold)" : "transparent",
-                border: `1.5px solid ${canVoid ? "var(--ds-gold)" : "var(--ds-border)"}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-                {canVoid && <Check size={9} color="#000" strokeWidth={3} />}
-              </div>
-              <div style={{ fontSize: 12.5, color: "var(--ds-text)", lineHeight: 1.4 }}>
-                Can authorize voids / edits on confirmed orders
-                <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 2 }}>
-                  Super Admin and Manager are always authorized.
-                </div>
-              </div>
-            </label>
-            <div style={{ marginTop: 10 }}>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={8}
-                value={voidPin}
-                onChange={(e) => setVoidPin(e.target.value.replace(/\D/g, ""))}
-                placeholder={staff.void_pin_hash ? "Enter new PIN to change (leave blank to keep)" : "Set 4-8 digit void PIN"}
-                style={{ width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "var(--ds-text)", outline: "none", letterSpacing: 2 }}
-              />
+            <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ds-muted)", display: "block", marginBottom: 10 }}>Manager PIN</label>
+            <div style={{ fontSize: 11.5, color: "var(--ds-muted)", lineHeight: 1.45, marginBottom: 10 }}>
+              One PIN that works everywhere a manager PIN is required — Void, Edit, Discount, Guest House check-in / check-out / key encoding / mark paid. Setting this grants both void and guest house authorization automatically.
             </div>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={managerPin}
+              onChange={(e) => setManagerPin(e.target.value.replace(/\D/g, ""))}
+              placeholder={(staff.void_pin_hash || staff.guesthouse_pin_hash) ? "Enter new PIN to change (leave blank to keep)" : "Set 4-8 digit Manager PIN"}
+              style={{ width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "var(--ds-text)", outline: "none", letterSpacing: 2 }}
+            />
+            {(staff.void_pin_hash || staff.guesthouse_pin_hash) && (
+              <div style={{ marginTop: 8, fontSize: 11.5, color: "#16a34a", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                <Check size={11} /> PIN is set
+              </div>
+            )}
           </div>
 
           <div>
-            <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ds-muted)", display: "block", marginBottom: 10 }}>Guest House Authorization</label>
-            <label style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "10px 12px", borderRadius: 7, cursor: "pointer",
-              background: canGuesthouse ? "rgba(200,169,110,0.08)" : "var(--ds-input-bg)",
-              border: `1px solid ${canGuesthouse ? "var(--ds-gold)" : "var(--ds-border)"}`,
-            }}>
-              <input type="checkbox" checked={canGuesthouse} onChange={() => setCanGuesthouse(v => !v)} style={{ display: "none" }} />
-              <div style={{
-                width: 14, height: 14, borderRadius: 3, flexShrink: 0,
-                background: canGuesthouse ? "var(--ds-gold)" : "transparent",
-                border: `1.5px solid ${canGuesthouse ? "var(--ds-gold)" : "var(--ds-border)"}`,
-                display: "flex", alignItems: "center", justifyContent: "center",
+            <label style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--ds-muted)", display: "block", marginBottom: 10 }}>Authorization</label>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <label style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 12px", borderRadius: 7, cursor: "pointer",
+                background: canVoid ? "rgba(200,169,110,0.08)" : "var(--ds-input-bg)",
+                border: `1px solid ${canVoid ? "var(--ds-gold)" : "var(--ds-border)"}`,
               }}>
-                {canGuesthouse && <Check size={9} color="#000" strokeWidth={3} />}
-              </div>
-              <div style={{ fontSize: 12.5, color: "var(--ds-text)", lineHeight: 1.4 }}>
-                Can authorize check-ins / key encoding
-                <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 2 }}>
-                  Super Admin, Manager and Front Desk are always authorized.
+                <input type="checkbox" checked={canVoid} onChange={() => setCanVoid(v => !v)} style={{ display: "none" }} />
+                <div style={{
+                  width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                  background: canVoid ? "var(--ds-gold)" : "transparent",
+                  border: `1.5px solid ${canVoid ? "var(--ds-gold)" : "var(--ds-border)"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {canVoid && <Check size={9} color="#000" strokeWidth={3} />}
                 </div>
-              </div>
-            </label>
-            <div style={{ marginTop: 10 }}>
-              <input
-                type="password"
-                inputMode="numeric"
-                maxLength={8}
-                value={guesthousePin}
-                onChange={(e) => setGuesthousePin(e.target.value.replace(/\D/g, ""))}
-                placeholder={staff.guesthouse_pin_hash ? "Enter new PIN to change (leave blank to keep)" : "Set 4-8 digit guest house PIN"}
-                style={{ width: "100%", background: "var(--ds-input-bg)", border: "1px solid var(--ds-border)", borderRadius: 7, padding: "9px 12px", fontSize: 13, color: "var(--ds-text)", outline: "none", letterSpacing: 2 }}
-              />
+                <div style={{ fontSize: 12.5, color: "var(--ds-text)", lineHeight: 1.4 }}>
+                  Can authorize voids / edits / discounts
+                  <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 2 }}>
+                    Super Admin and Manager are always authorized.
+                  </div>
+                </div>
+              </label>
+              <label style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 12px", borderRadius: 7, cursor: "pointer",
+                background: canGuesthouse ? "rgba(200,169,110,0.08)" : "var(--ds-input-bg)",
+                border: `1px solid ${canGuesthouse ? "var(--ds-gold)" : "var(--ds-border)"}`,
+              }}>
+                <input type="checkbox" checked={canGuesthouse} onChange={() => setCanGuesthouse(v => !v)} style={{ display: "none" }} />
+                <div style={{
+                  width: 14, height: 14, borderRadius: 3, flexShrink: 0,
+                  background: canGuesthouse ? "var(--ds-gold)" : "transparent",
+                  border: `1.5px solid ${canGuesthouse ? "var(--ds-gold)" : "var(--ds-border)"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  {canGuesthouse && <Check size={9} color="#000" strokeWidth={3} />}
+                </div>
+                <div style={{ fontSize: 12.5, color: "var(--ds-text)", lineHeight: 1.4 }}>
+                  Can authorize guest house actions
+                  <div style={{ fontSize: 11, color: "var(--ds-muted)", marginTop: 2 }}>
+                    Super Admin, Manager and Front Desk are always authorized.
+                  </div>
+                </div>
+              </label>
             </div>
           </div>
 

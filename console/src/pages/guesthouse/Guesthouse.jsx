@@ -59,7 +59,7 @@ function StaffRow({ s, onToggleAccess, onSetPin, onClearPin, busy }) {
 
   const implicit = IMPLICIT_ROLES.has(s.role);
   const hasAccess = implicit || !!s.can_manage_guesthouse || s.role === "guesthouse";
-  const hasPin = !!s.guesthouse_pin_hash;
+  const hasPin = !!(s.guesthouse_pin_hash || s.void_pin_hash);
 
   async function savePin() {
     if (!/^\d{4,8}$/.test(pin)) {
@@ -195,7 +195,7 @@ function StaffPanel({ notify }) {
     setLoading(true);
     const { data, error } = await supabase
       .from("staff_profiles")
-      .select("id, full_name, email, role, active, can_manage_guesthouse, guesthouse_pin_hash")
+      .select("id, full_name, email, role, active, can_manage_guesthouse, guesthouse_pin_hash, void_pin_hash")
       .eq("active", true)
       .order("full_name", { ascending: true });
     if (error) {
@@ -233,16 +233,16 @@ function StaffPanel({ notify }) {
 
   async function setPin(id, pin) {
     setBusy(true);
-    const ok = await callUpdate({ userId: id, guesthouse_pin: pin });
+    const ok = await callUpdate({ userId: id, manager_pin: pin });
     setBusy(false);
-    if (ok) { notify("PIN saved"); load(); }
+    if (ok) { notify("Manager PIN saved"); load(); }
     return ok;
   }
 
   async function clearPin(id) {
-    if (!window.confirm("Clear this staff member's guest house PIN?")) return;
+    if (!window.confirm("Clear this staff member's Manager PIN? They will lose void, discount, and guest house authorization.")) return;
     setBusy(true);
-    const ok = await callUpdate({ userId: id, guesthouse_pin: null });
+    const ok = await callUpdate({ userId: id, manager_pin: null });
     setBusy(false);
     if (ok) { notify("PIN cleared"); load(); }
   }
@@ -268,7 +268,7 @@ function StaffPanel({ notify }) {
     <Section
       title={`Staff with guest house access (${accessCount})`}
       icon={Users}
-      note="Roles super_admin, manager, and front_desk always have guest house access (implicit). For any other staff, grant access here and set a 4–8 digit PIN they will type at the Front Desk screen for check-in, check-out, encode-key, and mark-paid actions."
+      note="Roles super_admin, manager, and front_desk always have guest house access (implicit). For any other staff, grant access here and set a 4–8 digit Manager PIN. The same PIN unlocks void, discount, and all guest house actions (check-in, check-out, encode-key, mark-paid) — one PIN everywhere."
     >
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, alignItems: "center", marginBottom: 10 }}>
         <input
