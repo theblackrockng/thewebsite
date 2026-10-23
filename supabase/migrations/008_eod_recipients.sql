@@ -60,6 +60,6 @@ COMMENT ON TABLE public.eod_recipients IS
 
 INSERT INTO public.eod_recipients (kind, value, label, mode, active)
 VALUES
-  ('email', 'luchijudith35@gmail.com', 'Oluchi (Manager)', 'full', true),
-  ('email', 'theblaaqcheff@gmail.com', 'Chef Oluchukwu',   'full', true)
+  ('email', 'luchijudith35@gmail.com', 'Manager',   'full', true),
+  ('email', 'theblaaqcheff@gmail.com', 'Head Chef', 'full', true)
 ON CONFLICT (kind, value) DO NOTHING;

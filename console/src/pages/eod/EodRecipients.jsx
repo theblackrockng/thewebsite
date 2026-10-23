@@ -128,7 +128,7 @@ function AddForm({ onAdd, saving }) {
           type="text"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="e.g. Chef Pius"
+          placeholder="e.g. Head Chef"
           style={inputStyle}
         />
       </div>
@@ -227,7 +227,7 @@ function RecipientRow({ r, onToggle, onDelete, onSave, busy }) {
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 10, alignItems: "center" }}>
           <label style={{ fontSize: 12, color: "var(--ds-muted)" }}>Label</label>
-          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Chef Pius" style={inputStyle} />
+          <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Head Chef" style={inputStyle} />
         </div>
         {r.kind === "telegram" && (
           <div style={{ display: "grid", gridTemplateColumns: "90px 1fr", gap: 10, alignItems: "center" }}>

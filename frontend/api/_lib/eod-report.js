@@ -1,7 +1,7 @@
 // Server-side EOD report builder (CommonJS). Mirrors the pure classifier/aggregator
 // used by FrontDeskDisplay.jsx + EodHistory.jsx but exposes two renderers:
-//   - buildEodEmailHtml()    : wide, email-safe HTML for Oluchi + Chef Oluchukwu
-//   - buildEodKitchenText()  : plain text (HTML-escaped) for Chef Pius's Telegram
+//   - buildEodEmailHtml()    : wide, email-safe HTML for the manager email list
+//   - buildEodKitchenText()  : plain text (HTML-escaped) for Telegram recipients
 // Keep the classification sets in sync with frontend/src/pages/FrontDeskDisplay.jsx.
 
 const EOD_MAIN_KITCHEN_CATEGORIES = new Set([
@@ -229,7 +229,7 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
 }
 
 // Telegram-ready text (parse_mode=HTML). mode='kitchen' omits Drinks/Guest
-// House/Grand Total so Chef Pius only sees what the kitchen cooked.
+// House/Grand Total so the kitchen only sees what it cooked.
 function buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDate) {
   const kitchenOnly = mode === 'kitchen';
   const { sectionAgg, voidedAgg, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);

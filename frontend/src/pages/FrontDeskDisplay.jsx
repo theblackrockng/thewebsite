@@ -3119,7 +3119,7 @@ function DiscountModal({ order, t, onClose }) {
         {stage === "pin" && (
           <div>
             <div style={{ fontSize: 13, color: t.muted, marginBottom: 12 }}>
-              Enter the manager's PIN. Only Oluchi, Super Admins, and staff with void/discount authorization can approve.
+              Enter the manager's PIN. Only the manager, Super Admins, and staff with void/discount authorization can approve.
             </div>
             <input
               type="password"
@@ -3330,7 +3330,7 @@ function EditOrderModal({ order, t, onClose, onAddItems }) {
         {stage === "pin" && (
           <div>
             <div style={{ fontSize: 13, color: t.muted, marginBottom: 12 }}>
-              Enter the manager's void PIN. Only Oluchi, Super Admins, and staff with void authorization can approve.
+              Enter the manager's void PIN. Only the manager, Super Admins, and staff with void authorization can approve.
             </div>
             <input
               type="password"
