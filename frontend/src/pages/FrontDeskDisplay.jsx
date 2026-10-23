@@ -3075,7 +3075,7 @@ function DiscountModal({ order, t, onClose }) {
       const res = await fetch("/api/front-desk?resource=order-discount", {
         method: "PATCH",
         headers: { "Content-Type": "application/json", "x-void-token": token, ...(await authHeader()) },
-        body: JSON.stringify({ id: order.id, amount: Number(nextAmount) || 0, reason: reason.trim() || null }),
+        body: JSON.stringify({ order_id: order.id, amount: Number(nextAmount) || 0, reason: reason.trim() || null }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) { setError(data.error || `HTTP ${res.status}`); return; }
