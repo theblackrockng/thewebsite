@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { authHeader } from "../lib/staffAuth";
 import StaffLoginGate, { useStaffSession } from "../components/StaffLoginGate";
-import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search, Lock, Trash2, Edit2, BedDouble, KeyRound, LogIn as LogInIcon, ChefHat, History } from "lucide-react";
+import { UtensilsCrossed, Package, Truck, RefreshCw, LogOut, Sun, Moon, Volume2, VolumeX, Wifi, WifiOff, X, CalendarDays, Phone, Users, Printer, Wine, Plus, Minus, Search, Lock, Trash2, Edit2, BedDouble, KeyRound, LogIn as LogInIcon, ChefHat, History, Percent } from "lucide-react";
 import { MENU } from "../lib/data";
 
 const FRONT_DESK_ROLES = ["front_desk", "manager"];
@@ -2750,6 +2750,7 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
   const [showMerge, setShowMerge] = useState(false);
   const [showAddItems, setShowAddItems] = useState(false);
   const [showEditOrder, setShowEditOrder] = useState(false);
+  const [showDiscount, setShowDiscount] = useState(false);
   const [printStatus, setPrintStatus] = useState(null);
 
   const mergedOrders = (otherTableOrders || []).filter((o) => mergedIds.has(o.id));
@@ -2964,6 +2965,20 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
                 <Lock size={14} /> Edit / Void Items
               </button>
             )}
+            {canAddItems && items.length > 0 && order.payment_status !== "paid" && (
+              <button
+                onClick={() => setShowDiscount(true)}
+                style={{
+                  width: "100%", padding: "11px 16px", borderRadius: 10,
+                  border: `1.5px solid ${t.gold}`, background: "transparent",
+                  color: t.gold, fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  fontFamily: "inherit",
+                }}
+              >
+                <Percent size={14} /> {Number(order.discount_amount || 0) > 0 ? `Discount applied · ₦${Number(order.discount_amount).toLocaleString("en-NG")}` : "Discount"}
+              </button>
+            )}
             {hasMergeable && (
               <button
                 onClick={() => setShowMerge(true)}
@@ -3006,6 +3021,192 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
           onAddItems={() => { setShowEditOrder(false); setShowAddItems(true); }}
         />
       )}
+      {showDiscount && (
+        <DiscountModal
+          order={order}
+          t={t}
+          onClose={() => setShowDiscount(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function DiscountModal({ order, t, onClose }) {
+  const [stage, setStage] = useState("pin");
+  const [pin, setPin] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [token, setToken] = useState("");
+  const [authorizedBy, setAuthorizedBy] = useState("");
+  const [tokenExp, setTokenExp] = useState(0);
+  const [error, setError] = useState("");
+  const [amountInput, setAmountInput] = useState(Number(order.discount_amount || 0) > 0 ? String(order.discount_amount) : "");
+  const [currentAmount, setCurrentAmount] = useState(Number(order.discount_amount || 0));
+  const [reason, setReason] = useState(order.discount_reason || "");
+  const [busy, setBusy] = useState(false);
+  const [success, setSuccess] = useState("");
+
+  async function verifyPin() {
+    if (!pin || pin.length < 4) { setError("Enter the manager PIN"); return; }
+    setVerifying(true); setError("");
+    try {
+      const res = await fetch("/api/verify-void-pin", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) { setError(data.error || "Invalid PIN"); setPin(""); return; }
+      setToken(data.token);
+      setAuthorizedBy(data.by_name || "manager");
+      setTokenExp(data.exp || 0);
+      setStage("edit");
+    } catch (e) {
+      setError("Network error. Try again.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function apply(nextAmount) {
+    if (!token) { setError("Session expired. Reopen Discount."); return; }
+    setBusy(true); setError(""); setSuccess("");
+    try {
+      const res = await fetch("/api/front-desk?resource=order-discount", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-void-token": token },
+        body: JSON.stringify({ id: order.id, amount: Number(nextAmount) || 0, reason: reason.trim() || null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) { setError(data.error || `HTTP ${res.status}`); return; }
+      const amt = Number(data.discount_amount || 0);
+      setCurrentAmount(amt);
+      setAmountInput(amt > 0 ? String(amt) : "");
+      setSuccess(amt > 0
+        ? `Discount of ₦${amt.toLocaleString("en-NG")} applied. New total ₦${Number(data.total || 0).toLocaleString("en-NG")}.`
+        : "Discount cleared.");
+    } catch (e) {
+      setError("Network error. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const expiresIn = tokenExp ? Math.max(0, Math.round((tokenExp - Date.now()) / 1000)) : 0;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
+      <div style={{
+        position: "relative", width: "100%", maxWidth: 460,
+        background: t.card, border: `1px solid ${t.border}`,
+        borderRadius: 12, padding: 24, color: t.text, maxHeight: "88vh", overflow: "auto",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              <Percent size={16} style={{ color: t.gold }} /> Discount — Table {order.table_number}
+            </div>
+            <div style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>
+              Order {order.order_number || order.id.slice(0, 8)}
+              {authorizedBy && ` · authorized by ${authorizedBy} (${expiresIn}s)`}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: t.muted }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {stage === "pin" && (
+          <div>
+            <div style={{ fontSize: 13, color: t.muted, marginBottom: 12 }}>
+              Enter the manager's PIN. Only Oluchi, Super Admins, and staff with void/discount authorization can approve.
+            </div>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => { if (e.key === "Enter") verifyPin(); }}
+              placeholder="Manager PIN"
+              autoFocus
+              style={{ width: "100%", padding: "12px 14px", background: t.input, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 18, letterSpacing: 6, textAlign: "center", outline: "none" }}
+            />
+            {error && (
+              <div style={{ marginTop: 10, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Cancel</button>
+              <button onClick={verifyPin} disabled={verifying || !pin} style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: t.gold, color: t.onGold, fontWeight: 700, fontSize: 13, cursor: verifying ? "default" : "pointer", opacity: verifying || !pin ? 0.6 : 1 }}>
+                {verifying ? "Verifying…" : "Unlock"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {stage === "edit" && (
+          <div>
+            <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 12 }}>
+              Subtract a flat ₦ amount from this order before Mark Paid. Enter 0 to clear.
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "stretch", marginBottom: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", background: t.input, border: `1px solid ${t.border}`, borderRadius: 8, padding: "0 12px", color: t.muted, fontWeight: 700 }}>₦</div>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={amountInput}
+                onChange={(e) => setAmountInput(e.target.value.replace(/[^\d]/g, "").slice(0, 8))}
+                placeholder="0"
+                autoFocus
+                style={{ flex: 1, padding: "11px 14px", background: t.input, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 17, fontWeight: 700, outline: "none", fontVariantNumeric: "tabular-nums" }}
+              />
+            </div>
+            <input
+              type="text"
+              value={reason}
+              onChange={(e) => setReason(e.target.value.slice(0, 240))}
+              placeholder="Reason (optional) — e.g. loyal customer"
+              style={{ width: "100%", padding: "9px 12px", background: t.input, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 13, outline: "none", marginBottom: 12 }}
+            />
+            {currentAmount > 0 && (
+              <div style={{ marginBottom: 10, fontSize: 12.5, color: "#16a34a", fontWeight: 700 }}>
+                Currently off: ₦{currentAmount.toLocaleString("en-NG")}
+              </div>
+            )}
+            {success && (
+              <div style={{ marginBottom: 12, fontSize: 12.5, color: "#16a34a", background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.4)", borderRadius: 8, padding: "8px 12px" }}>
+                {success}
+              </div>
+            )}
+            {error && (
+              <div style={{ marginBottom: 12, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
+              {currentAmount > 0 ? (
+                <button
+                  onClick={() => { setAmountInput(""); apply(0); }}
+                  disabled={busy}
+                  style={{ padding: "10px 14px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, cursor: busy ? "default" : "pointer", fontFamily: "inherit", fontSize: 13, opacity: busy ? 0.6 : 1 }}
+                >
+                  Clear discount
+                </button>
+              ) : <div />}
+              <div style={{ display: "flex", gap: 10 }}>
+                <button onClick={onClose} style={{ padding: "10px 16px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.text, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>
+                  Close
+                </button>
+                <button
+                  onClick={() => apply(amountInput || 0)}
+                  disabled={busy}
+                  style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: t.gold, color: t.onGold, fontWeight: 700, fontSize: 13, cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1 }}
+                >
+                  {busy ? "Applying…" : "Apply Discount"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -3022,11 +3223,6 @@ function EditOrderModal({ order, t, onClose, onAddItems }) {
   const [items, setItems] = useState(() => (order.order_items || []).filter((i) => !i.voided));
   const [voidingItem, setVoidingItem] = useState(null);
   const [voidReason, setVoidReason] = useState("");
-  const [discountAmount, setDiscountAmount] = useState(Number(order.discount_amount || 0));
-  const [discountReason, setDiscountReason] = useState(order.discount_reason || "");
-  const [discountInput, setDiscountInput] = useState(Number(order.discount_amount || 0) > 0 ? String(order.discount_amount) : "");
-  const [discountBusy, setDiscountBusy] = useState(false);
-  const [discountSuccess, setDiscountSuccess] = useState("");
 
   async function verifyPin() {
     if (!/^\d{4,8}$/.test(pin)) { setError("Enter 4-8 digits."); return; }
@@ -3088,32 +3284,6 @@ function EditOrderModal({ order, t, onClose, onAddItems }) {
       if (/pin/i.test(e.message)) setStage("pin");
     } finally {
       setBusyItemId("");
-    }
-  }
-
-  async function applyDiscount(nextAmount) {
-    const amt = Math.max(0, Math.round(Number(nextAmount) || 0));
-    setDiscountBusy(true); setError(""); setDiscountSuccess("");
-    try {
-      const res = await fetch("/api/front-desk?resource=order-discount", {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Void-Token": token,
-          ...(await authHeader()),
-        },
-        body: JSON.stringify({ order_id: order.id, amount: amt, reason: discountReason.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Failed.");
-      setDiscountAmount(amt);
-      setDiscountInput(amt > 0 ? String(amt) : "");
-      setDiscountSuccess(amt > 0 ? `Discount of ₦${amt.toLocaleString("en-NG")} applied. New total ₦${Number(data.total || 0).toLocaleString("en-NG")}.` : "Discount cleared.");
-    } catch (e) {
-      setError(e.message);
-      if (/pin/i.test(e.message)) setStage("pin");
-    } finally {
-      setDiscountBusy(false);
     }
   }
 
@@ -3238,58 +3408,6 @@ function EditOrderModal({ order, t, onClose, onAddItems }) {
                 </div>
               </div>
             )}
-            <div style={{ marginTop: 18, padding: 14, border: `1px solid ${t.border}`, borderRadius: 8, background: t.input }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: t.gold, marginBottom: 10, display: "flex", alignItems: "center", gap: 6, textTransform: "uppercase", letterSpacing: 1 }}>
-                Whole-Order Discount
-              </div>
-              <div style={{ fontSize: 12, color: t.muted, marginBottom: 10 }}>
-                Subtract a flat ₦ amount from this order before Mark Paid. Enter 0 to clear.
-              </div>
-              <div style={{ display: "flex", gap: 8, alignItems: "stretch", marginBottom: 8 }}>
-                <div style={{ display: "flex", alignItems: "center", background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, padding: "0 10px", color: t.muted, fontWeight: 700 }}>₦</div>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={discountInput}
-                  onChange={(e) => setDiscountInput(e.target.value.replace(/[^\d]/g, "").slice(0, 8))}
-                  placeholder="0"
-                  style={{ flex: 1, padding: "9px 12px", background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 15, fontWeight: 700, outline: "none", fontVariantNumeric: "tabular-nums" }}
-                />
-                <button
-                  onClick={() => applyDiscount(discountInput || 0)}
-                  disabled={discountBusy}
-                  style={{ padding: "9px 16px", borderRadius: 6, border: "none", background: t.gold, color: t.onGold, fontWeight: 700, fontSize: 13, cursor: discountBusy ? "default" : "pointer", opacity: discountBusy ? 0.6 : 1 }}
-                >
-                  {discountBusy ? "Applying…" : "Apply"}
-                </button>
-              </div>
-              <input
-                type="text"
-                value={discountReason}
-                onChange={(e) => setDiscountReason(e.target.value.slice(0, 240))}
-                placeholder="Reason (optional) — e.g. loyal customer"
-                style={{ width: "100%", padding: "8px 10px", background: t.card, border: `1px solid ${t.border}`, borderRadius: 6, color: t.text, fontSize: 12.5, outline: "none" }}
-              />
-              {discountAmount > 0 && (
-                <div style={{ marginTop: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                  <div style={{ fontSize: 12.5, color: "#16a34a", fontWeight: 700 }}>
-                    Currently off: ₦{discountAmount.toLocaleString("en-NG")}
-                  </div>
-                  <button
-                    onClick={() => { setDiscountInput(""); applyDiscount(0); }}
-                    disabled={discountBusy}
-                    style={{ padding: "6px 10px", borderRadius: 6, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, cursor: "pointer", fontSize: 11.5 }}
-                  >
-                    Clear discount
-                  </button>
-                </div>
-              )}
-              {discountSuccess && (
-                <div style={{ marginTop: 10, fontSize: 12, color: "#16a34a", background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.4)", borderRadius: 6, padding: "6px 10px" }}>
-                  {discountSuccess}
-                </div>
-              )}
-            </div>
             {error && (
               <div style={{ marginTop: 12, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
             )}
