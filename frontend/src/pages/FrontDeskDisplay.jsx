@@ -3051,14 +3051,15 @@ function DiscountModal({ order, t, onClose }) {
     setVerifying(true); setError("");
     try {
       const res = await fetch("/api/verify-void-pin", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({ pin }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.ok) { setError(data.error || "Invalid PIN"); setPin(""); return; }
       setToken(data.token);
-      setAuthorizedBy(data.by_name || "manager");
-      setTokenExp(data.exp || 0);
+      setAuthorizedBy(data.authorized_by?.name || data.by_name || "manager");
+      setTokenExp(data.expires_at || data.exp || 0);
       setStage("edit");
     } catch (e) {
       setError("Network error. Try again.");
@@ -3073,7 +3074,7 @@ function DiscountModal({ order, t, onClose }) {
     try {
       const res = await fetch("/api/front-desk?resource=order-discount", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-void-token": token },
+        headers: { "Content-Type": "application/json", "x-void-token": token, ...(await authHeader()) },
         body: JSON.stringify({ id: order.id, amount: Number(nextAmount) || 0, reason: reason.trim() || null }),
       });
       const data = await res.json().catch(() => ({}));
