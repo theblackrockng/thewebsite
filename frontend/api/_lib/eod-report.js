@@ -47,11 +47,29 @@ function aggregateEod(completedOrders, menuCategoryMap) {
     'Grill Kitchen': new Map(),
     'Drinks': new Map(),
   };
+  const roomChargesAgg = new Map();
   const discounts = [];
   let totalDiscount = 0;
   for (const order of paidOrders) {
     for (const item of (order.order_items || [])) {
       if (item.voided) continue;
+      if (item.category === 'room') {
+        const key = `${item.item_name}||${item.modifiers || ''}`;
+        if (roomChargesAgg.has(key)) {
+          const row = roomChargesAgg.get(key);
+          row.qty += (item.qty || 0);
+          row.total += (Number(item.line_total) || 0);
+        } else {
+          roomChargesAgg.set(key, {
+            name: item.item_name,
+            modifier: item.modifiers || null,
+            qty: item.qty || 0,
+            unit_price: Number(item.unit_price) || 0,
+            total: Number(item.line_total) || 0,
+          });
+        }
+        continue;
+      }
       const section = classifyEodSection(item, menuCategoryMap);
       const bucket = sectionAgg[section];
       const key = `${item.item_name}||${item.modifiers || ''}`;
@@ -85,6 +103,7 @@ function aggregateEod(completedOrders, menuCategoryMap) {
     if (order.order_status !== 'completed') continue;
     for (const item of (order.order_items || [])) {
       if (!item.voided) continue;
+      if (item.category === 'room') continue;
       const key = `${item.item_name}||${item.modifiers || ''}`;
       if (voidedAgg.has(key)) {
         const row = voidedAgg.get(key);
@@ -101,7 +120,7 @@ function aggregateEod(completedOrders, menuCategoryMap) {
       }
     }
   }
-  return { sectionAgg, voidedAgg, discounts, totalDiscount, paidOrderCount: paidOrders.length };
+  return { sectionAgg, voidedAgg, roomChargesAgg, discounts, totalDiscount, paidOrderCount: paidOrders.length };
 }
 
 function dateHeader(reportDate) {
@@ -115,7 +134,7 @@ function dateHeader(reportDate) {
 // 'all' includes Drinks + Guest House + Grand Total; 'kitchen' omits them.
 function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, reportDate) {
   const kitchenOnly = mode === 'kitchen';
-  const { sectionAgg, voidedAgg, discounts, totalDiscount, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
+  const { sectionAgg, voidedAgg, roomChargesAgg, discounts, totalDiscount, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
   const dateStr = dateHeader(reportDate);
 
   const styles = {
@@ -185,8 +204,10 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
     for (const b of rows) {
       const total = Number(b.total_amount || 0);
       const paid = b.payment_status === 'paid';
-      if (paid) paidSum += total;
-      body += `<tr><td style="${styles.td}">Room ${esc(b.room_number || '?')} &middot; ${esc(b.guest_name || '')}</td><td style="${styles.tdR}">${esc(String(b.nights || ''))}n</td><td style="${styles.tdR}">${paid ? 'PAID' : 'UNPAID'}</td><td style="${styles.tdR}">${esc(fmtNaira(total))}</td></tr>`;
+      const billedToOrder = typeof b.notes === 'string' && b.notes.startsWith('Added to order');
+      if (paid && !billedToOrder) paidSum += total;
+      const payLabel = billedToOrder ? 'BILLED TO TABLE' : (paid ? 'PAID' : 'UNPAID');
+      body += `<tr><td style="${styles.td}">Room ${esc(b.room_number || '?')} &middot; ${esc(b.guest_name || '')}</td><td style="${styles.tdR}">${esc(String(b.nights || ''))}n</td><td style="${styles.tdR}">${esc(payLabel)}</td><td style="${styles.tdR}">${esc(fmtNaira(total))}</td></tr>`;
     }
     return `
 <div style="${styles.secH}">Guest House</div>
@@ -219,6 +240,7 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
   const mainKitchen  = sectionBlock('Main Kitchen', sectionAgg['Main Kitchen']);
   const grillKitchen = sectionBlock('Grill Kitchen', sectionAgg['Grill Kitchen']);
   const drinks       = kitchenOnly ? '' : sectionBlock('Drinks', sectionAgg['Drinks']);
+  const roomCharges  = kitchenOnly ? '' : sectionBlock('Rooms Billed to Tables', roomChargesAgg);
   const guesthouse   = kitchenOnly ? '' : guesthouseBlock(bookings);
   const voided       = voidedBlock(voidedAgg);
   const discountsHtml = kitchenOnly ? '' : discountsBlock();
@@ -227,14 +249,15 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
     [...sectionAgg['Main Kitchen'].values()].reduce((s, r) => s + r.total, 0)
     + [...sectionAgg['Grill Kitchen'].values()].reduce((s, r) => s + r.total, 0);
   const drinkTotal = [...sectionAgg['Drinks'].values()].reduce((s, r) => s + r.total, 0);
+  const roomChargesTotal = [...roomChargesAgg.values()].reduce((s, r) => s + r.total, 0);
   const guesthousePaidTotal = (bookings || [])
-    .filter((b) => b.payment_status === 'paid')
+    .filter((b) => b.payment_status === 'paid' && !(typeof b.notes === 'string' && b.notes.startsWith('Added to order')))
     .reduce((s, b) => s + Number(b.total_amount || 0), 0);
-  const gross = foodTotal + (kitchenOnly ? 0 : drinkTotal + guesthousePaidTotal);
+  const gross = foodTotal + (kitchenOnly ? 0 : drinkTotal + roomChargesTotal + guesthousePaidTotal);
   const discountForTotal = kitchenOnly ? 0 : totalDiscount;
   const grandTotal = Math.max(0, gross - discountForTotal);
 
-  const anyContent = mainKitchen || grillKitchen || drinks || guesthouse || voided || discountsHtml;
+  const anyContent = mainKitchen || grillKitchen || drinks || roomCharges || guesthouse || voided || discountsHtml;
   const emptyBlock = anyContent ? '' : `<div style="${styles.empty}">No activity on this date.</div>`;
 
   const grandBlock = kitchenOnly ? '' : `
@@ -255,7 +278,7 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
   <div style="${styles.card}">
     <h1 style="${styles.h1}">BLACKROCK</h1>
     <p style="${styles.sub}">${esc(title)} &middot; ${esc(dateStr)}</p>
-    ${mainKitchen}${grillKitchen}${drinks}${guesthouse}${discountsHtml}${voided}${emptyBlock}${grandBlock}
+    ${mainKitchen}${grillKitchen}${drinks}${roomCharges}${guesthouse}${discountsHtml}${voided}${emptyBlock}${grandBlock}
   </div>
   <div style="${styles.foot}">Automated by the 6am EOD cron. Manage recipients in the admin console.</div>
 </div>
@@ -267,7 +290,7 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
 // House/Grand Total so the kitchen only sees what it cooked.
 function buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDate) {
   const kitchenOnly = mode === 'kitchen';
-  const { sectionAgg, voidedAgg, discounts, totalDiscount, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
+  const { sectionAgg, voidedAgg, roomChargesAgg, discounts, totalDiscount, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
   const dateStr = dateHeader(reportDate);
 
   function section(title, agg) {
@@ -306,8 +329,10 @@ function buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDa
     for (const b of rows) {
       const total = Number(b.total_amount || 0);
       const paid = b.payment_status === 'paid';
-      if (paid) paidSum += total;
-      body += `\n  Rm ${esc(b.room_number || '?')} · ${esc(b.guest_name || '')} · ${esc(String(b.nights || ''))}n · ${paid ? 'PAID' : 'UNPAID'} · ${esc(fmtNaira(total))}`;
+      const billedToOrder = typeof b.notes === 'string' && b.notes.startsWith('Added to order');
+      if (paid && !billedToOrder) paidSum += total;
+      const payLabel = billedToOrder ? 'BILLED TO TABLE' : (paid ? 'PAID' : 'UNPAID');
+      body += `\n  Rm ${esc(b.room_number || '?')} · ${esc(b.guest_name || '')} · ${esc(String(b.nights || ''))}n · ${esc(payLabel)} · ${esc(fmtNaira(total))}`;
     }
     body += `\n  <i>Guest House subtotal (paid): ${esc(fmtNaira(paidSum))}</i>`;
     return body;
@@ -327,6 +352,7 @@ function buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDa
   const mainKitchen  = section('Main Kitchen',  sectionAgg['Main Kitchen']);
   const grillKitchen = section('Grill Kitchen', sectionAgg['Grill Kitchen']);
   const drinks       = kitchenOnly ? '' : section('Drinks', sectionAgg['Drinks']);
+  const roomCharges  = kitchenOnly ? '' : section('Rooms Billed to Tables', roomChargesAgg);
   const guesthouse   = kitchenOnly ? '' : guesthouseBlock(bookings);
   const voided       = voidedBlock(voidedAgg);
   const discountsBlk = kitchenOnly ? '' : discountsText();
@@ -335,16 +361,17 @@ function buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDa
     [...sectionAgg['Main Kitchen'].values()].reduce((s, r) => s + r.total, 0)
     + [...sectionAgg['Grill Kitchen'].values()].reduce((s, r) => s + r.total, 0);
   const drinkTotal = [...sectionAgg['Drinks'].values()].reduce((s, r) => s + r.total, 0);
+  const roomChargesTotal = [...roomChargesAgg.values()].reduce((s, r) => s + r.total, 0);
   const guesthousePaidTotal = (bookings || [])
-    .filter((b) => b.payment_status === 'paid')
+    .filter((b) => b.payment_status === 'paid' && !(typeof b.notes === 'string' && b.notes.startsWith('Added to order')))
     .reduce((s, b) => s + Number(b.total_amount || 0), 0);
-  const gross = foodTotal + (kitchenOnly ? 0 : drinkTotal + guesthousePaidTotal);
+  const gross = foodTotal + (kitchenOnly ? 0 : drinkTotal + roomChargesTotal + guesthousePaidTotal);
   const discountForTotal = kitchenOnly ? 0 : totalDiscount;
   const grandTotal = Math.max(0, gross - discountForTotal);
 
-  const anyContent = mainKitchen || grillKitchen || drinks || guesthouse || voided || discountsBlk;
+  const anyContent = mainKitchen || grillKitchen || drinks || roomCharges || guesthouse || voided || discountsBlk;
   const body = anyContent
-    ? `${mainKitchen}${grillKitchen}${drinks}${guesthouse}${discountsBlk}${voided}`
+    ? `${mainKitchen}${grillKitchen}${drinks}${roomCharges}${guesthouse}${discountsBlk}${voided}`
     : `\n<i>No activity on this date.</i>`;
   const grossLine = discountForTotal > 0
     ? `\n<i>Gross: ${esc(fmtNaira(gross))} · Discounts: -${esc(fmtNaira(discountForTotal))}</i>`
@@ -396,17 +423,18 @@ function buildEodMonthlyDigestHtml(archives, menuCategoryMap) {
     const snap = a.snapshot || {};
     const completedOrders = snap.completedOrders || [];
     const bookings = snap.bookings || [];
-    const { sectionAgg, totalDiscount, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
+    const { sectionAgg, roomChargesAgg, totalDiscount, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
 
     const main  = [...sectionAgg['Main Kitchen'].values()].reduce((s, r) => s + r.total, 0);
     const grill = [...sectionAgg['Grill Kitchen'].values()].reduce((s, r) => s + r.total, 0);
     const drinks = [...sectionAgg['Drinks'].values()].reduce((s, r) => s + r.total, 0);
+    const roomCharges = [...roomChargesAgg.values()].reduce((s, r) => s + r.total, 0);
     const guestPaid = (bookings || [])
-      .filter((b) => b.payment_status === 'paid')
+      .filter((b) => b.payment_status === 'paid' && !(typeof b.notes === 'string' && b.notes.startsWith('Added to order')))
       .reduce((s, b) => s + Number(b.total_amount || 0), 0);
     const foodTotal = main + grill;
     const dayDiscount = Number(totalDiscount) || 0;
-    const dayTotal = Math.max(0, foodTotal + drinks + guestPaid - dayDiscount);
+    const dayTotal = Math.max(0, foodTotal + drinks + roomCharges + guestPaid - dayDiscount);
 
     grandFood += foodTotal;
     grandDrinks += drinks;
