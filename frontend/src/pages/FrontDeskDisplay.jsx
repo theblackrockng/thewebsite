@@ -126,6 +126,14 @@ function lagosToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
 }
 
+function isTodayLagos(iso) {
+  if (!iso) return false;
+  const start = startOfToday();
+  const end = start + 24 * 60 * 60 * 1000;
+  const t = new Date(iso).getTime();
+  return t >= start && t < end;
+}
+
 function fmtResDate(date, today) {
   if (date === today) return "Today";
   const d = new Date(`${date}T12:00:00Z`);
@@ -520,8 +528,18 @@ function classifyEodSection(item, menuCategoryMap) {
 export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mode, reportDate) {
   const kitchenOnly = mode === "kitchen";
   const paidOrders = (completedOrders || []).filter(
-    (o) => o.order_status === "completed" && o.payment_status === "paid"
+    (o) => o.order_status === "completed" && o.payment_status === "paid" && !o.voided
   );
+  const voidedOrders = (completedOrders || [])
+    .filter((o) => o.voided)
+    .map((o) => ({
+      ref: o.order_number || (o.table_number ? `Table ${o.table_number}` : (o.id ? String(o.id).slice(0, 8) : "")),
+      total: Number(o.total) || 0,
+      by: o.voided_by_name || null,
+      reason: o.voided_reason || null,
+    }));
+  const voidedBookings = (bookings || []).filter((b) => b.voided);
+  const liveBookings   = (bookings || []).filter((b) => !b.voided);
   const now = new Date();
   const refDate = reportDate ? new Date(`${reportDate}T12:00:00+01:00`) : now;
   const dateStr = refDate.toLocaleDateString("en-GB", {
@@ -592,6 +610,7 @@ export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mo
   const voidedAgg = new Map();
   for (const order of (completedOrders || [])) {
     if (order.order_status !== "completed") continue;
+    if (order.voided) continue;
     for (const item of (order.order_items || [])) {
       if (!item.voided) continue;
       if (item.category === "room") continue;
@@ -688,20 +707,61 @@ export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mo
 <table><tr class="ssub"><td class="gl">Total Discounts</td><td class="gv">- ${esc(fmt(totalDiscount))}</td></tr></table>`;
   }
 
+  function voidedOrdersHtml() {
+    if (!voidedOrders.length) return "";
+    let body = "";
+    let sum = 0;
+    for (const v of voidedOrders) {
+      sum += Number(v.total) || 0;
+      const meta = [v.by ? `by ${v.by}` : "", v.reason].filter(Boolean).join(" · ");
+      const label = `${esc(v.ref || "Order")}${meta ? ` (${esc(meta)})` : ""}`;
+      body += `<tr><td class="nm">${label}</td><td class="ln">${esc(fmt(v.total))}</td></tr>`;
+    }
+    return `
+<div class="sec">Voided Orders</div>
+<table>
+<thead><tr><th class="nm">ORDER</th><th class="ln">WAS</th></tr></thead>
+<tbody>${body}</tbody>
+</table>
+<table><tr class="ssub"><td class="gl">Voided total (not counted)</td><td class="gv">${esc(fmt(sum))}</td></tr></table>`;
+  }
+
+  function voidedBookingsHtml() {
+    if (!voidedBookings.length) return "";
+    let body = "";
+    let sum = 0;
+    for (const b of voidedBookings) {
+      const total = Number(b.total_amount) || 0;
+      sum += total;
+      const meta = [b.voided_by_name ? `by ${b.voided_by_name}` : "", b.voided_reason].filter(Boolean).join(" · ");
+      const label = `Rm ${esc(b.room_number || "?")} · ${esc(b.guest_name || "")}${meta ? ` (${esc(meta)})` : ""}`;
+      body += `<tr><td class="nm">${label}</td><td class="ln">${esc(fmt(total))}</td></tr>`;
+    }
+    return `
+<div class="sec">Voided Bookings</div>
+<table>
+<thead><tr><th class="nm">ROOM / GUEST</th><th class="ln">WAS</th></tr></thead>
+<tbody>${body}</tbody>
+</table>
+<table><tr class="ssub"><td class="gl">Voided total (not counted)</td><td class="gv">${esc(fmt(sum))}</td></tr></table>`;
+  }
+
   const mainKitchen = sectionHtml("Main Kitchen", sectionAgg["Main Kitchen"]);
   const grillKitchen = sectionHtml("Grill Kitchen", sectionAgg["Grill Kitchen"]);
   const drinks = kitchenOnly ? "" : sectionHtml("Drinks", sectionAgg["Drinks"]);
   const roomChargesBlk = kitchenOnly ? "" : sectionHtml("Rooms Billed to Tables", roomChargesAgg);
-  const guesthouse = kitchenOnly ? "" : guesthouseHtml(bookings);
+  const guesthouse = kitchenOnly ? "" : guesthouseHtml(liveBookings);
   const discountsBlk = kitchenOnly ? "" : discountsHtml();
   const voided = voidedHtml(voidedAgg);
+  const voidedOrdersBlk   = kitchenOnly ? "" : voidedOrdersHtml();
+  const voidedBookingsBlk = kitchenOnly ? "" : voidedBookingsHtml();
 
   const foodTotal =
     [...sectionAgg["Main Kitchen"].values()].reduce((s, r) => s + r.total, 0)
     + [...sectionAgg["Grill Kitchen"].values()].reduce((s, r) => s + r.total, 0);
   const drinkTotal = [...sectionAgg["Drinks"].values()].reduce((s, r) => s + r.total, 0);
   const roomChargesTotal = [...roomChargesAgg.values()].reduce((s, r) => s + r.total, 0);
-  const guesthousePaidTotal = (bookings || [])
+  const guesthousePaidTotal = liveBookings
     .filter((b) => b.payment_status === "paid" && !(typeof b.notes === "string" && b.notes.startsWith("Added to order")))
     .reduce((s, b) => s + Number(b.total_amount || 0), 0);
   const gross = foodTotal + (kitchenOnly ? 0 : drinkTotal + roomChargesTotal + guesthousePaidTotal);
@@ -709,7 +769,7 @@ export function buildEndOfDayHtml(completedOrders, menuCategoryMap, bookings, mo
   const grandTotal = Math.max(0, gross - discountForTotal);
   const orderCount = paidOrders.length;
 
-  const anyContent = mainKitchen || grillKitchen || drinks || roomChargesBlk || guesthouse || discountsBlk || voided;
+  const anyContent = mainKitchen || grillKitchen || drinks || roomChargesBlk || guesthouse || discountsBlk || voided || voidedOrdersBlk || voidedBookingsBlk;
   const emptyBlock = anyContent ? "" : `<div class="smry" style="padding:4mm 0;font-style:italic">No activity today</div>`;
 
   const grandBlock = kitchenOnly ? "" : `
@@ -762,7 +822,7 @@ tbody td{font-size:9.5pt;font-weight:900;padding:0.8mm 0}
 <div class="dt">${esc(dateStr)}</div>
 <div class="dt">Printed: ${esc(timeStr)}</div>
 <div class="hr2"></div>
-${mainKitchen}${grillKitchen}${drinks}${roomChargesBlk}${guesthouse}${discountsBlk}${voided}${emptyBlock}${grandBlock}
+${mainKitchen}${grillKitchen}${drinks}${roomChargesBlk}${guesthouse}${discountsBlk}${voided}${voidedOrdersBlk}${voidedBookingsBlk}${emptyBlock}${grandBlock}
 <div class="eor">*** END OF REPORT ***</div>
 <div class="foot">Generated by BLACKROCK Front Desk</div>
 </body>
@@ -1730,10 +1790,13 @@ function FrontDeskMain({ onSessionLost }) {
     past: resLists.past.length,
   }), [resLists, reservations, resToday]);
 
-  const activeOrders = useMemo(() => orders.filter(hasActiveItems), [orders]);
-  const activeCompletedOrders = useMemo(() => completedOrders.filter(hasActiveItems), [completedOrders]);
+  const activeOrders = useMemo(() => orders.filter((o) => !o.voided).filter(hasActiveItems), [orders]);
+  const activeCompletedOrders = useMemo(
+    () => completedOrders.filter((o) => !o.voided).filter(hasActiveItems),
+    [completedOrders]
+  );
   const paidBookingsToday = useMemo(
-    () => (todayBookings || []).filter((b) => b.payment_status === "paid"),
+    () => (todayBookings || []).filter((b) => b.payment_status === "paid" && !b.voided),
     [todayBookings]
   );
   const visibleCompletedCount = activeCompletedOrders.length + paidBookingsToday.length;
@@ -1748,10 +1811,10 @@ function FrontDeskMain({ onSessionLost }) {
 
   const paidToday = useMemo(() => {
     const orderSum = completedOrders
-      .filter((o) => o.payment_status === "paid")
+      .filter((o) => o.payment_status === "paid" && !o.voided)
       .reduce((s, o) => s + (Number(o.total) || 0), 0);
     const bookingSum = (todayBookings || [])
-      .filter((b) => b.payment_status === "paid" && !(typeof b.notes === "string" && b.notes.startsWith("Added to order")))
+      .filter((b) => b.payment_status === "paid" && !b.voided && !(typeof b.notes === "string" && b.notes.startsWith("Added to order")))
       .reduce((s, b) => s + (Number(b.total_amount) || 0), 0);
     return orderSum + bookingSum;
   }, [completedOrders, todayBookings]);
@@ -2171,7 +2234,14 @@ function FrontDeskMain({ onSessionLost }) {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(440px, 1fr))", gap: 20 }}>
           {visible.map((item) => {
             if (item.type === "booking") {
-              return <PaidRoomCard key={item.id} booking={item.booking} t={t} />;
+              return (
+                <PaidRoomCard
+                  key={item.id}
+                  booking={item.booking}
+                  t={t}
+                  onVoided={() => { fetchGuesthouseRooms(); fetchTodayBookings(); fetchOrders(); }}
+                />
+              );
             }
             const { order, info } = item;
             return (
@@ -2191,6 +2261,7 @@ function FrontDeskMain({ onSessionLost }) {
                 guesthouseRooms={guesthouseRooms}
                 promptGuesthousePin={promptGuesthousePin}
                 onRoomAdded={() => { fetchGuesthouseRooms(); fetchOrders(); }}
+                onVoided={() => { fetchOrders(); fetchTodayBookings(); fetchGuesthouseRooms(); }}
               />
             );
           })}
@@ -2968,7 +3039,7 @@ function AddRoomModal({ order, t, rooms, promptGuesthousePin, onClose, onDone })
   );
 }
 
-function PaidRoomCard({ booking, t }) {
+function PaidRoomCard({ booking, t, onVoided }) {
   const roomNumber = booking.room_number || booking.guest_rooms?.room_number || "—";
   const guestName = booking.guest_name || "Guest";
   const nights = Number(booking.nights) || 1;
@@ -2977,6 +3048,10 @@ function PaidRoomCard({ booking, t }) {
   const checkInLabel = checkInIso
     ? new Date(checkInIso).toLocaleTimeString("en-NG", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Africa/Lagos" })
     : "";
+  const canVoid =
+    isTodayLagos(booking.created_at) &&
+    !(typeof booking.notes === "string" && booking.notes.startsWith("Added to order"));
+  const [showVoid, setShowVoid] = useState(false);
   return (
     <div style={{ background: t.card, border: `1px solid ${t.border}`, borderLeft: `4px solid ${t.gold}`, borderRadius: 12, padding: 20, display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
@@ -3001,11 +3076,34 @@ function PaidRoomCard({ booking, t }) {
           ₦{total.toLocaleString()}
         </div>
       </div>
+      {canVoid && (
+        <button
+          onClick={() => setShowVoid(true)}
+          style={{
+            marginTop: 2, padding: "9px 14px", borderRadius: 10,
+            border: `1.5px solid ${t.accent}`, background: "transparent",
+            color: t.accent, fontSize: 13, fontWeight: 700, cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            fontFamily: "inherit",
+          }}
+        >
+          <Trash2 size={14} /> Void Booking
+        </button>
+      )}
+      {showVoid && (
+        <VoidRecordModal
+          kind="booking"
+          record={booking}
+          t={t}
+          onClose={() => setShowVoid(false)}
+          onDone={() => { setShowVoid(false); if (onVoided) onVoided(); }}
+        />
+      )}
     </div>
   );
 }
 
-function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, onConfirm, onComplete, onPayment, otherTableOrders, guesthouseRooms, promptGuesthousePin, onRoomAdded }) {
+function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, onConfirm, onComplete, onPayment, otherTableOrders, guesthouseRooms, promptGuesthousePin, onRoomAdded, onVoided }) {
   const _baseCfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
   const statusCfg = (order.order_status === "new" && (order.order_type === "pickup" || order.order_type === "delivery"))
     ? { ..._baseCfg, label: "Awaiting confirmation" }
@@ -3020,6 +3118,7 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
   const [showAddRoom, setShowAddRoom] = useState(false);
   const [showEditOrder, setShowEditOrder] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
+  const [showVoidOrder, setShowVoidOrder] = useState(false);
   const [printStatus, setPrintStatus] = useState(null);
 
   const mergedOrders = (otherTableOrders || []).filter((o) => mergedIds.has(o.id));
@@ -3073,6 +3172,7 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
   const isPaid = order.payment_status === "paid";
   const canMarkPaid = !isPaid && !cancelled && (inCompletedTab || order.payment_status !== "failed");
   const canProof = !inCompletedTab && order.payment_status === "awaiting_proof" && !cancelled;
+  const canVoidOrder = inCompletedTab && !order.voided && isTodayLagos(order.completed_at || order.created_at);
   const timeLine = inCompletedTab
     ? (completion.known ? `Completed ${fmtLagosTime(completion.iso)}` : `Placed ${fmtLagosTime(order.created_at)}`)
     : timeSince(order.created_at, now);
@@ -3275,7 +3375,38 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
                 {mergedIds.size > 0 && <span style={{ color: t.gold, marginLeft: 6 }}>({mergedIds.size} added)</span>}
               </button>
             )}
+            {canVoidOrder && (
+              <button
+                onClick={() => setShowVoidOrder(true)}
+                style={{
+                  width: "100%", padding: "11px 16px", borderRadius: 10,
+                  border: `1.5px solid ${t.accent}`, background: "transparent",
+                  color: t.accent, fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  fontFamily: "inherit",
+                }}
+              >
+                <Trash2 size={14} /> Void Order
+              </button>
+            )}
           </div>
+        </div>
+      )}
+
+      {canVoidOrder && items.length === 0 && (
+        <div style={{ padding: "0 20px 18px" }}>
+          <button
+            onClick={() => setShowVoidOrder(true)}
+            style={{
+              width: "100%", padding: "11px 16px", borderRadius: 10,
+              border: `1.5px solid ${t.accent}`, background: "transparent",
+              color: t.accent, fontSize: 14, fontWeight: 700, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              fontFamily: "inherit",
+            }}
+          >
+            <Trash2 size={14} /> Void Order
+          </button>
         </div>
       )}
 
@@ -3319,6 +3450,15 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
           order={order}
           t={t}
           onClose={() => setShowDiscount(false)}
+        />
+      )}
+      {showVoidOrder && (
+        <VoidRecordModal
+          kind="order"
+          record={order}
+          t={t}
+          onClose={() => setShowVoidOrder(false)}
+          onDone={() => { setShowVoidOrder(false); if (onVoided) onVoided(); }}
         />
       )}
     </div>
@@ -3497,6 +3637,159 @@ function DiscountModal({ order, t, onClose }) {
                   {busy ? "Applying…" : "Apply Discount"}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function VoidRecordModal({ kind, record, t, onClose, onDone }) {
+  const [stage, setStage] = useState("pin");
+  const [pin, setPin] = useState("");
+  const [verifying, setVerifying] = useState(false);
+  const [token, setToken] = useState("");
+  const [authorizedBy, setAuthorizedBy] = useState("");
+  const [tokenExp, setTokenExp] = useState(0);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const isBooking = kind === "booking";
+  const titleLabel = isBooking
+    ? `Room ${record.room_number || record.guest_rooms?.room_number || ""}`.trim()
+    : (record.table_number ? `Table ${record.table_number}` : (record.order_number || record.id?.slice(0, 8) || "Order"));
+  const total = Number(isBooking ? (record.total_amount || 0) : (record.total || 0));
+  const subLabel = isBooking
+    ? `${record.guest_name || "Guest"} · ₦${total.toLocaleString("en-NG")}`
+    : `${record.order_number || record.id?.slice(0, 8) || ""} · ₦${total.toLocaleString("en-NG")}`;
+
+  async function verifyPin() {
+    if (!/^\d{4,8}$/.test(pin)) { setError("Enter 4-8 digits."); return; }
+    setVerifying(true); setError("");
+    try {
+      const res = await fetch("/api/verify-void-pin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ pin }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) { setError(data.error || "Invalid PIN."); setPin(""); return; }
+      setToken(data.token);
+      setAuthorizedBy(data.authorized_by?.name || data.by_name || "manager");
+      setTokenExp(data.expires_at || data.exp || 0);
+      setStage("reason");
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function submit() {
+    const trimmed = reason.trim();
+    if (!trimmed || trimmed.length < 3) { setError("Reason is required (min 3 characters)."); return; }
+    if (!token) { setError("Session expired. Reopen Void."); return; }
+    setBusy(true); setError("");
+    try {
+      const resource = isBooking ? "void-booking" : "void-order";
+      const body = isBooking ? { booking_id: record.id, reason: trimmed } : { order_id: record.id, reason: trimmed };
+      const res = await fetch(`/api/front-desk?resource=${resource}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "x-void-token": token, ...(await authHeader()) },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) { setError(data.error || `HTTP ${res.status}`); return; }
+      onDone && onDone();
+    } catch {
+      setError("Network error. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const expiresIn = tokenExp ? Math.max(0, Math.round((tokenExp - Date.now()) / 1000)) : 0;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.65)" }} onClick={onClose} />
+      <div style={{
+        position: "relative", width: "100%", maxWidth: 460,
+        background: t.card, border: `1px solid ${t.border}`,
+        borderRadius: 12, padding: 24, color: t.text, maxHeight: "88vh", overflow: "auto",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+              <Trash2 size={16} style={{ color: t.accent }} /> Void {isBooking ? "Booking" : "Order"} — {titleLabel}
+            </div>
+            <div style={{ fontSize: 12, color: t.muted, marginTop: 4 }}>
+              {subLabel}
+              {authorizedBy && stage !== "pin" ? ` · authorized by ${authorizedBy} (${expiresIn}s)` : ""}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: t.muted }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {stage === "pin" && (
+          <div>
+            <div style={{ fontSize: 13, color: t.muted, marginBottom: 12 }}>
+              Voiding removes this {isBooking ? "booking" : "order"} from today's revenue and moves it to the Voided audit section. Enter the manager PIN to continue.
+            </div>
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={8}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+              onKeyDown={(e) => { if (e.key === "Enter") verifyPin(); }}
+              placeholder="Manager PIN"
+              autoFocus
+              style={{ width: "100%", padding: "12px 14px", background: t.input, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 18, letterSpacing: 6, textAlign: "center", outline: "none" }}
+            />
+            {error && (
+              <div style={{ marginTop: 10, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
+            )}
+            <div style={{ display: "flex", gap: 10, marginTop: 16 }}>
+              <button onClick={onClose} style={{ flex: 1, padding: "10px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Cancel</button>
+              <button onClick={verifyPin} disabled={verifying || !pin} style={{ flex: 2, padding: "10px", borderRadius: 8, border: "none", background: t.gold, color: t.onGold, fontWeight: 700, fontSize: 13, cursor: verifying ? "default" : "pointer", opacity: verifying || !pin ? 0.6 : 1 }}>
+                {verifying ? "Verifying…" : "Unlock"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {stage === "reason" && (
+          <div>
+            <div style={{ fontSize: 12.5, color: t.muted, marginBottom: 12 }}>
+              Enter the reason for voiding (required, min 3 characters). This appears in audit reports.
+            </div>
+            <textarea
+              value={reason}
+              onChange={(e) => setReason(e.target.value.slice(0, 240))}
+              placeholder={isBooking ? "e.g. duplicate booking, superseded by Room 101 ₦40,000" : "e.g. test order, wrong table, duplicate"}
+              autoFocus
+              rows={3}
+              style={{ width: "100%", padding: "11px 14px", background: t.input, border: `1px solid ${t.border}`, borderRadius: 8, color: t.text, fontSize: 14, outline: "none", fontFamily: "inherit", resize: "vertical", marginBottom: 12 }}
+            />
+            {error && (
+              <div style={{ marginBottom: 12, fontSize: 12.5, color: t.accent, background: "rgba(220,38,38,0.08)", border: `1px solid ${t.accent}`, borderRadius: 8, padding: "8px 12px" }}>{error}</div>
+            )}
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+              <button onClick={onClose} style={{ padding: "10px 16px", borderRadius: 8, border: `1px solid ${t.border}`, background: "transparent", color: t.text, cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>
+                Cancel
+              </button>
+              <button
+                onClick={submit}
+                disabled={busy || !reason.trim()}
+                style={{ padding: "10px 20px", borderRadius: 8, border: "none", background: t.accent, color: "#fff", fontWeight: 700, fontSize: 13, cursor: busy ? "default" : "pointer", opacity: busy || !reason.trim() ? 0.6 : 1 }}
+              >
+                {busy ? "Voiding…" : `Void ${isBooking ? "Booking" : "Order"}`}
+              </button>
             </div>
           </div>
         )}

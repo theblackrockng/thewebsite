@@ -1337,6 +1337,174 @@ function lagosDayBounds(dateStr) {
   return { start: new Date(start).toISOString(), end };
 }
 
+function isTodayLagos(iso) {
+  if (!iso) return false;
+  const { start, end } = lagosDayBounds(lagosDate());
+  const t = new Date(iso).getTime();
+  return t >= new Date(start).getTime() && t < new Date(end).getTime();
+}
+
+async function voidOrderHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Void-Token');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, ORDER_ITEM_ROLES);
+  if (!staff) return;
+
+  const ip = getIP(req);
+  const { blocked } = checkUserAgent(req);
+  if (blocked) return res.status(400).json({ error: 'Bad request.' });
+  const { allowed } = checkCors(req);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden.' });
+  const { limited } = checkInMemoryRateLimit(ip, 'front-desk-void-order', 30, 60 * 60 * 1000);
+  if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+  const voidToken = req.headers['x-void-token'] || req.headers['X-Void-Token'] || '';
+  const authz = verifyVoidToken(voidToken);
+  if (!authz) return res.status(401).json({ error: 'Manager PIN required. Verify and try again.' });
+
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Invalid request body.' });
+  }
+  const { order_id: orderId } = body;
+  if (typeof orderId !== 'string' || !UUID_RE.test(orderId)) {
+    return res.status(400).json({ error: 'Missing or invalid order id.' });
+  }
+  const reason = typeof body.reason === 'string' ? body.reason.slice(0, 240).trim() : '';
+  if (!reason) return res.status(400).json({ error: 'Reason is required when voiding an order.' });
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const { data: order, error: orderErr } = await db
+    .from('orders')
+    .select('id, order_number, order_status, total, completed_at, created_at, voided, table_number, order_type')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (orderErr || !order) return res.status(404).json({ error: 'Order not found.' });
+  if (order.voided) return res.status(400).json({ error: 'Order is already voided.' });
+
+  const stamp = order.completed_at || order.created_at;
+  if (!isTodayLagos(stamp)) {
+    return res.status(400).json({ error: "Can't void an order from a previous day. Day-bounded to today only." });
+  }
+
+  const { error: updErr } = await db
+    .from('orders')
+    .update({
+      voided: true,
+      voided_at: new Date().toISOString(),
+      voided_by_id: authz.by_id || null,
+      voided_by_name: authz.by_name || staff.profile.full_name || null,
+      voided_reason: reason,
+    })
+    .eq('id', orderId)
+    .eq('voided', false);
+  if (updErr) {
+    console.error('[front-desk-void-order] update error:', updErr);
+    return res.status(500).json({ error: 'Failed to void order.', detail: updErr.message });
+  }
+
+  const ref = order.order_number || orderId.slice(0, 8);
+  const location = order.table_number ? `Table ${order.table_number}` : (order.order_type || 'order');
+  const fmt = (n) => '₦' + Number(n || 0).toLocaleString('en-NG');
+  await notifyTelegram(
+    'front-desk-void-order',
+    `🗑️ <b>Whole order voided</b> — <b>${escapeHtml(ref)}</b> (${escapeHtml(location)}), ${escapeHtml(fmt(order.total))}\nBy <b>${escapeHtml(authz.by_name || '?')}</b> · ${escapeHtml(reason)}`,
+  );
+
+  return res.status(200).json({ ok: true, voided: true });
+}
+
+async function voidBookingHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'PATCH, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Void-Token');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'PATCH') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, GUESTHOUSE_ROLES);
+  if (!staff) return;
+
+  const ip = getIP(req);
+  const { blocked } = checkUserAgent(req);
+  if (blocked) return res.status(400).json({ error: 'Bad request.' });
+  const { allowed } = checkCors(req);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden.' });
+  const { limited } = checkInMemoryRateLimit(ip, 'front-desk-void-booking', 30, 60 * 60 * 1000);
+  if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+  const voidToken = req.headers['x-void-token'] || req.headers['X-Void-Token'] || '';
+  const authz = verifyVoidToken(voidToken);
+  if (!authz) return res.status(401).json({ error: 'Manager PIN required. Verify and try again.' });
+
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Invalid request body.' });
+  }
+  const { booking_id: bookingId } = body;
+  if (typeof bookingId !== 'string' || !UUID_RE.test(bookingId)) {
+    return res.status(400).json({ error: 'Missing or invalid booking id.' });
+  }
+  const reason = typeof body.reason === 'string' ? body.reason.slice(0, 240).trim() : '';
+  if (!reason) return res.status(400).json({ error: 'Reason is required when voiding a booking.' });
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const { data: booking, error: bErr } = await db
+    .from('guest_room_bookings')
+    .select('id, room_id, room_number, guest_name, total_amount, status, notes, created_at, voided')
+    .eq('id', bookingId)
+    .maybeSingle();
+  if (bErr || !booking) return res.status(404).json({ error: 'Booking not found.' });
+  if (booking.voided) return res.status(400).json({ error: 'Booking is already voided.' });
+  if (typeof booking.notes === 'string' && booking.notes.startsWith('Added to order')) {
+    return res.status(400).json({ error: 'This room was added to a table bill — remove it from the Edit menu on that order instead.' });
+  }
+  if (!isTodayLagos(booking.created_at)) {
+    return res.status(400).json({ error: "Can't void a booking from a previous day. Day-bounded to today only." });
+  }
+
+  const { error: updErr } = await db
+    .from('guest_room_bookings')
+    .update({
+      voided: true,
+      voided_at: new Date().toISOString(),
+      voided_by_id: authz.by_id || null,
+      voided_by_name: authz.by_name || staff.profile.full_name || null,
+      voided_reason: reason,
+    })
+    .eq('id', bookingId)
+    .eq('voided', false);
+  if (updErr) {
+    console.error('[front-desk-void-booking] update error:', updErr);
+    return res.status(500).json({ error: 'Failed to void booking.', detail: updErr.message });
+  }
+
+  if (booking.status === 'active' && booking.room_id) {
+    await db.from('guest_rooms').update({ status: 'available' }).eq('id', booking.room_id);
+  }
+
+  const fmt = (n) => '₦' + Number(n || 0).toLocaleString('en-NG');
+  await notifyTelegram(
+    'front-desk-void-booking',
+    `🗑️ <b>Guest House booking voided</b> — Room <b>${escapeHtml(booking.room_number || '?')}</b> (${escapeHtml(booking.guest_name || 'guest')}), ${escapeHtml(fmt(booking.total_amount))}\nBy <b>${escapeHtml(authz.by_name || '?')}</b> · ${escapeHtml(reason)}`,
+  );
+
+  return res.status(200).json({ ok: true, voided: true });
+}
+
 async function eodHandler(req, res) {
   applySecurityHeaders(res);
   const corsHeaders = getCorsHeaders(req);
@@ -1764,6 +1932,8 @@ module.exports = function handler(req, res) {
   if (resource === 'guesthouse-rooms') return guesthouseRoomsHandler(req, res);
   if (resource === 'guesthouse-bookings') return guesthouseBookingsHandler(req, res);
   if (resource === 'add-room-to-order') return addRoomToOrderHandler(req, res);
+  if (resource === 'void-order') return voidOrderHandler(req, res);
+  if (resource === 'void-booking') return voidBookingHandler(req, res);
   if (resource === 'eod') return eodHandler(req, res);
   if (resource === 'eod-cron') return eodCronHandler(req, res);
   if (resource === 'eod-resend') return eodResendHandler(req, res);
