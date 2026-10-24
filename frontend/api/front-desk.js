@@ -1186,6 +1186,148 @@ async function guesthouseBookingsHandler(req, res) {
   return res.status(405).json({ error: 'Method not allowed.' });
 }
 
+// POST { order_id, room_id, nights? } — checks a guest into `room_id` and
+// adds the room charge as a line item to the open table order so the bill
+// combines food + room. Requires guesthouse PIN. The booking's guest_name
+// is a placeholder ("Table <n>") so the line item can display just the room
+// type and amount, per Front-Desk UX requirement.
+async function addRoomToOrderHandler(req, res) {
+  applySecurityHeaders(res);
+  const corsHeaders = getCorsHeaders(req);
+  Object.entries(corsHeaders).forEach(([k, v]) => res.setHeader(k, v));
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Guesthouse-Token');
+
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed.' });
+
+  const staff = await requireStaff(req, res, GUESTHOUSE_ROLES);
+  if (!staff) return;
+
+  const ip = getIP(req);
+  const { blocked } = checkUserAgent(req);
+  if (blocked) return res.status(400).json({ error: 'Bad request.' });
+  const { allowed } = checkCors(req);
+  if (!allowed) return res.status(403).json({ error: 'Forbidden.' });
+  const { limited } = checkInMemoryRateLimit(ip, 'front-desk-add-room', 60, 60 * 60 * 1000);
+  if (limited) return res.status(429).json({ error: 'Too many requests.' });
+
+  const token = req.headers['x-guesthouse-token'] || req.headers['X-Guesthouse-Token'] || '';
+  const authz = verifyGuesthouseToken(token);
+  if (!authz) return res.status(401).json({ error: 'Guesthouse PIN required. Verify and try again.' });
+
+  const body = req.body;
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return res.status(400).json({ error: 'Invalid request body.' });
+  }
+  const { order_id: orderId, room_id: roomId, nights } = body;
+  if (typeof orderId !== 'string' || !UUID_RE.test(orderId)) {
+    return res.status(400).json({ error: 'Missing or invalid order id.' });
+  }
+  if (typeof roomId !== 'string' || !UUID_RE.test(roomId)) {
+    return res.status(400).json({ error: 'Missing or invalid room id.' });
+  }
+  const nightsN = Number.parseInt(nights, 10) || 1;
+  if (nightsN < 1 || nightsN > 365) {
+    return res.status(400).json({ error: 'Nights must be between 1 and 365.' });
+  }
+
+  const db = getDb();
+  if (!db) return res.status(500).json({ error: 'Database not configured.' });
+
+  const { data: order, error: orderErr } = await db
+    .from('orders')
+    .select('id, order_number, order_status, table_number, order_type')
+    .eq('id', orderId)
+    .maybeSingle();
+  if (orderErr || !order) return res.status(404).json({ error: 'Order not found.' });
+  if (!EDITABLE_ORDER_STATUSES.includes(order.order_status)) {
+    return res.status(400).json({ error: `Cannot add a room to an order that is '${order.order_status}'.` });
+  }
+
+  const { data: room, error: roomErr } = await db
+    .from('guest_rooms')
+    .select('id, room_number, room_type, price')
+    .eq('id', roomId)
+    .maybeSingle();
+  if (roomErr || !room) return res.status(404).json({ error: 'Room not found.' });
+
+  const { data: existing } = await db
+    .from('guest_room_bookings')
+    .select('id')
+    .eq('room_id', roomId)
+    .eq('status', 'active')
+    .limit(1);
+  if (existing && existing.length > 0) {
+    return res.status(409).json({ error: 'Room is already occupied. Pick a different room.' });
+  }
+
+  const baseAmount = room.price * nightsN;
+  const totalAmount = baseAmount;
+  const placeholderName = order.table_number ? `Table ${order.table_number}` : 'Walk-in';
+  const orderRef = order.order_number || orderId.slice(0, 8);
+
+  const { data: booking, error: insBookingErr } = await db
+    .from('guest_room_bookings')
+    .insert({
+      room_id: roomId,
+      room_number: room.room_number,
+      guest_name: placeholderName,
+      nights: nightsN,
+      base_amount: baseAmount,
+      discount: 0,
+      total_amount: totalAmount,
+      notes: `Added to order ${orderRef}`,
+      checked_in_by_id: staff.profile.id,
+      checked_in_by_name: staff.profile.full_name || staff.profile.email || 'Front Desk',
+    })
+    .select('*')
+    .single();
+  if (insBookingErr) {
+    console.error('[add-room-to-order] booking insert error:', insBookingErr);
+    return res.status(500).json({ error: 'Failed to create room booking.', detail: insBookingErr.message });
+  }
+
+  await db.from('guest_rooms').update({ status: 'occupied' }).eq('id', roomId);
+
+  const { error: insItemErr } = await db.from('order_items').insert({
+    order_id: orderId,
+    item_id: `room:${roomId}`,
+    item_name: room.room_type,
+    unit_price: room.price,
+    qty: nightsN,
+    line_total: totalAmount,
+    category: 'room',
+    modifiers: `Room ${room.room_number}${nightsN > 1 ? ` · ${nightsN} nights` : ''}`,
+  });
+  if (insItemErr) {
+    console.error('[add-room-to-order] item insert error:', insItemErr);
+    await db.from('guest_room_bookings').delete().eq('id', booking.id);
+    await db.from('guest_rooms').update({ status: 'available' }).eq('id', roomId);
+    return res.status(500).json({ error: 'Failed to add room to bill.', detail: insItemErr.message });
+  }
+
+  let totals;
+  try {
+    totals = await recomputeOrderTotals(db, orderId);
+  } catch (err) {
+    console.error('[add-room-to-order] recompute error:', err);
+    totals = null;
+  }
+
+  const staffName = staff.profile.full_name || staff.profile.email || 'Front Desk';
+  const location = order.table_number ? `Table ${order.table_number}` : (order.order_type || 'order');
+  const telegramMsg = [
+    `🛏️➕ <b>Room added to ${escapeHtml(orderRef)}</b> (${escapeHtml(location)})`,
+    `Room <b>${escapeHtml(room.room_number)}</b> (${escapeHtml(room.room_type)}) — ${nightsN} night${nightsN === 1 ? '' : 's'}`,
+    `By <b>${escapeHtml(staffName)}</b> (PIN: ${escapeHtml(authz.by_name || '—')})`,
+    totals ? `New bill total: ₦${totals.total.toLocaleString('en-NG')}` : '',
+  ].filter(Boolean).join('\n');
+  await notifyTelegram('front-desk-add-room', telegramMsg);
+
+  return res.status(200).json({ ok: true, booking, ...(totals || {}) });
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function lagosDayBounds(dateStr) {
@@ -1621,6 +1763,7 @@ module.exports = function handler(req, res) {
   if (resource === 'add-items') return addItemsHandler(req, res);
   if (resource === 'guesthouse-rooms') return guesthouseRoomsHandler(req, res);
   if (resource === 'guesthouse-bookings') return guesthouseBookingsHandler(req, res);
+  if (resource === 'add-room-to-order') return addRoomToOrderHandler(req, res);
   if (resource === 'eod') return eodHandler(req, res);
   if (resource === 'eod-cron') return eodCronHandler(req, res);
   if (resource === 'eod-resend') return eodResendHandler(req, res);

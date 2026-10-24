@@ -419,6 +419,79 @@ table{width:100%;border-collapse:collapse;table-layout:fixed}
 </html>`;
 }
 
+function buildCheckInReceiptHtml(booking, room) {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Africa/Lagos' });
+  const timeStr = now.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Lagos' });
+  const roomNumber = booking?.room_number || room?.room_number || '—';
+  const roomType = room?.room_type || booking?.room_type || 'Room';
+  const nights = Number(booking?.nights) || 1;
+  const price = Number(room?.price || (booking?.base_amount && nights ? booking.base_amount / nights : 0)) || 0;
+  const base = Number(booking?.base_amount) || (price * nights);
+  const discount = Number(booking?.discount) || 0;
+  const total = Number(booking?.total_amount) || Math.max(0, base - discount);
+  const paid = booking?.payment_status === 'paid';
+  const fmtN = (n) => '₦' + Number(n || 0).toLocaleString('en-NG');
+  const checkInIso = booking?.check_in_at || booking?.created_at;
+  const checkInLabel = checkInIso
+    ? new Date(checkInIso).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Africa/Lagos' })
+    : `${dateStr} · ${timeStr}`;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+@page{size:80mm auto;margin:0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{margin:0;padding:0 7mm;width:80mm;font-family:'Courier New',Courier,ui-monospace,monospace;font-size:10pt;font-weight:900;color:#000;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;-webkit-text-stroke:0.3px #000;text-rendering:geometricPrecision}
+.brand{font-size:16pt;font-weight:900;letter-spacing:4px;text-align:center;margin-top:1mm;margin-bottom:1mm}
+.sub{font-size:9pt;font-weight:900;text-align:center;letter-spacing:1px;margin-bottom:2mm;text-transform:uppercase}
+.hr{border-top:2px solid #000;margin:2mm 0;height:0}
+.hr2{border-top:3px double #000;margin:2mm 0;height:0}
+.tbl{font-size:12pt;font-weight:900;text-align:center;margin:1mm 0;letter-spacing:2px;text-transform:uppercase}
+.meta{font-size:9pt;font-weight:900;text-align:center;margin-bottom:2mm;letter-spacing:1px}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+.item .nm{font-size:10pt;word-break:break-word;padding:0.8mm 1mm 0.8mm 0;text-align:left}
+.item .pr{width:28mm;font-size:10pt;text-align:right;white-space:nowrap;padding:0.8mm 0}
+.ssub td{padding:1mm 0;font-size:10pt;font-weight:900;border-top:2px solid #000}
+.ssub .pr{width:28mm;text-align:right;white-space:nowrap}
+.dsc td{padding:0.6mm 0 1.5mm;font-size:10pt;font-weight:900}
+.dsc .pr{width:28mm;text-align:right;white-space:nowrap}
+.tot td{padding:2mm 0;font-size:11.5pt;font-weight:900;border-top:3px double #000;border-bottom:3px double #000;text-transform:uppercase;letter-spacing:1px}
+.tot .pr{width:28mm;text-align:right;white-space:nowrap}
+.pay{text-align:center;font-size:12pt;font-weight:900;margin:2mm 0;letter-spacing:3px;text-transform:uppercase}
+.bl{font-size:9.5pt;font-weight:900;text-align:center;margin-bottom:1mm;text-transform:uppercase;letter-spacing:1px}
+.bd{font-size:9.5pt;font-weight:900;text-align:center;margin-bottom:0.5mm}
+.foot{font-size:9pt;font-weight:900;text-align:center;margin-top:3mm;letter-spacing:1px}
+</style>
+</head>
+<body>
+<div class="brand">BLACKROCK</div>
+<div class="sub">Guest House</div>
+<div class="hr2"></div>
+<div class="tbl">Room ${esc(String(roomNumber))}</div>
+<div class="meta">${esc(roomType)}</div>
+<div class="meta">Checked in ${esc(checkInLabel)}</div>
+<div class="hr"></div>
+<table>
+<tr class="item"><td class="nm">${esc(roomType)}</td><td class="pr">${esc(fmtN(price))}</td></tr>
+<tr class="item"><td class="nm">× ${esc(String(nights))} night${nights === 1 ? '' : 's'}</td><td class="pr">${esc(fmtN(base))}</td></tr>
+${discount > 0 ? `<tr class="ssub"><td>Subtotal</td><td class="pr">${esc(fmtN(base))}</td></tr><tr class="dsc"><td>Discount</td><td class="pr">- ${esc(fmtN(discount))}</td></tr>` : ''}
+<tr class="tot"><td>Total</td><td class="pr">${esc(fmtN(total))}</td></tr>
+</table>
+<div class="pay">Payment: ${paid ? 'PAID' : 'PENDING'}</div>
+${paid ? '' : `<div class="hr2"></div>
+<div class="bl">Transfer to this account</div>
+<div class="bd">Guaranty Trust Bank (GTB)</div>
+<div class="bd">Blackrock Restaurant LoungeBar</div>
+<div class="bd">9006080442</div>`}
+<div class="hr2"></div>
+<div class="foot">Thank you for staying with us</div>
+</body>
+</html>`;
+}
+
 const EOD_MAIN_KITCHEN_CATEGORIES = new Set([
   "Starters", "Salads", "Rice", "Pasta",
   "Bush Bar Kitchen", "Continental", "Sauces",
@@ -2059,6 +2132,9 @@ function FrontDeskMain({ onSessionLost }) {
                 onComplete={completeOrder}
                 onPayment={setPayment}
                 otherTableOrders={orders.filter((o) => isTableOrder(o) && o.id !== order.id)}
+                guesthouseRooms={guesthouseRooms}
+                promptGuesthousePin={promptGuesthousePin}
+                onRoomAdded={() => { fetchGuesthouseRooms(); fetchOrders(); }}
               />
             );
           })}
@@ -2700,6 +2776,142 @@ function AddItemsModal({ order, t, staffName, onClose }) {
   );
 }
 
+function AddRoomModal({ order, t, rooms, promptGuesthousePin, onClose, onDone }) {
+  const available = (rooms || []).filter((r) => !r.active_booking);
+  const [selected, setSelected] = useState(null);
+  const [nights, setNights] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const nightsN = Math.max(1, Math.min(365, Number(nights) || 1));
+  const total = selected ? Number(selected.price) * nightsN : 0;
+  const fmtN = (n) => "₦" + Number(n || 0).toLocaleString("en-NG");
+
+  async function submit() {
+    if (!selected || submitting) return;
+    setError("");
+    const auth = await promptGuesthousePin("add a room to this bill");
+    if (!auth) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/front-desk?resource=add-room-to-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-guesthouse-token": auth.token,
+          ...(await authHeader()),
+        },
+        body: JSON.stringify({ order_id: order.id, room_id: selected.id, nights: nightsN }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) {
+        setError(data.detail ? `${data.error || "Failed"}: ${data.detail}` : (data.error || "Failed to add room."));
+        setSubmitting(false);
+        return;
+      }
+      onDone();
+    } catch {
+      setError("Could not reach the server.");
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      style={{ position: "fixed", inset: 0, zIndex: 920, background: "rgba(0,0,0,0.72)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{ background: t.card, color: t.text, border: `2px solid ${t.gold}`, borderRadius: 16, width: "100%", maxWidth: 560, maxHeight: "90vh", display: "flex", flexDirection: "column" }}
+      >
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 12, letterSpacing: "0.14em", textTransform: "uppercase", color: t.gold, fontWeight: 700 }}>
+              Add Room to {order.table_number ? `Table ${order.table_number}` : "Bill"}
+            </div>
+            <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>Pick an available room</div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: t.muted, cursor: "pointer", display: "flex" }}><X size={22} /></button>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "14px 20px" }}>
+          {available.length === 0 ? (
+            <div style={{ padding: "40px 20px", textAlign: "center", color: t.muted, fontSize: 14 }}>
+              No rooms are available. Check the Guest House tab to free a room first.
+            </div>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {available.map((r) => {
+                const active = selected?.id === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    onClick={() => setSelected(r)}
+                    style={{
+                      textAlign: "left", padding: "14px 16px", borderRadius: 10,
+                      border: `2px solid ${active ? t.gold : t.border}`,
+                      background: active ? "rgba(200,169,110,0.08)" : "transparent",
+                      color: t.text, cursor: "pointer", fontFamily: "inherit",
+                      display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 17, fontWeight: 800 }}>Room {r.room_number}</div>
+                      <div style={{ fontSize: 13, color: t.muted, marginTop: 2 }}>{r.room_type}</div>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: t.gold, fontVariantNumeric: "tabular-nums" }}>{fmtN(r.price)}</div>
+                      <div style={{ fontSize: 12, color: t.muted }}>per night</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "14px 20px", borderTop: `1px solid ${t.border}`, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
+          <label>
+            <div style={{ fontSize: 11, color: t.muted, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: 6 }}>Nights</div>
+            <input
+              type="number"
+              min={1}
+              max={365}
+              value={nights}
+              onChange={(e) => setNights(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: `1px solid ${t.border}`, background: t.input, color: t.text, fontSize: 15, fontFamily: "inherit", boxSizing: "border-box" }}
+            />
+          </label>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: t.muted, textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700 }}>Room charge</div>
+            <div style={{ fontSize: 24, fontWeight: 800, color: t.gold, fontVariantNumeric: "tabular-nums" }}>{fmtN(total)}</div>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ padding: "10px 24px", color: "#ef4444", fontSize: 13, borderTop: `1px solid ${t.border}` }}>{error}</div>
+        )}
+
+        <div style={{ padding: "14px 20px", borderTop: `1px solid ${t.border}`, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} disabled={submitting} style={{ padding: "11px 18px", borderRadius: 10, border: `1px solid ${t.border}`, background: "transparent", color: t.muted, fontSize: 14, fontWeight: 700, cursor: submitting ? "default" : "pointer", fontFamily: "inherit" }}>
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!selected || submitting}
+            style={{ padding: "11px 22px", borderRadius: 10, border: "none", background: !selected || submitting ? t.border : t.gold, color: !selected || submitting ? t.muted : t.onGold, fontSize: 14, fontWeight: 800, cursor: !selected || submitting ? "not-allowed" : "pointer", fontFamily: "inherit" }}
+          >
+            {submitting ? "Adding…" : "Add Room →"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PaidRoomCard({ booking, t }) {
   const roomNumber = booking.room_number || booking.guest_rooms?.room_number || "—";
   const guestName = booking.guest_name || "Guest";
@@ -2737,7 +2949,7 @@ function PaidRoomCard({ booking, t }) {
   );
 }
 
-function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, onConfirm, onComplete, onPayment, otherTableOrders }) {
+function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, onConfirm, onComplete, onPayment, otherTableOrders, guesthouseRooms, promptGuesthousePin, onRoomAdded }) {
   const _baseCfg = STATUS_CFG[order.order_status] ?? { label: order.order_status, color: "#6b7280" };
   const statusCfg = (order.order_status === "new" && (order.order_type === "pickup" || order.order_type === "delivery"))
     ? { ..._baseCfg, label: "Awaiting confirmation" }
@@ -2749,6 +2961,7 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
   const [mergedIds, setMergedIds] = useState(() => new Set());
   const [showMerge, setShowMerge] = useState(false);
   const [showAddItems, setShowAddItems] = useState(false);
+  const [showAddRoom, setShowAddRoom] = useState(false);
   const [showEditOrder, setShowEditOrder] = useState(false);
   const [showDiscount, setShowDiscount] = useState(false);
   const [printStatus, setPrintStatus] = useState(null);
@@ -2951,6 +3164,20 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
                 <Plus size={15} /> Add Items to Table {order.table_number}
               </button>
             )}
+            {canAddItems && (
+              <button
+                onClick={() => setShowAddRoom(true)}
+                style={{
+                  width: "100%", padding: "11px 16px", borderRadius: 10,
+                  border: `1.5px dashed ${t.gold}`, background: "transparent",
+                  color: t.gold, fontSize: 14, fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  fontFamily: "inherit",
+                }}
+              >
+                <BedDouble size={15} /> Add Room to Bill
+              </button>
+            )}
             {canAddItems && items.length > 0 && (
               <button
                 onClick={() => setShowEditOrder(true)}
@@ -3011,6 +3238,16 @@ function OrderCard({ order, t, now, completion, flashing, readyFlashing, busy, o
           t={t}
           staffName={staffName}
           onClose={() => setShowAddItems(false)}
+        />
+      )}
+      {showAddRoom && (
+        <AddRoomModal
+          order={order}
+          t={t}
+          rooms={guesthouseRooms}
+          promptGuesthousePin={promptGuesthousePin}
+          onClose={() => setShowAddRoom(false)}
+          onDone={() => { setShowAddRoom(false); onRoomAdded && onRoomAdded(); }}
         />
       )}
       {showEditOrder && (
@@ -3500,6 +3737,44 @@ function BarDeskCard({ order, t, now, busy, onUpdate }) {
   );
 }
 
+function PrintCheckInButton({ room, booking, t }) {
+  const [status, setStatus] = useState(null);
+  async function handlePrint() {
+    setStatus('printing');
+    const html = applyPrintStyle(buildCheckInReceiptHtml(booking, room));
+    try {
+      if (window.electronAPI) {
+        const result = await window.electronAPI.printReceipt(html);
+        setStatus(result.success ? 'ok' : 'error');
+      } else {
+        const w = window.open('', '_blank');
+        if (w) {
+          w.document.write(html);
+          w.document.close();
+          w.focus();
+          try { w.print(); } catch {}
+          setStatus('ok');
+        } else {
+          setStatus('error');
+        }
+      }
+    } catch {
+      setStatus('error');
+    }
+    setTimeout(() => setStatus(null), 3000);
+  }
+  const label = status === 'printing' ? 'Printing…' : status === 'ok' ? 'Sent' : status === 'error' ? 'Retry' : 'Print';
+  return (
+    <button
+      onClick={handlePrint}
+      disabled={status === 'printing'}
+      style={{ flex: 1, minWidth: 120, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 14px", borderRadius: 8, border: `1px solid ${status === 'error' ? t.accent : t.gold}`, background: "transparent", color: status === 'error' ? t.accent : t.gold, fontWeight: 700, cursor: status === 'printing' ? "default" : "pointer", opacity: status === 'printing' ? 0.6 : 1, fontFamily: "inherit", fontSize: 14 }}
+    >
+      <Printer size={16} /> {label}
+    </button>
+  );
+}
+
 function GuestHouseView({ t, rooms, loaded, error, actionIds, onCheckIn, onCheckOut, onEncodeKey, onMarkPaid, onRefresh }) {
   const [checkInRoom, setCheckInRoom] = useState(null);
   const [tab, setTab] = useState("rooms");
@@ -3609,6 +3884,7 @@ function GuestHouseView({ t, rooms, loaded, error, actionIds, onCheckIn, onCheck
                     >
                       <KeyRound size={16} /> Encode key
                     </button>
+                    <PrintCheckInButton room={room} booking={b} t={t} />
                     {b.payment_status !== "paid" ? (
                       <button
                         onClick={() => onMarkPaid(room, "cash")}
