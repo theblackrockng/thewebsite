@@ -47,6 +47,8 @@ function aggregateEod(completedOrders, menuCategoryMap) {
     'Grill Kitchen': new Map(),
     'Drinks': new Map(),
   };
+  const discounts = [];
+  let totalDiscount = 0;
   for (const order of paidOrders) {
     for (const item of (order.order_items || [])) {
       if (item.voided) continue;
@@ -66,6 +68,16 @@ function aggregateEod(completedOrders, menuCategoryMap) {
           total: Number(item.line_total) || 0,
         });
       }
+    }
+    const amt = Number(order.discount_amount) || 0;
+    if (amt > 0) {
+      totalDiscount += amt;
+      discounts.push({
+        ref: order.order_number || (order.table_number ? `Table ${order.table_number}` : (order.id ? String(order.id).slice(0, 8) : '')),
+        amount: amt,
+        by: order.discount_by_name || null,
+        reason: order.discount_reason || null,
+      });
     }
   }
   const voidedAgg = new Map();
@@ -89,7 +101,7 @@ function aggregateEod(completedOrders, menuCategoryMap) {
       }
     }
   }
-  return { sectionAgg, voidedAgg, paidOrderCount: paidOrders.length };
+  return { sectionAgg, voidedAgg, discounts, totalDiscount, paidOrderCount: paidOrders.length };
 }
 
 function dateHeader(reportDate) {
@@ -103,7 +115,7 @@ function dateHeader(reportDate) {
 // 'all' includes Drinks + Guest House + Grand Total; 'kitchen' omits them.
 function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, reportDate) {
   const kitchenOnly = mode === 'kitchen';
-  const { sectionAgg, voidedAgg, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
+  const { sectionAgg, voidedAgg, discounts, totalDiscount, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
   const dateStr = dateHeader(reportDate);
 
   const styles = {
@@ -186,11 +198,30 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
 </table>`;
   }
 
+  function discountsBlock() {
+    if (!discounts || discounts.length === 0) return '';
+    let body = '';
+    for (const d of discounts) {
+      const meta = [d.by ? `by ${d.by}` : '', d.reason].filter(Boolean).join(' · ');
+      const label = `${esc(d.ref || 'Order')}${meta ? ` <span style="color:#7a6f60;font-size:12px">(${esc(meta)})</span>` : ''}`;
+      body += `<tr><td style="${styles.td}">${label}</td><td style="${styles.tdR}">- ${esc(fmtNaira(d.amount))}</td></tr>`;
+    }
+    return `
+<div style="${styles.secH}">Discounts Given</div>
+<table style="${styles.tbl}">
+  <thead><tr><th style="${styles.th}">Order</th><th style="${styles.thR}">Amount Off</th></tr></thead>
+  <tbody>${body}
+    <tr><td style="${styles.sub1}">Total Discounts</td><td style="${styles.sub1R}">- ${esc(fmtNaira(totalDiscount))}</td></tr>
+  </tbody>
+</table>`;
+  }
+
   const mainKitchen  = sectionBlock('Main Kitchen', sectionAgg['Main Kitchen']);
   const grillKitchen = sectionBlock('Grill Kitchen', sectionAgg['Grill Kitchen']);
   const drinks       = kitchenOnly ? '' : sectionBlock('Drinks', sectionAgg['Drinks']);
   const guesthouse   = kitchenOnly ? '' : guesthouseBlock(bookings);
   const voided       = voidedBlock(voidedAgg);
+  const discountsHtml = kitchenOnly ? '' : discountsBlock();
 
   const foodTotal =
     [...sectionAgg['Main Kitchen'].values()].reduce((s, r) => s + r.total, 0)
@@ -199,13 +230,17 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
   const guesthousePaidTotal = (bookings || [])
     .filter((b) => b.payment_status === 'paid')
     .reduce((s, b) => s + Number(b.total_amount || 0), 0);
-  const grandTotal = foodTotal + (kitchenOnly ? 0 : drinkTotal + guesthousePaidTotal);
+  const gross = foodTotal + (kitchenOnly ? 0 : drinkTotal + guesthousePaidTotal);
+  const discountForTotal = kitchenOnly ? 0 : totalDiscount;
+  const grandTotal = Math.max(0, gross - discountForTotal);
 
-  const anyContent = mainKitchen || grillKitchen || drinks || guesthouse || voided;
+  const anyContent = mainKitchen || grillKitchen || drinks || guesthouse || voided || discountsHtml;
   const emptyBlock = anyContent ? '' : `<div style="${styles.empty}">No activity on this date.</div>`;
 
   const grandBlock = kitchenOnly ? '' : `
 <table style="${styles.tbl}">
+  ${discountForTotal > 0 ? `<tr><td style="${styles.sub1}">Gross (before discounts)</td><td style="${styles.sub1R}">${esc(fmtNaira(gross))}</td></tr>
+  <tr><td style="${styles.sub1}">Discounts Applied</td><td style="${styles.sub1R}">- ${esc(fmtNaira(discountForTotal))}</td></tr>` : ''}
   <tr><td style="${styles.grand}">Grand Total</td><td style="${styles.grandR}">${esc(fmtNaira(grandTotal))}</td></tr>
 </table>
 <div style="${styles.foot}">${esc(String(paidOrderCount))} completed order${paidOrderCount !== 1 ? 's' : ''} included</div>`;
@@ -220,7 +255,7 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
   <div style="${styles.card}">
     <h1 style="${styles.h1}">BLACKROCK</h1>
     <p style="${styles.sub}">${esc(title)} &middot; ${esc(dateStr)}</p>
-    ${mainKitchen}${grillKitchen}${drinks}${guesthouse}${voided}${emptyBlock}${grandBlock}
+    ${mainKitchen}${grillKitchen}${drinks}${guesthouse}${discountsHtml}${voided}${emptyBlock}${grandBlock}
   </div>
   <div style="${styles.foot}">Automated by the 6am EOD cron. Manage recipients in the admin console.</div>
 </div>
@@ -232,7 +267,7 @@ function buildEodEmailHtml(completedOrders, menuCategoryMap, bookings, mode, rep
 // House/Grand Total so the kitchen only sees what it cooked.
 function buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDate) {
   const kitchenOnly = mode === 'kitchen';
-  const { sectionAgg, voidedAgg, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
+  const { sectionAgg, voidedAgg, discounts, totalDiscount, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
   const dateStr = dateHeader(reportDate);
 
   function section(title, agg) {
@@ -278,11 +313,23 @@ function buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDa
     return body;
   }
 
+  function discountsText() {
+    if (!discounts || discounts.length === 0) return '';
+    let body = `\n<b>Discounts Given</b>`;
+    for (const d of discounts) {
+      const meta = [d.by ? `by ${d.by}` : '', d.reason].filter(Boolean).join(' · ');
+      body += `\n  ${esc(d.ref || 'Order')}${meta ? ` (${esc(meta)})` : ''}: -${esc(fmtNaira(d.amount))}`;
+    }
+    body += `\n  <i>Total discounts: -${esc(fmtNaira(totalDiscount))}</i>`;
+    return body;
+  }
+
   const mainKitchen  = section('Main Kitchen',  sectionAgg['Main Kitchen']);
   const grillKitchen = section('Grill Kitchen', sectionAgg['Grill Kitchen']);
   const drinks       = kitchenOnly ? '' : section('Drinks', sectionAgg['Drinks']);
   const guesthouse   = kitchenOnly ? '' : guesthouseBlock(bookings);
   const voided       = voidedBlock(voidedAgg);
+  const discountsBlk = kitchenOnly ? '' : discountsText();
 
   const foodTotal =
     [...sectionAgg['Main Kitchen'].values()].reduce((s, r) => s + r.total, 0)
@@ -291,13 +338,18 @@ function buildEodText(completedOrders, menuCategoryMap, bookings, mode, reportDa
   const guesthousePaidTotal = (bookings || [])
     .filter((b) => b.payment_status === 'paid')
     .reduce((s, b) => s + Number(b.total_amount || 0), 0);
-  const grandTotal = foodTotal + (kitchenOnly ? 0 : drinkTotal + guesthousePaidTotal);
+  const gross = foodTotal + (kitchenOnly ? 0 : drinkTotal + guesthousePaidTotal);
+  const discountForTotal = kitchenOnly ? 0 : totalDiscount;
+  const grandTotal = Math.max(0, gross - discountForTotal);
 
-  const anyContent = mainKitchen || grillKitchen || drinks || guesthouse || voided;
+  const anyContent = mainKitchen || grillKitchen || drinks || guesthouse || voided || discountsBlk;
   const body = anyContent
-    ? `${mainKitchen}${grillKitchen}${drinks}${guesthouse}${voided}`
+    ? `${mainKitchen}${grillKitchen}${drinks}${guesthouse}${discountsBlk}${voided}`
     : `\n<i>No activity on this date.</i>`;
-  const totalBlock = kitchenOnly ? '' : `\n\n<b>Grand Total: ${esc(fmtNaira(grandTotal))}</b>\n<i>${paidOrderCount} completed order${paidOrderCount !== 1 ? 's' : ''}</i>`;
+  const grossLine = discountForTotal > 0
+    ? `\n<i>Gross: ${esc(fmtNaira(gross))} · Discounts: -${esc(fmtNaira(discountForTotal))}</i>`
+    : '';
+  const totalBlock = kitchenOnly ? '' : `\n${grossLine}\n<b>Grand Total: ${esc(fmtNaira(grandTotal))}</b>\n<i>${paidOrderCount} completed order${paidOrderCount !== 1 ? 's' : ''}</i>`;
 
   const title = kitchenOnly ? 'Kitchen End of Day' : 'End of Day Report';
   return `<b>BLACKROCK — ${esc(title)}</b>\n${esc(dateStr)}\n${body}${totalBlock}`;
@@ -338,13 +390,13 @@ function buildEodMonthlyDigestHtml(archives, menuCategoryMap) {
   }
 
   const days = [];
-  let grandFood = 0, grandDrinks = 0, grandGuest = 0, grandOrders = 0, grandBookings = 0;
+  let grandFood = 0, grandDrinks = 0, grandGuest = 0, grandDiscount = 0, grandOrders = 0, grandBookings = 0;
 
   for (const a of (archives || [])) {
     const snap = a.snapshot || {};
     const completedOrders = snap.completedOrders || [];
     const bookings = snap.bookings || [];
-    const { sectionAgg, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
+    const { sectionAgg, totalDiscount, paidOrderCount } = aggregateEod(completedOrders, menuCategoryMap);
 
     const main  = [...sectionAgg['Main Kitchen'].values()].reduce((s, r) => s + r.total, 0);
     const grill = [...sectionAgg['Grill Kitchen'].values()].reduce((s, r) => s + r.total, 0);
@@ -353,11 +405,13 @@ function buildEodMonthlyDigestHtml(archives, menuCategoryMap) {
       .filter((b) => b.payment_status === 'paid')
       .reduce((s, b) => s + Number(b.total_amount || 0), 0);
     const foodTotal = main + grill;
-    const dayTotal = foodTotal + drinks + guestPaid;
+    const dayDiscount = Number(totalDiscount) || 0;
+    const dayTotal = Math.max(0, foodTotal + drinks + guestPaid - dayDiscount);
 
     grandFood += foodTotal;
     grandDrinks += drinks;
     grandGuest += guestPaid;
+    grandDiscount += dayDiscount;
     grandOrders += paidOrderCount;
     grandBookings += bookings.length;
 
@@ -365,7 +419,7 @@ function buildEodMonthlyDigestHtml(archives, menuCategoryMap) {
     days.push({
       report_date: a.report_date,
       label: dayLabel(a.report_date),
-      foodTotal, drinks, guestPaid, dayTotal, paidOrderCount, bookingCount: bookings.length, quiet,
+      foodTotal, drinks, guestPaid, discount: dayDiscount, dayTotal, paidOrderCount, bookingCount: bookings.length, quiet,
     });
   }
 
@@ -374,7 +428,7 @@ function buildEodMonthlyDigestHtml(archives, menuCategoryMap) {
   const rangeLabel = (first && last)
     ? `${dayLabel(first)} — ${dayLabel(last)}`
     : (first || 'No archives');
-  const grandTotal = grandFood + grandDrinks + grandGuest;
+  const grandTotal = Math.max(0, grandFood + grandDrinks + grandGuest - grandDiscount);
 
   const overview = `
 <div style="${styles.overH}">30-Day Summary</div>
@@ -385,6 +439,7 @@ function buildEodMonthlyDigestHtml(archives, menuCategoryMap) {
   <tr><td style="${styles.overTd}">Food subtotal</td><td style="${styles.overTdR}">${esc(fmtNaira(grandFood))}</td></tr>
   <tr><td style="${styles.overTd}">Drinks subtotal</td><td style="${styles.overTdR}">${esc(fmtNaira(grandDrinks))}</td></tr>
   <tr><td style="${styles.overTd}">Guest House (paid)</td><td style="${styles.overTdR}">${esc(fmtNaira(grandGuest))}</td></tr>
+  ${grandDiscount > 0 ? `<tr><td style="${styles.overTd}">Discounts applied</td><td style="${styles.overTdR}">- ${esc(fmtNaira(grandDiscount))}</td></tr>` : ''}
   <tr><td style="${styles.overTd};font-weight:800;font-size:14px">Grand total</td><td style="${styles.overTdR};font-size:15px">${esc(fmtNaira(grandTotal))}</td></tr>
 </table>`;
 
@@ -405,6 +460,7 @@ function buildEodMonthlyDigestHtml(archives, menuCategoryMap) {
     <tr><td style="${styles.td}">Food (Main + Grill)</td><td style="${styles.tdR}">${esc(fmtNaira(d.foodTotal))}</td></tr>
     <tr><td style="${styles.td}">Drinks</td><td style="${styles.tdR}">${esc(fmtNaira(d.drinks))}</td></tr>
     <tr><td style="${styles.td}">Guest House (paid)</td><td style="${styles.tdR}">${esc(fmtNaira(d.guestPaid))}</td></tr>
+    ${d.discount > 0 ? `<tr><td style="${styles.td}">Discounts applied</td><td style="${styles.tdR}">- ${esc(fmtNaira(d.discount))}</td></tr>` : ''}
     <tr><td style="${styles.dayTot}">Day total</td><td style="${styles.dayTotR}">${esc(fmtNaira(d.dayTotal))}</td></tr>
   </tbody>
 </table>`;
