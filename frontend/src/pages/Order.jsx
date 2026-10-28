@@ -18,7 +18,7 @@ const SOUPS = [
   "Oha/Bitterleaf Soup",
 ];
 
-const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo", "Poundo"];
+const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo", "Poundo", "White Rice"];
 
 const SIDES = [
   { name: "White Rice", price: 5000 },

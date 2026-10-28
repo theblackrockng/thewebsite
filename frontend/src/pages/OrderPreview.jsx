@@ -35,7 +35,7 @@ export const SOUPS = [
   "Oha/Bitterleaf Soup",
 ];
 
-export const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo", "Poundo"];
+export const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo", "Poundo", "White Rice"];
 export const SIDES = [
   { name: "White Rice", price: 5000 },
   { name: "Yam Fries", price: 3000 },
