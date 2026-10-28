@@ -29,7 +29,9 @@ const SOUPS = [
   "Oha/Bitterleaf Soup",
 ];
 const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo", "Poundo", "White Rice"];
-const SIDES = [
+// Fallback used only if the sides table fetch fails. Normally sides come
+// from the console-managed `sides` table at mount.
+const SIDES_FALLBACK = [
   { name: "White Rice", price: 5000 },
   { name: "Yam Fries", price: 3000 },
   { name: "Potato Fries", price: 3000 },
@@ -188,6 +190,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
   const [soupModal, setSoupModal] = useState(null);
   const [traditionalModal, setTraditionalModal] = useState(null);
   const [sideModal, setSideModal] = useState(null);
+  const [sidesData, setSidesData] = useState(SIDES_FALLBACK);
   const [buffetModal, setBuffetModal] = useState(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [doneOrder, setDoneOrder] = useState(null);
@@ -228,6 +231,18 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
   useEffect(() => {
     supabase.from("site_content").select("data").eq("section", "menu-category-images").maybeSingle()
       .then(({ data }) => { if (data?.data) setDbCategoryImages(data.data); });
+  }, []);
+
+  useEffect(() => {
+    async function fetchSides() {
+      const { data, error } = await supabase
+        .from("sides")
+        .select("name, price, sort_order")
+        .eq("active", true)
+        .order("sort_order", { ascending: true });
+      if (!error && Array.isArray(data) && data.length > 0) setSidesData(data);
+    }
+    fetchSides();
   }, []);
 
   useEffect(() => {
@@ -713,9 +728,9 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
                     renderDish={(dish, idx, chunk) => {
                       const isNational    = cat === "National Dishes";
                       const isTraditional = cat === "Traditional Specials";
-                      const isGrill       = cat === "Charcoal Grills" || cat === "Continental" || cat === "Bush Bar Kitchen";
+                      const hasSides      = dish.has_sides === true;
                       const isBuffet      = cat === "Buffet";
-                      const needsPicker   = isNational || isTraditional || isGrill || isBuffet;
+                      const needsPicker   = isNational || isTraditional || hasSides || isBuffet;
                       const cartItem      = needsPicker ? null : getCartItem(dish.id);
                       const natItems      = needsPicker ? getNationalCartItems(dish.id) : null;
                       const natQty        = natItems ? natItems.reduce((s, i) => s + i.qty, 0) : 0;
@@ -740,10 +755,10 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
                                 <WoQtyControl
                                   qty={natQty}
                                   onDec={() => removeLastVariant(dish.id)}
-                                  onInc={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : isBuffet ? setBuffetModal(dish) : setSideModal(dish)}
+                                  onInc={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : isBuffet ? setBuffetModal(dish) : hasSides ? setSideModal(dish) : null}
                                 />
                               ) : (
-                                <WoCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : isBuffet ? setBuffetModal(dish) : setSideModal(dish)} />
+                                <WoCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : isBuffet ? setBuffetModal(dish) : hasSides ? setSideModal(dish) : null} />
                               )
                             ) : cartItem ? (
                               <WoQtyControl
@@ -816,6 +831,7 @@ export default function WaiterOrder({ waiterName, onSwitchWaiter }) {
       {sideModal && (
         <WaiterSidePickerModal
           dish={sideModal}
+          sides={sidesData}
           onClose={() => setSideModal(null)}
           onConfirm={(side, sidePrice) => {
             const cartId = side ? `${sideModal.id}|${side}` : sideModal.id;
@@ -996,9 +1012,9 @@ function WaiterPickerModal({ dish, showSoup = true, onClose, onConfirm }) {
 }
 
 /* ── Side picker modal ──────────────────────────────────────────────── */
-function WaiterSidePickerModal({ dish, onClose, onConfirm }) {
+function WaiterSidePickerModal({ dish, sides = SIDES_FALLBACK, onClose, onConfirm }) {
   const [choice, setChoice] = useState("none");
-  const picked = choice === "none" ? null : SIDES.find(s => s.name === choice);
+  const picked = choice === "none" ? null : sides.find(s => s.name === choice);
   const sidePrice = picked ? picked.price : 0;
   const totalPrice = Number(dish.price || 0) + sidePrice;
   const row = (active) => ({
@@ -1023,7 +1039,7 @@ function WaiterSidePickerModal({ dish, onClose, onConfirm }) {
               <span>No side</span>
               <span style={{ fontSize: 12, color: choice === "none" ? "#0f0d0a" : "#9C8E7A" }}>—</span>
             </button>
-            {SIDES.map((s) => (
+            {sides.map((s) => (
               <button key={s.name} onClick={() => setChoice(s.name)} style={row(choice === s.name)}>
                 <span>{s.name}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: choice === s.name ? "#0f0d0a" : "#c8a96e" }}>+₦{s.price.toLocaleString("en-NG")}</span>

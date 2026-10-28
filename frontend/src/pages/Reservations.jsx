@@ -232,6 +232,7 @@ export default function Reservations() {
   const [soupModal, setSoupModal] = useState(null);
   const [traditionalModal, setTraditionalModal] = useState(null);
   const [sideModal, setSideModal] = useState(null);
+  const [sidesData, setSidesData] = useState(SIDES);
   const [payStep, setPayStep] = useState(null); // null | 'choice' | 'bank' | 'done'
   const [payChoice, setPayChoice] = useState(null); // null | 'deposit_70' | 'pay_full' | 'preference_only'
 
@@ -245,7 +246,7 @@ export default function Reservations() {
     setMenuLoading(true);
     supabase
       .from("menu_items")
-      .select("id, name, description, price, category")
+      .select("id, name, description, price, category, has_sides")
       .eq("available", true)
       .order("name")
       .then(({ data, error }) => {
@@ -257,6 +258,17 @@ export default function Reservations() {
         setMenuLoading(false);
       });
   }, [step, menuItems.length]);
+
+  useEffect(() => {
+    supabase
+      .from("sides")
+      .select("name, price, sort_order")
+      .eq("active", true)
+      .order("sort_order", { ascending: true })
+      .then(({ data, error }) => {
+        if (!error && Array.isArray(data) && data.length > 0) setSidesData(data);
+      });
+  }, []);
 
   const selectedOcc = OCCASIONS.find((o) => o.id === occasion);
   const isConcierge = selectedOcc?.concierge;
@@ -905,8 +917,6 @@ export default function Reservations() {
                           const imgSrc = MEAL_CATEGORY_IMAGES[activeCatFinal];
                           const isNational    = activeCatFinal === "National Dishes";
                           const isTraditional = activeCatFinal === "Traditional Specials";
-                          const isGrill       = activeCatFinal === "Charcoal Grills" || activeCatFinal === "Continental" || activeCatFinal === "Bush Bar Kitchen";
-                          const needsPicker   = isNational || isTraditional || isGrill;
 
                           return (
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32, alignItems: "start" }}>
@@ -921,6 +931,8 @@ export default function Reservations() {
                                   renderDish={(dish) => {
                                     const cartEntries = mealCart.filter((i) => i.id === dish.id);
                                     const totalQty = cartEntries.reduce((s, i) => s + i.qty, 0);
+                                    const hasSides = dish.has_sides === true;
+                                    const needsPicker = isNational || isTraditional || hasSides;
 
                                     return (
                                       <div
@@ -947,10 +959,10 @@ export default function Reservations() {
                                               <ResQtyControl
                                                 qty={totalQty}
                                                 onDec={() => removeLastVariant(dish.id)}
-                                                onInc={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : setSideModal(dish)}
+                                                onInc={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : hasSides ? setSideModal(dish) : null}
                                               />
                                             ) : (
-                                              <ResCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : setSideModal(dish)} />
+                                              <ResCircleAddBtn onClick={() => isNational ? setSoupModal(dish) : isTraditional ? setTraditionalModal(dish) : hasSides ? setSideModal(dish) : null} />
                                             )
                                           ) : totalQty > 0 ? (
                                             <ResQtyControl
@@ -1217,6 +1229,7 @@ export default function Reservations() {
                 {sideModal && (
                   <SidePickerModal
                     dish={sideModal}
+                    sides={sidesData}
                     onClose={() => setSideModal(null)}
                     onConfirm={(side, sidePrice) => {
                       const key = side ? `${sideModal.id}|${side}` : sideModal.id;

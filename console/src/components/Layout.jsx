@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useMatch } from "react-router-dom";
 import {
   LayoutGrid, CalendarDays, MessageSquare, UtensilsCrossed,
   Image, FileEdit, Users, UserCircle, Settings, Home, Search,
-  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop, QrCode, TrendingUp, Mail, BedDouble,
+  Bell, Sun, Moon, LogOut, Menu, X, Shield, ShieldAlert, Layers, BookUser, BookOpen, ShoppingBag, GalleryHorizontal, LayoutPanelTop, QrCode, TrendingUp, Mail, BedDouble, Salad,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabase";
@@ -37,7 +37,7 @@ function useCurrentPage() {
     "/users": "Staff Management", "/content-hub": "Content Hub",
     "/settings": "Settings", "/blog": "Blog", "/security": "Security Log",
     "/profile": "My Profile", "/eod-recipients": "EOD Recipients",
-    "/guesthouse": "Guest House",
+    "/guesthouse": "Guest House", "/sides": "Sides",
   };
   if (pathname.startsWith("/profile/")) return "Staff Profile";
   return map[pathname] ?? "Console";
@@ -60,6 +60,7 @@ const NAV_GROUPS = [
     label: "Content",
     items: [
       { to: "/menu",         label: "Menu Management", icon: UtensilsCrossed },
+      { to: "/sides",        label: "Sides",           icon: Salad, managerOrAbove: true },
       { to: "/media",        label: "Media Library",   icon: Image },
       { to: "/images",       label: "Website Images",  icon: LayoutPanelTop },
       { to: "/gallery",      label: "Gallery",         icon: GalleryHorizontal },

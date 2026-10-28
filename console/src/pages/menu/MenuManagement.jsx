@@ -114,6 +114,7 @@ const CATEGORIES = [
   "Starters", "Salads", "Rice", "Pasta",
   "Bush Bar Kitchen", "Continental", "Sauces",
   "Charcoal Grills", "National Dishes", "Traditional Specials",
+  "BLACKROCK EXPERIENCE", "Buffet", "Packaging", "Protein Section",
 ];
 
 const DRINK_CATEGORIES = [
@@ -466,6 +467,7 @@ function EditPanel({ dish, onClose, onSaved, defaultMenuType = "food", foodCateg
     price: dish?.price ?? "",
     description: dish?.description ?? "",
     available: dish?.available ?? true,
+    has_sides: dish?.has_sides ?? false,
     image_url: dish?.image_url ?? "",
   });
   const [customCategory, setCustomCategory] = useState("");
@@ -506,6 +508,7 @@ function EditPanel({ dish, onClose, onSaved, defaultMenuType = "food", foodCateg
         price: parseFloat(String(form.price).replace(/,/g, "")),
         description: form.description.trim(),
         available: form.available,
+        has_sides: form.menu_type === "food" ? !!form.has_sides : false,
         image_url: imageUrl || null,
       };
       if (isNew) {
@@ -634,6 +637,31 @@ function EditPanel({ dish, onClose, onSaved, defaultMenuType = "food", foodCateg
                 }} />
               </button>
             </div>
+            {/* Has sides (food only) */}
+            {form.menu_type === "food" && (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <label style={{ ...LABEL_STYLE, marginBottom: 0 }}>Has sides</label>
+                  <button
+                    onClick={() => set("has_sides", !form.has_sides)}
+                    style={{
+                      width: 44, height: 24, borderRadius: 99, border: "none", cursor: "pointer", position: "relative",
+                      background: form.has_sides ? "var(--ds-gold)" : "var(--ds-border)",
+                      transition: "background 0.2s",
+                    }}
+                  >
+                    <span style={{
+                      position: "absolute", top: 3, left: form.has_sides ? 23 : 3, width: 18, height: 18,
+                      borderRadius: "50%", background: form.has_sides ? "#1a1a1a" : "var(--ds-muted)",
+                      transition: "left 0.2s",
+                    }} />
+                  </button>
+                </div>
+                <p style={{ fontSize: 11, color: "var(--ds-muted)", margin: "4px 0 0", lineHeight: 1.4 }}>
+                  When on, the waiter sees the side picker (White Rice, Yam Fries, etc.) after this dish is added. Manage the side list from <strong>Content → Sides</strong>.
+                </p>
+              </div>
+            )}
             {/* Image */}
             <div>
               <label style={LABEL_STYLE}>Image</label>

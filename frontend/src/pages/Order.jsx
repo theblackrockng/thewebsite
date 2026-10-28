@@ -20,7 +20,9 @@ const SOUPS = [
 
 const SWALLOWS = ["Pounded Yam", "Eba", "Amala", "Fufu", "Wheat", "Semo", "Poundo", "White Rice"];
 
-const SIDES = [
+// Fallback used only if the sides table fetch fails. Normally sides come
+// from the console-managed `sides` table at mount — see `useEffect` below.
+const SIDES_FALLBACK = [
   { name: "White Rice", price: 5000 },
   { name: "Yam Fries", price: 3000 },
   { name: "Potato Fries", price: 3000 },
@@ -52,7 +54,8 @@ export default function Order() {
   const [activeDrinkCat, setActiveDrinkCat] = useState(DRINK_CATEGORY_ORDER[0]);
   const [soupModal, setSoupModal] = useState(null); // dish object when open
   const [traditionalModal, setTraditionalModal] = useState(null); // swallow-only picker
-  const [sideModal, setSideModal] = useState(null); // side picker for grills/continental
+  const [sideModal, setSideModal] = useState(null); // side picker for dishes flagged has_sides
+  const [sidesData, setSidesData] = useState(SIDES_FALLBACK);
 
   const [placing, setPlacing] = useState(false);
   const [orderConfirmed, setOrderConfirmed] = useState(null);
@@ -146,6 +149,18 @@ export default function Order() {
       }
     }
     fetchMenu();
+  }, []);
+
+  useEffect(() => {
+    async function fetchSides() {
+      const { data, error } = await supabase
+        .from("sides")
+        .select("name, price, sort_order")
+        .eq("active", true)
+        .order("sort_order", { ascending: true });
+      if (!error && Array.isArray(data) && data.length > 0) setSidesData(data);
+    }
+    fetchSides();
   }, []);
 
   // Derived values for active menu type
@@ -369,8 +384,8 @@ export default function Order() {
                 {foodData[cat].map((dish) => {
                   const isNational = cat === "National Dishes";
                   const isTraditional = cat === "Traditional Specials";
-                  const isGrill = cat === "Charcoal Grills" || cat === "Continental" || cat === "Bush Bar Kitchen";
-                  const needsPicker = isNational || isTraditional || isGrill;
+                  const hasSides = dish.has_sides === true;
+                  const needsPicker = isNational || isTraditional || hasSides;
                   return (
                     <DishCard
                       key={dish.id}
@@ -380,7 +395,7 @@ export default function Order() {
                       onAdd={() => {
                         if (isNational) setSoupModal(dish);
                         else if (isTraditional) setTraditionalModal(dish);
-                        else if (isGrill) setSideModal(dish);
+                        else if (hasSides) setSideModal(dish);
                         else addItem({ id: dish.id, name: dish.name, price: dish.price, category: dish.category, menuType: "food", description: dish.description });
                       }}
                       onSetQty={(q) => setQty(dish.id, q)}
@@ -472,6 +487,7 @@ export default function Order() {
       {sideModal && (
         <SidePickerModal
           dish={sideModal}
+          sides={sidesData}
           onClose={() => setSideModal(null)}
           onConfirm={(side, sidePrice) => {
             const cartId = side ? `${sideModal.id}|${side}` : sideModal.id;
@@ -845,10 +861,10 @@ function DishCard({ dish, cartItem, nationalCartItems, onAdd, onSetQty, onRemove
   );
 }
 
-function SidePickerModal({ dish, onClose, onConfirm }) {
+function SidePickerModal({ dish, sides = SIDES_FALLBACK, onClose, onConfirm }) {
   const [choice, setChoice] = useState("none");
 
-  const picked = choice === "none" ? null : SIDES.find(s => s.name === choice);
+  const picked = choice === "none" ? null : sides.find(s => s.name === choice);
   const sidePrice = picked ? picked.price : 0;
   const totalPrice = Number(dish.price || 0) + sidePrice;
 
@@ -877,7 +893,7 @@ function SidePickerModal({ dish, onClose, onConfirm }) {
               <span>No side</span>
               <span style={{ fontSize: 12, color: choice === "none" ? "#0f0d0a" : "#9C8E7A" }}>—</span>
             </button>
-            {SIDES.map((s) => (
+            {sides.map((s) => (
               <button key={s.name} onClick={() => setChoice(s.name)} style={chip(choice === s.name)}>
                 <span>{s.name}</span>
                 <span style={{ fontSize: 12, fontWeight: 700, color: choice === s.name ? "#0f0d0a" : "#c8a96e" }}>+₦{s.price.toLocaleString("en-NG")}</span>

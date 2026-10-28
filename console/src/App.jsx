@@ -29,6 +29,7 @@ import Analytics from "./pages/analytics/Analytics";
 import Search from "./pages/search/Search";
 import EodRecipients from "./pages/eod/EodRecipients";
 import Guesthouse from "./pages/guesthouse/Guesthouse";
+import Sides from "./pages/sides/Sides";
 
 function NotSetUpScreen() {
   const { signOut } = useAuth();
@@ -160,6 +161,7 @@ function AppRoutes() {
       <Route path="/"            element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/reservations" element={<ProtectedRoute><Reservations /></ProtectedRoute>} />
       <Route path="/menu"        element={<ProtectedRoute><MenuManagement /></ProtectedRoute>} />
+      <Route path="/sides"       element={<ProtectedRoute><Sides /></ProtectedRoute>} />
       <Route path="/media"       element={<ProtectedRoute><MediaLibrary /></ProtectedRoute>} />
       <Route path="/content"     element={<ProtectedRoute><SiteContent /></ProtectedRoute>} />
       <Route path="/enquiries"   element={<ProtectedRoute><Enquiries /></ProtectedRoute>} />
